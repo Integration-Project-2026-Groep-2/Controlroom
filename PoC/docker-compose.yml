@@ -1,0 +1,35 @@
+﻿version: '3.8'
+services:
+  rabbitmq:
+    image: 'rabbitmq:3-management-alpine'
+    container_name: poc-rabbitmq
+    ports:
+      - '5672:5672'
+      - '15672:15672'
+    networks:
+      - controlroom-net
+  elasticsearch:
+    image: 'docker.elastic.co/elasticsearch/elasticsearch:8.12.2'
+    container_name: poc-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - '9200:9200'
+    networks:
+      - controlroom-net
+  kibana:
+    image: 'docker.elastic.co/kibana/kibana:8.12.2'
+    container_name: poc-kibana
+    environment:
+      - 'ELASTICSEARCH_HOSTS=http://elasticsearch:9200'
+    ports:
+      - '5601:5601'
+    depends_on:
+      - elasticsearch
+    networks:
+      - controlroom-net
+networks:
+  controlroom-net:
+    driver: bridge
