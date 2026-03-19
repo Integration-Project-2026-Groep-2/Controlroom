@@ -24,4 +24,5 @@ func Validate() error {
 			log.Printf("Invalid Heartbeat received")
 		}
 	}
+	return nil
 }

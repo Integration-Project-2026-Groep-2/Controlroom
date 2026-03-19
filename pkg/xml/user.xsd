@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+elementFormDefault="qualified">
+
+<xs:element name="User" type="UserType"/>
+
+<xs:complexType name="UserType">
+    <xs:sequence>
+        <xs:element name="id"          type="xs:string"/>
+        <xs:element name="type"        type="UserTypeEnum"/>
+        <xs:element name="organisatie" type="xs:string"/>
+        <xs:element name="datum"       type="xs:dateTime"/>
+    </xs:sequence>
+</xs:complexType>
+
+<xs:simpleType name="UserTypeEnum">
+    <xs:restriction base="xs:string">
+        <xs:enumeration value="mens"/>
+        <xs:enumeration value="organisatie"/>
+    </xs:restriction>
+</xs:simpleType>
+
+</xs:schema>
