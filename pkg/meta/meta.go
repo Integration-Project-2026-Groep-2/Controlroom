@@ -44,6 +44,13 @@ const (
 	TOKEN_QUESTION TokenType = '?'
 )
 
+type SequenceType int
+
+const ()
+
+type Sequence struct {
+}
+
 type Node struct {
 	Lexeme []byte
 	Next   *Node
@@ -51,7 +58,7 @@ type Node struct {
 	Last   *Node
 }
 
-type Tree struct {
+type AST struct {
 	Root    *Node
 	Current *Node
 }
@@ -59,8 +66,6 @@ type Tree struct {
 type Token struct {
 	Type   TokenType
 	Lexeme []byte
-	Line   int
-	Column int
 }
 
 type MetaLexer struct {
@@ -68,19 +73,15 @@ type MetaLexer struct {
 	Stream   []byte
 	Start    int
 	Current  int
-	Line     int
-	Column   int
 }
 
 type MetaError struct {
 	FileName string
 	Content  string
-	Line     int
-	Column   int
 }
 
 func (e *MetaError) Error() string {
-	return fmt.Sprintf("error in %s at line %d, column %d: %s", e.FileName, e.Line, e.Column)
+	return fmt.Sprintf("error in %s: %s", e.FileName, e.Content)
 }
 
 func IsXsd(fileName string) bool {
@@ -125,27 +126,59 @@ func Lex(content []byte) []Token {
 
 		case TOKEN_LANGLE:
 			{
-				if TokenType(content[i+1]) == TOKEN_QUESTION {
+				next := TokenType(content[i+1])
+				newLexeme := []byte{}
 
+				if next == TOKEN_QUESTION {
 					continue
+				} else {
+					for next != TOKEN_RANGLE && next != TOKEN_SLASH {
+
+						// break before reaching out of bounds
+						// TODO(nasr): write a general check that checks for EOF
+
+						if i+1 >= len(content) {
+							break
+						}
+
+						if TokenType(content[i]) == TOKEN_LANGLE {
+                       		i++
+						}
+						newLexeme = append(newLexeme, content[i])
+						i++
+						next = TokenType(content[i])
+					}
+					newToken := Token{
+						Type:   TOKEN_UNDEFINED,
+						Lexeme: newLexeme,
+					}
+					tokens = append(tokens, newToken)
 				}
 			}
 		case TOKEN_RANGLE:
-		case TOKEN_COLON:
-		case TOKEN_EQUALS:
 		case TOKEN_SLASH:
 			{
-				if TokenType(content[i+1]) == TOKEN_RANGLE {
+				if TokenType(content[i]) == TOKEN_RANGLE {
 
 					// TODO(nasr): end of a lexeme
 				}
 
 			}
 		case TOKEN_QUESTION:
+			{
+				continue
+
+			}
+
+		case TOKEN_COLON:
+		case TOKEN_EQUALS:
 
 		}
 
-		// TODO(nasr): match and append tokens
+	}
+
+	for _, tok := range tokens {
+		fmt.Println(string(tok.Lexeme))
 	}
 
 	return tokens
