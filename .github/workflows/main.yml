@@ -1,0 +1,21 @@
+name: C CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: My first action
+        env:
+          SERVER: ${{ secrets.SERVER }}
+          PORT_APM: ${{ secrets.PORT_APM }} 
+          PORT_ELASTICSEARCH:${{ secrets.PORT_ELASTICSEARCH }} 
+          PORT_KIBANA: ${{ secrets.PORT_KIBANA }} 
+          PORT_LOGSTASH: ${{ secrets.PORT_LOGSTASH }} 

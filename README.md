@@ -1,6 +1,6 @@
 # Control Room: PoC
 
-Welcome to the Control Room Proof of Concept (PoC). This repository contains the foundational architecture for receiving, processing, and visualizing event-driven data (Heartbeats and Users) from our various microservice teams (CRM, Facturatie, Kassa, etc.).
+Welcome to the Control Room. This repository contains the foundational architecture for receiving, processing, and visualizing event-driven data (Heartbeats and Users) from our various microservice teams (CRM, Facturatie, Kassa, etc.).
 
 This guide will walk you through spinning up the local infrastructure, running the Go microservices, and building your first real-time monitoring dashboards in Kibana.
 
