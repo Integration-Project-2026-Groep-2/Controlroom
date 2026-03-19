@@ -145,16 +145,13 @@ func Lex(content []byte) []Token {
 
 	for i := 0; i < len(content); i++ {
 
-		ch := content[i]
+		ch := TokenType(content[i])
 
-		if isWhiteSpace(ch) {
-			continue
-		}
-
-		switch TokenType(ch) {
+		switch ch {
 
 		case TOKEN_LANGLE:
 			{
+				i++
 				next := TokenType(content[i+1])
 				newLexeme := []byte{}
 
@@ -165,22 +162,17 @@ func Lex(content []byte) []Token {
 					// continue checking the line while the final thing isnt a slash or a rangle
 					for next != TOKEN_RANGLE && next != TOKEN_SLASH {
 
-						current := TokenType(content[i])
-
 						// break before reaching out of bounds
 						// TODO(nasr): write a general check that checks for EOF
 						if i+1 >= len(content) {
 							break
 						}
 
-						if current == TOKEN_LANGLE {
-							i++
-						}
-
 						newLexeme = append(newLexeme, content[i])
 						i++
 						next = TokenType(content[i])
 					}
+
 					newToken := Token{
 						Type:   TOKEN_UNDEFINED,
 						Lexeme: newLexeme,
@@ -208,10 +200,6 @@ func Lex(content []byte) []Token {
 
 		}
 
-	}
-
-	for _, tok := range tokens {
-		fmt.Println(string(tok.Lexeme))
 	}
 
 	return tokens

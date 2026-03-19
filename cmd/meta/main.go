@@ -46,7 +46,11 @@ func main() {
 			continue
 		}
 
-		meta.Lex(output)
+		tokens := meta.Lex(output)
+
+		for _, tok := range tokens {
+			fmt.Println(string(tok.Lexeme))
+		}
 	}
 
 }
