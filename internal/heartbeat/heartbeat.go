@@ -1,11 +1,16 @@
 package heartbeat
 
-// TODO(nasr): replace with own validation
-
 import (
 	"github.com/go-playground/validator/v10"
 	"encoding/xml"
 )
+
+
+type Heartbeat struct {
+	XMLName   xml.Name `xml:"Heartbeat" json:"-"`
+	ServiceID string   `xml:"serviceId" json:"service_id" validate:"required"`
+	Timestamp string   `xml:"timestamp" json:"@timestamp" validate:"required"`
+}
 
 func Validate() error {
 	for d := range msgsHeartbeat {

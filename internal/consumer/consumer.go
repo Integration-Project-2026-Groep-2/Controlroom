@@ -39,30 +39,18 @@ func Start() {
 	}
 	defer ch.Close()
 
-	// TODO(nasr): bind these to actual exchanges 
 
-	// Declare Exchange & Queues
-	// TODO(nasr): replace with actual exchanges
+	// TODO(nasr): needs refactorign 
 	ch.ExchangeDeclare("control_room_exchange", "direct", true, false, false, false, nil)
 	qHeartbeat, _ := ch.QueueDeclare("heartbeat_queue", true, false, false, false, nil)
-
-	// TODO(nasr): who defines the user queue
-	// qUser, _ := ch.QueueDeclare("user_queue", true, false, false, false, nil)
-
-	// Bind Queues to Exchange using Routing Keys
+	qUser, _ := ch.QueueDeclare("user_queue", true, false, false, false, nil)
 	ch.QueueBind(qHeartbeat.Name, "routing.heartbeat", "control_room_exchange", false, nil)
 	ch.QueueBind(qUser.Name, "routing.user", "control_room_exchange", false, nil)
-
-	// Consume from Queues
 	msgsHeartbeat, _ := ch.Consume(qHeartbeat.Name, "", true, false, false, false, nil)
 	msgsUser, _ := ch.Consume(qUser.Name, "", true, false, false, false, nil)
 
-	log.Printf("Room Consumer listening...")
 
 	validate := validator.New()
-
-	// TODO(nasr): improve heartbeat exeternal validation
-	// TODO(nasr): improve user external validation 
 
 	go user.Validate()
 	go heartbeat.Validate()

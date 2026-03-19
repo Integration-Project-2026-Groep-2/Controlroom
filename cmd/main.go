@@ -2,7 +2,7 @@ package main
 
 
 import (
-	   "controlroom/consumer"
+	   "integration-project-ehb/controlroom/consumer"
 )
 
 
