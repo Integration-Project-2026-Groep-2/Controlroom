@@ -44,11 +44,40 @@ const (
 	TOKEN_QUESTION TokenType = '?'
 )
 
-type SequenceType int
+// NOTE(nasr): AI genereated Xsd to go mapping
+var XsdToGo = map[string]string{
+	"xs:string":          "string",
+	"xs:boolean":         "bool",
+	"xs:int":             "int",
+	"xs:integer":         "int",
+	"xs:long":            "int64",
+	"xs:short":           "int16",
+	"xs:byte":            "int8",
+	"xs:float":           "float32",
+	"xs:double":          "float64",
+	"xs:decimal":         "float64",
+	"xs:dateTime":        "time.Time",
+	"xs:date":            "time.Time",
+	"xs:time":            "time.Time",
+	"xs:duration":        "time.Duration",
+	"xs:base64Binary":    "[]byte",
+	"xs:hexBinary":       "[]byte",
+	"xs:anyURI":          "string",
+	"xs:positiveInteger": "uint",
+}
 
-const ()
+type SequenceType string
+
+const (
+	SEQUENCE_COMPLEX_TYPE SequenceType = "complexType"
+	SEQUENCE_SIMPLE_TYPE               = "simpleType"
+	SEQUENCE_SCHEMA_TYPE               = "schema"
+)
 
 type Sequence struct {
+	SType      SequenceType
+	Attributes string
+	Type       string
 }
 
 type Node struct {
@@ -132,18 +161,22 @@ func Lex(content []byte) []Token {
 				if next == TOKEN_QUESTION {
 					continue
 				} else {
+
+					// continue checking the line while the final thing isnt a slash or a rangle
 					for next != TOKEN_RANGLE && next != TOKEN_SLASH {
+
+						current := TokenType(content[i])
 
 						// break before reaching out of bounds
 						// TODO(nasr): write a general check that checks for EOF
-
 						if i+1 >= len(content) {
 							break
 						}
 
-						if TokenType(content[i]) == TOKEN_LANGLE {
-                       		i++
+						if current == TOKEN_LANGLE {
+							i++
 						}
+
 						newLexeme = append(newLexeme, content[i])
 						i++
 						next = TokenType(content[i])
