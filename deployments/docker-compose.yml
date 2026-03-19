@@ -1,7 +1,6 @@
 ﻿services:
-  # NOTE(nasr): elastic search runs seperatly and we connect to it from our library
   elasticsearch:
-    # NOTE(nasr): changed to a newer version 
+    # NOTE(nasr): changed to a newer version
     image: 'docker.elastic.co/elasticsearch/elasticsearch:9.3.1'
     container_name: elasticsearch
     environment:
@@ -11,25 +10,32 @@
       # handles authentication                  #
       ###########################################
       - xpack.security.enabled=false
-
       # NOTE(nasr): set it to 1G but will this suffice or is this too much?
-      - ES_JAVA_OPTS=-Xms1G -Xmx1G
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
     ports:
       - '9200:9200'
     networks:
       - controlroom-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q '\"status\":\"green\\|yellow\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   kibana:
     # NOTE(nasr): updated the version
     image: 'docker.elastic.co/kibana/kibana:9.3.1'
     container_name: kibana
     environment:
-      - 'ELASTICSEARCH_HOSTS=http://elasticsearch:9200'
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
     ports:
       - '5601:5601'
     depends_on:
-      - elasticsearch
+      elasticsearch:
+        condition: service_healthy
     networks:
       - controlroom-network
+
 networks:
   controlroom-network:
     driver: bridge

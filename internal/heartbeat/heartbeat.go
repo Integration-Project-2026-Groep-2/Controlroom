@@ -1,10 +1,11 @@
 package heartbeat
 
 import (
-	"github.com/go-playground/validator/v10"
 	"encoding/xml"
-)
 
+	"github.com/go-playground/validator/v10"
+	"integration-project-ehb/controlroom/pkg/elastic"
+)
 
 type Heartbeat struct {
 	XMLName   xml.Name `xml:"Heartbeat" json:"-"`
@@ -18,7 +19,7 @@ func Validate() error {
 		xml.Unmarshal(d.Body, &hb)
 		if err := validate.Struct(hb); err == nil {
 			log.Printf("Valid Heartbeat: %s\n", hb.ServiceID)
-			sendToElastic(es, "heartbeats", hb)
+			SendToElastic(es, "heartbeats", hb)
 		} else {
 			log.Printf("Invalid Heartbeat received")
 		}
