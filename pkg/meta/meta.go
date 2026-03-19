@@ -11,73 +11,96 @@ import (
 	"path/filepath"
 )
 
-type Token struct {
+type TokenType byte
+
+const (
+	TOKEN_UNDEFINED TokenType = iota
+	TOKEN_SCHEMA
+	TOKEN_ELEMENT
+	TOKEN_COMPLEX_TYPE
+	TOKEN_SIMPLE_TYPE
+	TOKEN_SEQUENCE
+	TOKEN_RESTRICTION
+	TOKEN_ENUMERATION
+	TOKEN_ATTR_NAME
+	TOKEN_ATTR_TYPE
+	TOKEN_ATTR_BASE
+	TOKEN_ATTR_VALUE
+	TOKEN_ATTR_ELEMENT_FORM_DEFAULT
+	TOKEN_ATTR_XMLNS
+	TOKEN_TYPE_STRING
+	TOKEN_TYPE_DATETIME
+	TOKEN_TYPE_INT
+	TOKEN_TYPE_BOOLEAN
+	TOKEN_TYPE_DECIMAL
+	TOKEN_IDENT
+	TOKEN_STRING_LIT
+
+	TOKEN_COLON    TokenType = ':'
+	TOKEN_EQUALS   TokenType = '='
+	TOKEN_SLASH    TokenType = '/'
+	TOKEN_LANGLE   TokenType = '<'
+	TOKEN_RANGLE   TokenType = '>'
+	TOKEN_QUESTION TokenType = '?'
+)
+
+type Node struct {
+	Lexeme []byte
+	Next   *Node
+	First  *Node
+	Last   *Node
 }
 
-// =============================================================================
+type Tree struct {
+	Root    *Node
+	Current *Node
+}
+
+type Token struct {
+	Type   TokenType
+	Lexeme []byte
+	Line   int
+	Column int
+}
 
 type MetaLexer struct {
-	FileName  string
-	Line      int
-	Column    int
-	Position  int
-	Codepoint int32
+	FileName string
+	Stream   []byte
+	Start    int
+	Current  int
+	Line     int
+	Column   int
 }
 
-// =============================================================================
-// custom errors
-// =============================================================================
 type MetaError struct {
 	FileName string
 	Content  string
-	Position string
 	Line     int
 	Column   int
 }
 
 func (e *MetaError) Error() string {
-	return fmt.Sprintf("error in %s at line %d, column %d: %s", e.FileName, e.Line, e.Column, e.Content)
+	return fmt.Sprintf("error in %s at line %d, column %d: %s", e.FileName, e.Line, e.Column)
 }
 
-// =============================================================================
-
-// =============================================================================
-// file loading and handling
-// =============================================================================
-func isXsd(fileName string) bool {
+func IsXsd(fileName string) bool {
 	return filepath.Ext(fileName) == ".xsd"
 }
 
-func Load(base string) ([]string, error) {
-	entries, err := os.ReadDir(base)
+func (*MetaLexer) LoadFile(path string, file string) ([]byte, error) {
+
+	content, err := os.ReadFile(filepath.Join(path, file))
+
 	if err != nil {
 		return nil, &MetaError{
-			FileName: base,
-			Content:  fmt.Sprintf("failed to read directory >>> %v <<<", err),
+			FileName: file,
+			Content:  fmt.Sprintf("failed to open file >>> %v <<<", err),
 		}
 	}
 
-	var contents []string
-	for _, file := range entries {
-		if !isXsd(file.Name()) {
-			continue
-		}
-		content, err := os.ReadFile(filepath.Join(base, file.Name()))
-		if err != nil {
-			return nil, &MetaError{
-				FileName: file.Name(),
-				Content:  fmt.Sprintf("failed to open file >>> %v <<<", err),
-			}
-		}
-		contents = append(contents, string(content))
-	}
-
-	return contents, nil
+	return content, nil
 
 }
-
-// =============================================================================
-// =============================================================================
 
 func isWhiteSpace(character byte) bool {
 
@@ -87,16 +110,39 @@ func isWhiteSpace(character byte) bool {
 	return false
 }
 
-// =============================================================================
-
-func Lex(content string) []Token {
+func Lex(content []byte) []Token {
 	tokens := []Token{}
 
 	for i := 0; i < len(content); i++ {
+
 		ch := content[i]
 
 		if isWhiteSpace(ch) {
 			continue
+		}
+
+		switch TokenType(ch) {
+
+		case TOKEN_LANGLE:
+			{
+				if TokenType(content[i+1]) == TOKEN_QUESTION {
+
+					continue
+				}
+			}
+		case TOKEN_RANGLE:
+		case TOKEN_COLON:
+		case TOKEN_EQUALS:
+		case TOKEN_SLASH:
+			{
+				if TokenType(content[i+1]) == TOKEN_RANGLE {
+
+					// TODO(nasr): end of a lexeme
+				}
+
+			}
+		case TOKEN_QUESTION:
+
 		}
 
 		// TODO(nasr): match and append tokens
