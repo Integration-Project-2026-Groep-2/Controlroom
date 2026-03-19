@@ -1,0 +1,79 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Build output
+bin/
+build/
+dist/
+
+# Test artifacts
+*.test
+*.out
+coverage.out
+coverage.html
+
+# Go workspace
+go.work.sum
+
+# Vendor (uncomment if not committing vendor/)
+# vendor/
+
+# Elasticsearch data & logs
+elasticsearch/data/
+elasticsearch/logs/
+elasticsearch/config/certs/
+
+# Logstash
+logstash/data/
+logstash/logs/
+
+# Kibana
+kibana/data/
+kibana/logs/
+
+# Filebeat / Metricbeat / other beats
+*beat/data/
+*beat/logs/
+
+# Override files (local dev only)
+docker-compose.override.yml
+docker-compose.local.yml
+
+# Docker volumes (if bind-mounted locally)
+volumes/
+.docker/
+
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.p12
+secrets/
+
+# Neovim / Vim
+*.swp
+*.swo
+*~
+.netrwhist
+Session.vim
+
+# JetBrains
+.idea/
+
+# VSCode
+.vscode/
+
+.DS_Store
+Thumbs.db
+
+*.log
+*.tmp
+*.bak
+tmp/
+temp/
