@@ -11,6 +11,20 @@ import (
 	"path/filepath"
 )
 
+type Token struct {
+}
+
+// =============================================================================
+
+type MetaLexer struct {
+	FileName  string
+	Line      int
+	Column    int
+	Position  int
+	Codepoint int32
+}
+
+// =============================================================================
 // custom errors
 // =============================================================================
 type MetaError struct {
@@ -24,8 +38,10 @@ type MetaError struct {
 func (e *MetaError) Error() string {
 	return fmt.Sprintf("error in %s at line %d, column %d: %s", e.FileName, e.Line, e.Column, e.Content)
 }
+
 // =============================================================================
 
+// =============================================================================
 // file loading and handling
 // =============================================================================
 func isXsd(fileName string) bool {
@@ -58,4 +74,33 @@ func Load(base string) ([]string, error) {
 
 	return contents, nil
 
+}
+
+// =============================================================================
+// =============================================================================
+
+func isWhiteSpace(character byte) bool {
+
+	if character == '\n' || character == '\r' || character == '\t' || character == ' ' {
+		return true
+	}
+	return false
+}
+
+// =============================================================================
+
+func Lex(content string) []Token {
+	tokens := []Token{}
+
+	for i := 0; i < len(content); i++ {
+		ch := content[i]
+
+		if isWhiteSpace(ch) {
+			continue
+		}
+
+		// TODO(nasr): match and append tokens
+	}
+
+	return tokens
 }
