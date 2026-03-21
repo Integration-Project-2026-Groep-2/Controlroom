@@ -2,55 +2,45 @@
 // xmlgen — generates Go structs from XSD schema files
 // author: abdellah el morabit
 // =============================================================================
-
 package main
 
 import (
 	"flag"
 	"fmt"
+	"integration-project-ehb/controlroom/pkg/meta"
 	"log"
 	"os"
-
-	"path/filepath"
-
-	"integration-project-ehb/controlroom/pkg/meta"
 )
 
-// handles command line arguments for passing in a root folder for finding xsd files to parse
 var (
 	base = flag.String("path", "pkg/xml/", "path to folder containing xsd files")
 )
 
 func main() {
-
-	// parse command line arguments
 	flag.Parse()
 
 	entries, err := os.ReadDir(*base)
 	if err != nil {
-
-		fmt.Errorf("error: %v", err)
+		log.Fatalf("xmlgen: failed to read directory: %v", err)
 	}
 
-	for _, file := range entries {
-
-		var lexer meta.MetaLexer
-
-		output, err := lexer.LoadFile(*base, file.Name())
-
-		if err != nil {
-			log.Fatalf("xmlgen failed: %v", err)
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
 		}
-
-		if !meta.IsXsd(filepath.Join(file.Name())) {
+		if !meta.IsXsd(entry.Name()) {
 			continue
 		}
 
-		tokens := meta.Lex(output)
+		var lexer meta.MetaLexer
+		if err := lexer.LoadFile(*base, entry.Name()); err != nil {
+			log.Fatalf("xmlgen: %v", err)
+		}
 
-		for _, tok := range tokens {
+		lexer.Lex()
+		for _, tok := range lexer.Tokens {
 			fmt.Println(string(tok.Lexeme))
 		}
+		fmt.Println("//////////////////////////////////////////////////")
 	}
-
 }
