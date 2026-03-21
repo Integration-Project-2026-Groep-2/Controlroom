@@ -140,6 +140,7 @@ type Sequence struct {
 type Node struct {
 	Lexeme []byte
 	Next   *Node
+	Parent *Node
 	First  *Node
 	Last   *Node
 }
@@ -156,6 +157,7 @@ type AST struct {
 type Token struct {
 	Type   TokenType
 	Lexeme []byte
+	Tag    TagType
 }
 
 // MetaLexer holds the raw XSD byte stream, the token list produced by Lex,
@@ -254,7 +256,47 @@ func (ml *MetaLexer) getByteAtPosition(offset int) byte {
 // checkTag inspects the stream at the current position and returns the TagType
 // of the XSD element tag found there.
 func (ml *MetaLexer) checkTag() TagType {
-	// if getByteAtPosition()
+	index := 0
+	for ml.Position+index < len(ml.Stream) && !isWhiteSpace(ml.Stream[ml.Position+index]) {
+		index++
+	}
+	tag := ml.Stream[ml.Position : ml.Position+index]
+	return TagType(tag)
+}
+
+// PushNextNode appends node as the next sibling of the current AST node.
+func (ast *AST) PushNextNode(node *Node) error {
+	if node == nil {
+		// TODO(nasr): Logging
+		return nil
+	}
+
+	if ast.Root == nil {
+		ast.Root = node
+	}
+
+	ast.Current.Next = node
+	ast.Current.Parent = ast.Current
+	ast.Current = node
+
+	return nil
+}
+
+// PushChildNode appends node as a child of the current AST node.
+func (ast *AST) PushChildNode(node *Node) error {
+
+	if node == nil || ast.Root == nil {
+		// TODO(nasr): Logging
+		return nil
+	}
+
+	ast.Current.First = node
+	ast.Current.Last = node
+	ast.Current.Parent = ast.Current
+
+	ast.Current = node
+
+	return nil
 }
 
 // Lex scans the full stream and populates ml.Tokens. The token slice is reset
@@ -300,35 +342,30 @@ func (ml *MetaLexer) Lex() error {
 				}
 				// skip namespace prefix (everything up to and including ':')
 				if cur == TOKEN_COLON {
-					// drop prefix, start fresh
 
-					// save pos to handle with slices
-					start := ml.Position
-					var end int
-
-					for !isWhiteSpace(ml.current()) && !ml.atEnd() {
-
-						ml.advance()
-					}
-					end = ml.Position
-
-					lexeme = lexeme[start:end]
-					ml.advance()
 					continue
 				}
+
 				if !isWhiteSpace(ml.current()) {
 					lexeme = append(lexeme, ml.current())
+					// ml.advance()
 				}
 				ml.advance()
+
 			}
 
 			if len(lexeme) > 0 {
 				ml.Tokens = append(ml.Tokens, Token{
 					Type:   TOKEN_UNDEFINED_EOF,
 					Lexeme: lexeme,
+					Tag:    ml.checkTag(),
 				})
 			}
 
+			// NOTE(nasr): having a rangle ( '>' means that we've reached the end of a sequence
+			// and thus we can push it on to the ast
+			// aslong as we dont reach the closing sequence of this particular sequence we keep pushing the next
+			// sequences as childs
 		case TOKEN_RANGLE:
 			ml.advance()
 
@@ -349,28 +386,5 @@ func (ml *MetaLexer) Lex() error {
 		}
 	}
 
-	return nil
-}
-
-// PushNextNode appends node as the next sibling of the current AST node.
-func (ast *AST) PushNextNode(node *Node) error {
-
-	return nil
-}
-
-// PushChildNode appends node as a child of the current AST node.
-func (ast *AST) PushChildNode(node *Node) error {
-
-	return nil
-}
-
-// Parse builds the AST from the token slice produced by Lex.
-// tokens is passed by pointer to avoid copying the slice header.
-func (ast *AST) Parse(tokens *[]Token) error {
-
-	// for index, token := range tokens {
-	//
-	// }
-	//
 	return nil
 }
