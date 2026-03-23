@@ -7,6 +7,7 @@ package meta
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 )
@@ -249,6 +250,7 @@ func (ml *MetaLexer) skipWhiteSpace() {
 }
 
 // getByteAtPosition returns the byte at Position + offset within the stream.
+// TODO(nasr): add checking for out of bounds errors
 func (ml *MetaLexer) getByteAtPosition(offset int) byte {
 	return ml.Stream[ml.Position]
 }
@@ -275,8 +277,9 @@ func (ast *AST) PushNextNode(node *Node) error {
 		ast.Root = node
 	}
 
+	node.Parent = ast.Current
+
 	ast.Current.Next = node
-	ast.Current.Parent = ast.Current
 	ast.Current = node
 
 	return nil
@@ -302,9 +305,10 @@ func (ast *AST) PushChildNode(node *Node) error {
 // Lex scans the full stream and populates ml.Tokens. The token slice is reset
 // before scanning begins. Processing instructions (<?xml ... ?>) are skipped.
 // Namespace prefixes (xs:) are stripped from tag lexemes. Returns nil on success.
-func (ml *MetaLexer) Lex() error {
+func (ml *MetaLexer) Lex(ast *AST) error {
 
 	ml.Tokens = ml.Tokens[:0]
+	tokensIndex := 0
 
 	for !ml.atEnd() {
 		ml.skipWhiteSpace()
@@ -340,45 +344,71 @@ func (ml *MetaLexer) Lex() error {
 				if cur == TOKEN_RANGLE || cur == TOKEN_SLASH {
 					break
 				}
+
 				// skip namespace prefix (everything up to and including ':')
 				if cur == TOKEN_COLON {
-
+					// TODO(nasr): check if it's a closing or opening tag
+					lexeme = lexeme[2:]         
+					ml.advance()
 					continue
 				}
 
 				if !isWhiteSpace(ml.current()) {
 					lexeme = append(lexeme, ml.current())
-					// ml.advance()
 				}
 				ml.advance()
-
 			}
 
 			if len(lexeme) > 0 {
-				ml.Tokens = append(ml.Tokens, Token{
+				token := Token{
 					Type:   TOKEN_UNDEFINED_EOF,
 					Lexeme: lexeme,
-					Tag:    ml.checkTag(),
-				})
+					Tag:    TagType(lexeme),
+				}
+
+				{
+					ml.Tokens = append(ml.Tokens, token)
+					tokensIndex++
+				}
+
+				node := &Node{Lexeme: lexeme}
+
+				// first node becomes root, subsequent nodes become children
+				if ast.Root == nil {
+					ast.Root = node
+					ast.Current = node
+				} else {
+					ast.PushChildNode(node)
+					log.Printf(string(lexeme))
+				}
 			}
 
-			// NOTE(nasr): having a rangle ( '>' means that we've reached the end of a sequence
-			// and thus we can push it on to the ast
-			// aslong as we dont reach the closing sequence of this particular sequence we keep pushing the next
-			// sequences as childs
+		// open tag is fully closed nothing extra to do, node already pushed above
 		case TOKEN_RANGLE:
 			ml.advance()
 
 		case TOKEN_SLASH:
+
 			ml.advance()
-			// closing tag: skip until '>'
+
+			// closing tag: walk back up to parent before skipping to '>'
+			if ast.Current != nil && ast.Current.Parent != nil {
+				ast.Current = ast.Current.Parent
+			}
+
 			for !ml.atEnd() && TokenType(ml.current()) != TOKEN_RANGLE {
 				ml.advance()
 			}
+
 			// consume '>'
 			ml.advance()
 
 		case TOKEN_EQUALS:
+
+            var lexeme []byte
+			node := &Node{Lexeme: lexeme}
+		    ast.PushChildNode(node)
+
 			ml.advance()
 
 		default:
@@ -386,5 +416,13 @@ func (ml *MetaLexer) Lex() error {
 		}
 	}
 
+	return nil
+}
+
+func WriteGoStruct(ast *AST, folderPath string) error {
+
+	node := AST.Root
+
+	for node := AST.Current 
 	return nil
 }

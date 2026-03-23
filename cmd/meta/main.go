@@ -19,6 +19,7 @@ var (
 func main() {
 	flag.Parse()
 
+	var ast meta.AST
 	entries, err := os.ReadDir(*base)
 	if err != nil {
 		log.Fatalf("xmlgen: failed to read directory: %v", err)
@@ -37,10 +38,10 @@ func main() {
 			log.Fatalf("xmlgen: %v", err)
 		}
 
-		lexer.Lex()
-		for _, tok := range lexer.Tokens {
-			fmt.Println(string(tok.Lexeme))
-		}
+		lexer.Lex(&ast)
+		// for _, tok := range lexer.Tokens {
+		// 	// fmt.Println(string(tok.Lexeme))
+		// }
 		fmt.Println("//////////////////////////////////////////////////")
 	}
 }

@@ -10,12 +10,5 @@ elementFormDefault="qualified">
     </xs:sequence>
 </xs:complexType>
 
-<xs:complexType name="MillisecondDurationType">
-    <xs:simpleContent>
-        <xs:extension base="xs:positiveInteger">
-            <xs:attribute name="unit" type="xs:string" fixed="ms"/>
-        </xs:extension>
-    </xs:simpleContent>
-</xs:complexType>
 
 </xs:schema>
