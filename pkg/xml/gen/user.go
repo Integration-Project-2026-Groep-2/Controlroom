@@ -11,18 +11,11 @@ import (
 var _ = xml.Name{}
 var _ = time.Time{}
 
-type UserType struct {
-	XMLName xml.Name `xml:"userType"`
+type User struct {
+	XMLName xml.Name `xml:"user"`
 	Id                       string               `xml:"id"`
-	Type                     UserTypeEnum         `xml:"type"`
+	Type                     string               `xml:"type"`
 	Organisatie              string               `xml:"organisatie"`
 	Datum                    time.Time            `xml:"datum"`
 }
-
-type UserTypeEnum string
-
-const (
-	UserTypeEnumMens                 UserTypeEnum = "mens"
-	UserTypeEnumOrganisatie          UserTypeEnum = "organisatie"
-)
 

@@ -11,8 +11,8 @@ import (
 var _ = xml.Name{}
 var _ = time.Time{}
 
-type HeartbeatType struct {
-	XMLName xml.Name `xml:"heartbeatType"`
+type Heartbeat struct {
+	XMLName xml.Name `xml:"heartbeat"`
 	ServiceId                string               `xml:"serviceId"`
 	Timestamp                time.Time            `xml:"timestamp"`
 }

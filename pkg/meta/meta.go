@@ -142,6 +142,7 @@ type Node struct {
 }
 
 // AST holds the root of the parsed syntax tree and a cursor used during parsing.
+// Abstract syntax tree
 type AST struct {
 	Root    *Node
 	Current *Node
@@ -237,7 +238,6 @@ func isTagDelim(c byte) bool {
 	return c == '>' || c == '/' || isWhiteSpace(c)
 }
 
-
 // readUntil reads bytes up to (but not including) any byte where stop returns true.
 func (ml *MetaLexer) readUntil(stop func(byte) bool) []byte {
 	start := ml.Position
@@ -298,7 +298,7 @@ func (ml *MetaLexer) parseAttrs() Attrs {
 		// NOTE(nasr): skipping the attribute if it's empty
 		ml.skipWhiteSpace()
 		if ml.atEnd() || ml.current() != '=' {
-			continue 
+			continue
 		}
 
 		ml.advance() // consume '='
@@ -390,13 +390,6 @@ func (ast *AST) popToParent() {
 }
 
 // Lex scans the full stream and builds the AST.
-// Fixes over original:
-//   - namespace stripping done on the complete raw tag name, not mid-append
-//   - closing tags recognised and trigger popToParent instead of node creation
-//   - self-closing tags (/>) use pushSibling, not pushChild
-//   - attributes fully parsed into Node.Attrs
-//   - TOKEN_EQUALS case removed (was creating empty ghost nodes)
-//   - XML comments skipped
 func (ml *MetaLexer) Lex(ast *AST) error {
 	ml.Tokens = ml.Tokens[:0]
 
@@ -412,8 +405,8 @@ func (ml *MetaLexer) Lex(ast *AST) error {
 			continue
 		}
 
- 		// consume '<'
-		ml.advance() 
+		// consume '<'
+		ml.advance()
 		if ml.atEnd() {
 			break
 		}
@@ -427,7 +420,7 @@ func (ml *MetaLexer) Lex(ast *AST) error {
 			continue
 		}
 
-		// NOTE(nasr): skip comments by checking for lines or what are they called -> - <- 
+		// NOTE(nasr): skip comments by checking for lines or what are they called -> - <-
 		if ml.current() == '!' {
 			ml.advance()
 			for !ml.atEnd() {
@@ -448,7 +441,7 @@ func (ml *MetaLexer) Lex(ast *AST) error {
 			ml.advance()
 		}
 
-		// read full raw tag 
+		// read full raw tag
 		rawTag := ml.readUntil(isTagDelim)
 		local := string(stripNamespace(rawTag))
 
@@ -512,6 +505,7 @@ func (ml *MetaLexer) Lex(ast *AST) error {
 
 	return nil
 }
+
 // goIdent converts an XSD name to a capitalised Go exported identifier.
 func goIdent(name string) string {
 	if name == "" {
@@ -752,7 +746,7 @@ func buildStructs(node *Node, buf *strings.Builder, seen map[string]bool) {
 	buildStructs(node.Next, buf, seen)
 }
 
-// NOTE(nasr): ai generated struct generation :) 
+// NOTE(nasr): ai generated struct generation :)
 // =============================================================================
 // writeStruct emits a single Go struct definition.
 func writeStruct(buf *strings.Builder, name string, fields []structField) {
@@ -805,7 +799,6 @@ func WriteGoStruct(ast *AST, folderPath string, xsdFile string) error {
 	buf.WriteString("var _ = time.Time{}\n\n")
 
 	buildStructs(ast.Root, &buf, make(map[string]bool))
-
 
 	outPath := filepath.Join(folderPath, xsdToGoFileName(xsdFile))
 	if err := os.WriteFile(outPath, []byte(buf.String()), 0644); err != nil {
