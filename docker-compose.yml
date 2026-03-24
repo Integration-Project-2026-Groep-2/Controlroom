@@ -1,0 +1,66 @@
+﻿services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.3.1
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+    ports:
+      # TODO(marwan): replace with github secrets
+      - "9200:9200"
+    networks:
+      - controlroom-network
+    healthcheck:
+      # TODO(marwan): replace with github secrets
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q '\"status\":\"green\\|yellow\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:9.3.1
+    container_name: kibana
+    environment:
+      # TODO(marwan): replace with github secrets
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - controlroom-network
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    environment:
+      # TODO(marwan): replace with github secrets
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - controlroom-network
+
+  controlroom:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: controlroom
+    depends_on:
+      - rabbitmq
+      - elasticsearch
+    environment:
+      # TODO(marwan): replace with github secrets
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+    networks:
+      - controlroom-network
+    restart: unless-stopped
+
+networks:
+  controlroom-network:
+    driver: bridge
