@@ -9,6 +9,8 @@
     ports:
       # TODO(marwan): replace with github secrets
       - "9200:9200"
+    volumes:
+      - elasticsearch:/usr/share/elasticsearch/data
     networks:
       - controlroom-network
     healthcheck:
@@ -64,3 +66,7 @@
 networks:
   controlroom-network:
     driver: bridge
+
+volumes:
+  elasticsearch:
+    driver: local
