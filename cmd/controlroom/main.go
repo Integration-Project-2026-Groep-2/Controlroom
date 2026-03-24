@@ -1,76 +1,56 @@
 package main
 
 import (
+	"context"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"integration-project-ehb/controlroom/internal/heartbeat"
-	"integration-project-ehb/controlroom/internal/user"
+	"integration-project-ehb/controlroom/internal/rabbitmq"
 
 	elasticsearch "github.com/elastic/go-elasticsearch/v9"
-	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 func main() {
+	log.Println("Starting Controlroom...")
 
-	// Connect to RabbitMQ
-	// TODO(nasr): handle credentials using github secrets
-	conn, err := amqp.Dial("amqp://guest:guest@localhost:5672/")
+	// RabbitMQ setup
+	conn, ch, msgs, err := cr_rabbitmq.SetupHeartbeatConsumer()
 	if err != nil {
-		log.Fatalf("Failed to connect to RabbitMQ: %v", err)
+		log.Fatalf("RabbitMQ setup failed: %v", err)
 	}
 	defer conn.Close()
-
-	ch, err := conn.Channel()
-	if err != nil {
-		log.Fatalf("Failed to open channel: %v", err)
-	}
 	defer ch.Close()
 
-	// Declare exchange
-	err = ch.ExchangeDeclare("control_room_exchange", "direct", true, false, false, false, nil)
-	if err != nil {
-		log.Fatalf("Failed to declare exchange: %v", err)
-	}
-
-	// Declare queues
-	qHeartbeat, err := ch.QueueDeclare("heartbeat_queue", false, true, false, false, nil)
-	if err != nil {
-		log.Fatalf("Failed to declare heartbeat queue: %v", err)
-	}
-
-	qUser, err := ch.QueueDeclare("user_queue", true, false, false, false, nil)
-	if err != nil {
-		log.Fatalf("Failed to declare user queue: %v", err)
-	}
-
-	// Bind queues to exchange
-	if err = ch.QueueBind(qHeartbeat.Name, "routing.heartbeat", "control_room_exchange", false, nil); err != nil {
-		log.Fatalf("Failed to bind heartbeat queue: %v", err)
-	}
-	if err = ch.QueueBind(qUser.Name, "routing.user", "control_room_exchange", false, nil); err != nil {
-		log.Fatalf("Failed to bind user queue: %v", err)
-	}
-
-	// Start consumers
-	msgsHeartbeat, err := ch.Consume(qHeartbeat.Name, "", true, false, false, false, nil)
-	if err != nil {
-		log.Fatalf("Failed to consume heartbeat queue: %v", err)
-	}
-
-	msgsUser, err := ch.Consume(qUser.Name, "", true, false, false, false, nil)
-	if err != nil {
-		log.Fatalf("Failed to consume user queue: %v", err)
-	}
-
-	// Connect to Elasticsearch
-	// TODO(nasr): send errors to kibana
+	// Elasticsearch
 	esClient, err := elasticsearch.NewDefaultClient()
 	if err != nil {
 		log.Fatalf("Failed to create Elasticsearch client: %v", err)
 	}
 
-	go heartbeat.Validate(msgsHeartbeat, esClient)
-	go user.Validate(msgsUser, esClient)
+	// DLQ channel
+	dlqCh, err := conn.Channel()
+	if err != nil {
+		log.Fatalf("Failed to open DLQ channel: %v", err)
+	}
+	defer dlqCh.Close()
 
-	select {}
+	processor := heartbeat.CreateProcessor(esClient, dlqCh)
+
+	// Graceful shutdown
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	go heartbeat.ConsumeHeartbeats(processor, msgs, ctx)
+
+	log.Println("Controlroom is running...")
+
+	<-sigChan
+	log.Println("Shutting down...")
+	cancel()
 }
