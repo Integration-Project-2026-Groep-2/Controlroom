@@ -19,3 +19,5 @@ jobs:
           PORT_ELASTICSEARCH:${{ secrets.PORT_ELASTICSEARCH }} 
           PORT_KIBANA: ${{ secrets.PORT_KIBANA }} 
           PORT_LOGSTASH: ${{ secrets.PORT_LOGSTASH }} 
+# TODO(marwan): test heartbeat
+# TODO(marwan): secrets toepassen
