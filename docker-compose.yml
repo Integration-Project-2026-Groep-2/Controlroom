@@ -7,14 +7,12 @@
       - xpack.security.enabled=false
       - ES_JAVA_OPTS=-Xms1g -Xmx1g
     ports:
-      # TODO(marwan): replace with github secrets
-      - "9200:9200"
+      - "${PORT_ELASTICSEARCH}:9200"
     volumes:
       - elasticsearch:/usr/share/elasticsearch/data
     networks:
       - controlroom-network
     healthcheck:
-      # TODO(marwan): replace with github secrets
       test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q '\"status\":\"green\\|yellow\"'"]
       interval: 10s
       timeout: 5s
@@ -23,10 +21,9 @@
     image: docker.elastic.co/kibana/kibana:9.3.1
     container_name: kibana
     environment:
-      # TODO(marwan): replace with github secrets
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
     ports:
-      - "5601:5601"
+      - "${PORT_KIBANA}:5601"
     depends_on:
       elasticsearch:
         condition: service_healthy
@@ -41,28 +38,10 @@
     depends_on:
       - elasticsearch
     environment:
-      # TODO(marwan): replace with github secrets
-      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
       - ELASTICSEARCH_URL=http://elasticsearch:9200
     networks:
       - controlroom-network
-    restart: unless-stopped
-
-  rabbitmq:
-    image: rabbitmq:3-management
-    container_name: rabbitmq
-    networks:
-      - controlroom-network
-    ports:
-      # TODO(marwan): replace with github secrets
-      - "5672:5672"     # AMQP
-      - "15672:15672"   # Management UI
-    environment:
-      # TODO(marwan): replace with github secrets
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
-    volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
     restart: unless-stopped
 
 networks:
