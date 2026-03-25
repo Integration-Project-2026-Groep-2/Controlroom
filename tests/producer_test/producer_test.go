@@ -1,24 +1,20 @@
 package producer_test
 
 import (
-
 	"context"
 	"encoding/xml"
 	"fmt"
 	"log"
+	"testing"
 	"time"
-
 
 	"github.com/go-playground/validator/v10"
 	amqp "github.com/rabbitmq/amqp091-go"
 
-
 	"integration-project-ehb/controlroom/pkg/xml/gen"
-
 )
 
-
-func TestProducer() {
+func TestProducer(t *testing.T) {
 
 	validate := validator.New()
 
@@ -45,12 +41,11 @@ func TestProducer() {
 
 	// 3. The Infinite Sending Loop
 	for {
-		now := time.Now().UTC().Format(time.RFC3339)
+		now := time.Now().UTC()
 
 		// Create dummy data
-		hbCRM := Heartbeat{ServiceID: "Service-CRM", Timestamp: now}
-		hbFacturatie := Heartbeat{ServiceID: "Service-Facturatie", Timestamp: now}
-		userNew := User{ID: "U-101", Type: "human", Organisatie: "IT-Dept", Datum: now}
+		hbCRM := gen.Heartbeat{ServiceId: "Service-CRM", Timestamp: now}
+		hbFacturatie := gen.Heartbeat{ServiceId: "Service-Facturatie", Timestamp: now}
 
 		// Validate & Send CRM Heartbeat
 		if err := validate.Struct(hbCRM); err == nil {
@@ -64,13 +59,6 @@ func TestProducer() {
 			xmlData, _ := xml.Marshal(hbFacturatie)
 			ch.PublishWithContext(context.Background(), "control_room_exchange", "routing.heartbeat", false, false, amqp.Publishing{ContentType: "text/xml", Body: xmlData})
 			fmt.Println("📤 Sent: Facturatie Heartbeat")
-		}
-
-		// Validate & Send User
-		if err := validate.Struct(userNew); err == nil {
-			xmlData, _ := xml.Marshal(userNew)
-			ch.PublishWithContext(context.Background(), "control_room_exchange", "routing.user", false, false, amqp.Publishing{ContentType: "text/xml", Body: xmlData})
-			fmt.Println("📤 Sent: User Message")
 		}
 
 		fmt.Println("--- Waiting 5 seconds ---")
