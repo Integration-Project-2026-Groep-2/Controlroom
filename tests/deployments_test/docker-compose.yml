@@ -3,13 +3,11 @@ services:
     image: rabbitmq:3-management
     container_name: rabbitmq
     ports:
-      # TODO(marwan): replace with github secrets
-      - "5672:5672"     # AMQP
+      - "${PORT_KIBANA}:5601"   # AMQP
       - "15672:15672"   # Management UI
     environment:
-      # TODO(marwan): replace with github secrets
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
+      - ${RABBITMQ_USER}
+      - ${RABBITMQ_PASSWORD}
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     restart: unless-stopped
