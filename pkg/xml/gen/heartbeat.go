@@ -9,4 +9,7 @@ type Heartbeat struct {
 	XMLName   xml.Name  `xml:"Heartbeat" json:"heartbeat"`
 	ServiceId string    `xml:"serviceId" json:"service_id"`
 	Timestamp time.Time `xml:"timestamp" json:"timestamp"`
+	XMLName   xml.Name  `xml:"heartbeat"`
+	ServiceId string    `xml:"serviceId" validate:"required"`
+	Timestamp time.Time `xml:"timestamp" validate:"required"`
 }
