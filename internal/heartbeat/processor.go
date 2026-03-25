@@ -15,10 +15,22 @@ import (
 	"integration-project-ehb/controlroom/pkg/xml/gen"
 )
 
+type DLQPublisher interface {
+	PublishWithContext(ctx context.Context, exchange, key string, mandatory, immediate bool, msg amqp.Publishing) error
+}
+
 type Processor struct {
 	es        *elasticsearch.Client
 	validator *validator.Validate
-	dlq       *amqp.Channel
+	dlq       DLQPublisher
+}
+
+func NewProcessor(es *elasticsearch.Client, dlq DLQPublisher) *Processor {
+	return &Processor{
+		es:        es,
+		validator: validator.New(),
+		dlq:       dlq,
+	}
 }
 
 func CreateProcessor(es *elasticsearch.Client, dlqCh *amqp.Channel) *Processor {
@@ -34,7 +46,7 @@ func CreateProcessor(es *elasticsearch.Client, dlqCh *amqp.Channel) *Processor {
 	}
 }
 
-func processHeartbeat(p *Processor, body []byte) error {
+func ProcessHeartbeat(p *Processor, body []byte) error {
 	var hb gen.Heartbeat
 
 	if err := xml.Unmarshal(body, &hb); err != nil {
@@ -56,7 +68,7 @@ func processHeartbeat(p *Processor, body []byte) error {
 	return nil
 }
 
-func sendToDLQ(dlq *amqp.Channel, body []byte, reason string) error {
+func sendToDLQ(dlq DLQPublisher, body []byte, reason string) error {
 	err := dlq.PublishWithContext(
 		context.Background(),
 		"",
