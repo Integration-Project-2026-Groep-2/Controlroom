@@ -12,8 +12,8 @@ var _ = xml.Name{}
 var _ = time.Time{}
 
 type Heartbeat struct {
-	XMLName xml.Name `xml:"heartbeat"`
-	ServiceId                string               `xml:"serviceId"`
-	Timestamp                time.Time            `xml:"timestamp"`
+	XMLName   xml.Name  `xml:"heartbeat"`
+	ServiceId string    `xml:"serviceId" validate:"required"`
+	Timestamp time.Time `xml:"timestamp" validate:"required"`
 }
 
