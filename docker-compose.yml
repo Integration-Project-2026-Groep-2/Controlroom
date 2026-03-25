@@ -34,26 +34,12 @@
     networks:
       - controlroom-network
 
-  rabbitmq:
-    image: rabbitmq:3-management
-    container_name: rabbitmq
-    environment:
-      # TODO(marwan): replace with github secrets
-      - RABBITMQ_DEFAULT_USER=guest
-      - RABBITMQ_DEFAULT_PASS=guest
-    ports:
-      - "5672:5672"
-      - "15672:15672"
-    networks:
-      - controlroom-network
-
   controlroom:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: controlroom
     depends_on:
-      - rabbitmq
       - elasticsearch
     environment:
       # TODO(marwan): replace with github secrets
