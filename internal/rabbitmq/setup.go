@@ -13,8 +13,6 @@ func SetupHeartbeatConsumer() (*amqp.Connection, *amqp.Channel, <-chan amqp.Deli
 	url := os.Getenv("RABBITMQ_URL")
 	conn, err := amqp.Dial(url)
 
-	log.Printf("connection value: %v", conn)
-
 	if err != nil {
 		return nil, nil, nil, err
 	}
