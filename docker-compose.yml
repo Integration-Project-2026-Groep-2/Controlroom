@@ -19,7 +19,6 @@
       interval: 10s
       timeout: 5s
       retries: 10
-
   kibana:
     image: docker.elastic.co/kibana/kibana:9.3.1
     container_name: kibana
@@ -49,10 +48,28 @@
       - controlroom-network
     restart: unless-stopped
 
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    networks:
+      - controlroom-network
+    ports:
+      # TODO(marwan): replace with github secrets
+      - "5672:5672"     # AMQP
+      - "15672:15672"   # Management UI
+    environment:
+      # TODO(marwan): replace with github secrets
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    restart: unless-stopped
+
 networks:
   controlroom-network:
     driver: bridge
 
 volumes:
+  rabbitmq_data:
   elasticsearch:
     driver: local

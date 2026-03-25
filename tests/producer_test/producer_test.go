@@ -1,54 +1,80 @@
-// producer van thomas
-package main
+package producer_test
 
 import (
+
 	"context"
 	"encoding/xml"
-	"testing"
+	"fmt"
+	"log"
 	"time"
 
+
+	"github.com/go-playground/validator/v10"
 	amqp "github.com/rabbitmq/amqp091-go"
-	"github.com/stretchr/testify/assert"
+
 
 	"integration-project-ehb/controlroom/pkg/xml/gen"
+
 )
 
-// MockChannel implements a fake AMQP channel to capture Publish calls
-type MockChannel struct {
-	Published []amqp.Publishing
-}
 
-func (m *MockChannel) PublishWithContext(ctx context.Context, exchange, key string, mandatory, immediate bool, msg amqp.Publishing) error {
-	m.Published = append(m.Published, msg)
-	return nil
-}
+func TestProducer() {
 
-// minimal interface to satisfy your code
-func (m *MockChannel) Close() error {
-	return nil
-}
+	validate := validator.New()
 
-// TestSendHeartbeat verifies that Heartbeat XML is published
-func TestSendHeartbeat(t *testing.T) {
-	now := time.Now().UTC()
-	hb := gen.Heartbeat{ServiceId: "Service-test", Timestamp: now}
+	// 1. Connect to RabbitMQ
+	conn, err := amqp.Dial("amqp://guest:guest@localhost:5672/")
+	if err != nil {
+		log.Fatalf("❌ Failed to connect to RabbitMQ: %v", err)
+	}
+	defer conn.Close()
 
-	// marshal to xml for comparison
-	expectedXML, err := xml.Marshal(hb)
-	assert.NoError(t, err)
+	ch, err := conn.Channel()
+	if err != nil {
+		log.Fatalf("Failed to open channel: %v", err)
+	}
+	defer ch.Close()
 
-	mockCh := &MockChannel{}
+	// 2. Declare the Exchange
+	err = ch.ExchangeDeclare("control_room_exchange", "direct", true, false, false, false, nil)
+	if err != nil {
+		log.Fatalf("Failed to declare exchange: %v", err)
+	}
 
-	// simulate sending
-	err = mockCh.PublishWithContext(context.Background(), "control_room_exchange", "routing.heartbeat", false, false,
-		amqp.Publishing{
-			ContentType: "text/xml",
-			Body:        expectedXML,
-		})
-	assert.NoError(t, err)
+	fmt.Println("🚀 Producer started! Sending data every 5 seconds... (Press CTRL+C to exit)")
 
-	// assertions
-	assert.Len(t, mockCh.Published, 1, "should have published one message")
-	assert.Equal(t, expectedXML, mockCh.Published[0].Body, "published XML should match")
-	assert.Equal(t, "text/xml", mockCh.Published[0].ContentType, "content type should be text/xml")
+	// 3. The Infinite Sending Loop
+	for {
+		now := time.Now().UTC().Format(time.RFC3339)
+
+		// Create dummy data
+		hbCRM := Heartbeat{ServiceID: "Service-CRM", Timestamp: now}
+		hbFacturatie := Heartbeat{ServiceID: "Service-Facturatie", Timestamp: now}
+		userNew := User{ID: "U-101", Type: "human", Organisatie: "IT-Dept", Datum: now}
+
+		// Validate & Send CRM Heartbeat
+		if err := validate.Struct(hbCRM); err == nil {
+			xmlData, _ := xml.Marshal(hbCRM)
+			ch.PublishWithContext(context.Background(), "control_room_exchange", "routing.heartbeat", false, false, amqp.Publishing{ContentType: "text/xml", Body: xmlData})
+			fmt.Println("📤 Sent: CRM Heartbeat")
+		}
+
+		// Validate & Send Facturatie Heartbeat
+		if err := validate.Struct(hbFacturatie); err == nil {
+			xmlData, _ := xml.Marshal(hbFacturatie)
+			ch.PublishWithContext(context.Background(), "control_room_exchange", "routing.heartbeat", false, false, amqp.Publishing{ContentType: "text/xml", Body: xmlData})
+			fmt.Println("📤 Sent: Facturatie Heartbeat")
+		}
+
+		// Validate & Send User
+		if err := validate.Struct(userNew); err == nil {
+			xmlData, _ := xml.Marshal(userNew)
+			ch.PublishWithContext(context.Background(), "control_room_exchange", "routing.user", false, false, amqp.Publishing{ContentType: "text/xml", Body: xmlData})
+			fmt.Println("📤 Sent: User Message")
+		}
+
+		fmt.Println("--- Waiting 5 seconds ---")
+		time.Sleep(5 * time.Second)
+	}
+
 }
