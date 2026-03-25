@@ -34,7 +34,9 @@ func (m *mockDLQ) PublishWithContext(_ context.Context, _, _ string, _, _ bool, 
 }
 
 func newTestProcessor(dlq heartbeat.DLQPublisher) *heartbeat.Processor {
-	es, _ := elasticsearch.NewDefaultClient()
+	es, _ := elasticsearch.NewClient(elasticsearch.Config{
+		Addresses: []string{"http://localhost:9999"}, // nep URL zodat ES altijd faalt
+	})
 	return heartbeat.NewProcessor(es, dlq)
 }
 
