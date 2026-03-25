@@ -30,26 +30,12 @@
         condition: service_healthy
     networks:
       - controlroom-network
-
-  rabbitmq:
-    image: rabbitmq:3-management
-    container_name: rabbitmq
-    environment:
-      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER}
-      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD}
-    ports:
-      - "5672:5672"
-      - "15672:15672"
-    networks:
-      - controlroom-network
-
   controlroom:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: controlroom
     depends_on:
-      - rabbitmq
       - elasticsearch
     environment:
       - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
