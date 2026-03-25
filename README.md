@@ -17,10 +17,7 @@ Receives, validates, and stores event-driven data (heartbeats, status checks, us
 ## Run
 ```bash
 # Start infrastructure
-docker-compose up -d
-
-# Start consumer
-go run cmd/main.go
+docker compose up -d
 ```
 
 RabbitMQ UI: http://localhost:15672 (guest / guest)
