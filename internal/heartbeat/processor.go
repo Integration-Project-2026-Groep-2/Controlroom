@@ -50,18 +50,21 @@ func ProcessHeartbeat(p *Processor, body []byte) error {
 	var hb gen.Heartbeat
 
 	if err := xml.Unmarshal(body, &hb); err != nil {
-		return sendToDLQ(p.dlq, body, fmt.Sprintf("unmarshal error: %v", err))
+		sendToDLQ(p.dlq, body, fmt.Sprintf("unmarshal error: %v", err))
+		return err
 	}
 
 	if err := p.validator.Struct(hb); err != nil {
-		return sendToDLQ(p.dlq, body, fmt.Sprintf("validation error: %v", err))
+		sendToDLQ(p.dlq, body, fmt.Sprintf("validation error: %v", err))
+		return err
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	if err := indexHeartbeat(p.es, ctx, &hb); err != nil {
-		return sendToDLQ(p.dlq, body, fmt.Sprintf("index error: %v", err))
+		sendToDLQ(p.dlq, body, fmt.Sprintf("index error: %v", err))
+		return err
 	}
 
 	log.Printf("Indexed heartbeat: %s", hb.ServiceId)
