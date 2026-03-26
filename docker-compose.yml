@@ -17,7 +17,6 @@
       interval: 10s
       timeout: 5s
       retries: 10
-
   kibana:
     image: docker.elastic.co/kibana/kibana:9.3.1
     container_name: kibana
@@ -49,5 +48,6 @@ networks:
     driver: bridge
 
 volumes:
+  rabbitmq_data:
   elasticsearch:
     driver: local
