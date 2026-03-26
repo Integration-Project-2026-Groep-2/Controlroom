@@ -5,7 +5,6 @@ import (
 	"os"
 
 	amqp "github.com/rabbitmq/amqp091-go"
-	"log"
 )
 
 func SetupHeartbeatConsumer() (*amqp.Connection, *amqp.Channel, <-chan amqp.Delivery, error) {
