@@ -2,13 +2,14 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"integration-project-ehb/controlroom/internal/heartbeat"
-	"integration-project-ehb/controlroom/internal/rabbitmq"
+	cr_rabbitmq "integration-project-ehb/controlroom/internal/rabbitmq"
 
 	elasticsearch "github.com/elastic/go-elasticsearch/v9"
 )
@@ -24,11 +25,18 @@ func main() {
 	defer conn.Close()
 	defer ch.Close()
 
+	fmt.Printf("2 we are here")
 	// Elasticsearch
 	esClient, err := elasticsearch.NewDefaultClient()
 	if err != nil {
 		log.Fatalf("Failed to create Elasticsearch client: %v", err)
 	}
+	res, err := esClient.Info()
+	if err != nil {
+		log.Fatalf("Error connecting to Elasticsearch: %s", err)
+	}
+	defer res.Body.Close()
+	log.Println("Successfully connected to Elasticsearch!")
 
 	// DLQ channel
 	dlqCh, err := conn.Channel()
