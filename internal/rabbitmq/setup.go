@@ -1,6 +1,7 @@
 package cr_rabbitmq
 
 import (
+	"fmt"
 	"os"
 
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -17,7 +18,7 @@ func SetupHeartbeatConsumer() (*amqp.Connection, *amqp.Channel, <-chan amqp.Deli
 
 	ch, err := conn.Channel()
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, fmt.Errorf("failed here")
 	}
 
 	err = ch.ExchangeDeclare(

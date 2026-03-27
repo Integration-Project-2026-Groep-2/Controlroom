@@ -12,10 +12,9 @@ var _ = xml.Name{}
 var _ = time.Time{}
 
 type User struct {
-	XMLName xml.Name `xml:"user"`
-	Id                       string               `xml:"id"`
-	Type                     string               `xml:"type"`
-	Organisatie              string               `xml:"organisatie"`
-	Datum                    time.Time            `xml:"datum"`
+	XMLName     xml.Name  `xml:"user"`
+	Id          string    `xml:"id"`
+	Type        string    `xml:"type"`
+	Organisatie string    `xml:"organisatie"`
+	Datum       time.Time `xml:"datum"`
 }
-
