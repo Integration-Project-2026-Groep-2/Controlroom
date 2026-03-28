@@ -17,10 +17,18 @@ Receives, validates, and stores event-driven data (heartbeats, status checks, us
 ## Run
 ```bash
 # Start infrastructure
+docker compose up -d --build
+```
+
+### local setup
+
+After running the initial docker compose and the controlroom network has been created.
+```bash
+cd ./tests/deployments_test
 docker compose up -d
 ```
 
-RabbitMQ UI: http://localhost:15672 (guest / guest)
+RabbitMQ UI: http://localhost:15672
 Elasticsearch: http://localhost:9200
 Kibana: http://localhost:5601
 
@@ -30,3 +38,13 @@ Kibana: http://localhost:5601
 2. Create data view `heartbeats`, timestamp field `@timestamp`
 3. Create data view `users`, timestamp field `@timestamp`
 
+ :: responsible: Thomas Heusdens
+
+
+## Tests
+
+```bash
+go test ./tests/...
+```
+
+responsible: Marwan Makouh
