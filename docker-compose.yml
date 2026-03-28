@@ -42,7 +42,6 @@
     environment:
       - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@${RABBITMQ_HOST}:5672/
       - RABBITMQ_HOST=${RABBITMQ_HOST}
-      - ELASTICSEARCH_URL=http://elasticsearch:9200
     networks:
       - controlroom-network
     restart: unless-stopped
