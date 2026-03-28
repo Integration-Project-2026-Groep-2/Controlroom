@@ -74,3 +74,75 @@ func SetupHeartbeatConsumer() (*amqp.Connection, *amqp.Channel, <-chan amqp.Deli
 
 	return conn, ch, msgs, nil
 }
+
+func SetupUserConsumer() (*amqp.Connection, *amqp.Channel, <-chan amqp.Delivery, error) {
+
+	// TODO(marwan): replace with secrets
+	conn, err := amqp.Dial("amqp://guest:guest@rabbitmq:5672/")
+
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	ch, err := conn.Channel()
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	err = ch.ExchangeDeclare(
+		"user.topic",
+		"direct",
+		true,
+		false,
+		false,
+		false,
+		nil,
+	)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	Quser, err := ch.QueueDeclare(
+		"crm.user.confirmed",
+		false,
+		true,
+		false,
+		false,
+		nil,
+	)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	err = ch.QueueBind(
+		Quser.Name,
+		// TODO(Steven) Add actual routing key when exists
+		"temp.routing.consumers",
+		"user.topic",
+		false,
+		nil,
+	)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	err = ch.Qos(10, 0, false)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	msgs, err := ch.Consume(
+		Quser.Name,
+		"",
+		false,
+		false,
+		false,
+		false,
+		nil,
+	)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	return conn, ch, msgs, nil
+}

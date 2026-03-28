@@ -1,4 +1,4 @@
-package heartbeat
+package userobject
 
 import (
 	"bytes"
@@ -13,11 +13,20 @@ import (
 	"github.com/elastic/go-elasticsearch/v9/esapi"
 )
 
-func indexHeartbeat(es *elasticsearch.Client, ctx context.Context, hb *gen.Heartbeat) error {
+func indexUser(es *elasticsearch.Client, ctx context.Context, uo *gen.UserConfirmed) error {
 	doc := map[string]interface{}{
-		"serviceId": hb.ServiceId,
-		"timestamp": hb.Timestamp,
-		"indexed":   time.Now(),
+		"Id":          uo.Id,
+		"Email":       uo.Email,
+		"FirstName":   uo.FirstName,
+		"LastName":    uo.LastName,
+		"Phone":       uo.Phone,
+		"Role":        uo.Role,
+		"CompanyId":   uo.CompanyId,
+		"BadgeCode":   uo.BadgeCode,
+		"IsActive":    uo.IsActive,
+		"GdprConsent": uo.GdprConsent,
+		"ConfirmedAt": uo.ConfirmedAt,
+		"indexed":     time.Now(),
 	}
 
 	jsonData, err := json.Marshal(doc)
@@ -26,8 +35,8 @@ func indexHeartbeat(es *elasticsearch.Client, ctx context.Context, hb *gen.Heart
 	}
 
 	req := esapi.IndexRequest{
-		Index:      "heartbeats",
-		DocumentID: fmt.Sprintf("%s-%d", hb.ServiceId, hb.Timestamp.Unix()),
+		Index:      "users",
+		DocumentID: fmt.Sprintf("%s-%d", uo.Id, uo.ConfirmedAt),
 		Body:       bytes.NewReader(jsonData),
 		Refresh:    "true",
 	}
