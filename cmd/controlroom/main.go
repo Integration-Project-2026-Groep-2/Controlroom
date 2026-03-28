@@ -34,6 +34,15 @@ func main() {
 	defer connUser.Close()
 	defer chUser.Close()
 
+	fmt.Printf("2 we are here")
+	// Setup consumer of user
+	connUser, chUser, msgsUser, errUser := cr_rabbitmq.SetupUserConsumer()
+	if err != nil {
+		log.Fatalf("setup of User Consumer failed: %v", errUser)
+	}
+	defer connUser.Close()
+	defer chUser.Close()
+
 	// Elasticsearch
 	esClient, err := elasticsearch.NewDefaultClient()
 	if err != nil {
