@@ -9,8 +9,7 @@ import (
 
 func SetupHeartbeatConsumer() (*amqp.Connection, *amqp.Channel, <-chan amqp.Delivery, error) {
 
-	url := os.Getenv("RABBITMQ_URL")
-	conn, err := amqp.Dial(url)
+	conn, err := amqp.Dial(os.Getenv("RABBITMQ_URL"))
 
 	if err != nil {
 		return nil, nil, nil, err
@@ -79,9 +78,7 @@ func SetupHeartbeatConsumer() (*amqp.Connection, *amqp.Channel, <-chan amqp.Deli
 }
 
 func SetupUserConsumer() (*amqp.Connection, *amqp.Channel, <-chan amqp.Delivery, error) {
-
-	// TODO(marwan): replace with secrets
-	conn, err := amqp.Dial("amqp://guest:guest@rabbitmq:5672/")
+	conn, err := amqp.Dial(os.Getenv("RABBITMQ_URL"))
 
 	if err != nil {
 		return nil, nil, nil, err
