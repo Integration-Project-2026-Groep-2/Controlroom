@@ -10,6 +10,7 @@ import (
 
 	"integration-project-ehb/controlroom/internal/heartbeat"
 	cr_rabbitmq "integration-project-ehb/controlroom/internal/rabbitmq"
+	userobject "integration-project-ehb/controlroom/internal/userObject"
 
 	elasticsearch "github.com/elastic/go-elasticsearch/v9"
 )
@@ -25,7 +26,14 @@ func main() {
 	defer conn.Close()
 	defer ch.Close()
 
-	fmt.Printf("2 we are here")
+	// Setup consumer of user
+	connUser, chUser, msgsUser, errUser := cr_rabbitmq.SetupUserConsumer()
+	if err != nil {
+		log.Fatalf("setup of User Consumer failed: %v", errUser)
+	}
+	defer connUser.Close()
+	defer chUser.Close()
+
 	// Elasticsearch
 	esClient, err := elasticsearch.NewDefaultClient()
 	if err != nil {
@@ -46,6 +54,7 @@ func main() {
 	defer dlqCh.Close()
 
 	processor := heartbeat.CreateProcessor(esClient, dlqCh)
+	processorUser := userobject.CreateProcessor(esClient, dlqCh)
 
 	// Graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
@@ -55,6 +64,7 @@ func main() {
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	go heartbeat.ConsumeHeartbeats(processor, msgs, ctx)
+	go userobject.ConsumeUserObjects(processorUser, msgsUser, ctx)
 
 	log.Println("Controlroom is running...")
 
