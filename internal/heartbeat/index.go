@@ -77,10 +77,11 @@ func indexInternalLogs(es *elasticsearch.Client, ctx context.Context, logMsg *in
 
 	// Create an IndexRequest
 	req := esapi.IndexRequest{
-		Index:      "internal-logs", // You can choose your index name
+		Index:      "internal-logs",
 		DocumentID: fmt.Sprintf("%s-%d", logMsg.Service, logMsg.Timestamp.UnixNano()),
 		Body:       bytes.NewReader(jsonData),
-		Refresh:    "true", // optional: refresh immediately
+		// optional: refresh immediately
+		Refresh: "true",
 	}
 
 	// Execute the request
