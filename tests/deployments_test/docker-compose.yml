@@ -3,29 +3,20 @@ services:
     image: rabbitmq:3-management
     container_name: rabbitmq
     ports:
-      - "5672:5672"   # AMQP
-      - "15672:15672"   # Management UI
+      - "5672:5672"
+      - "15672:15672"
     environment:
-      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER}
-      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD}
-      - ABBITMQ_SERVER_ADDITIONAL_ERL_ARGS=-rabbit allow_loopback_users false
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - cr_controlroom-network
     restart: unless-stopped
+
+networks:
+  cr_controlroom-network:
+    external: true
 
 volumes:
   rabbitmq_data:
-
-
-  # rabbitmq:
-  #   image: rabbitmq:3-management
-  #   container_name: rabbitmq
-  #   environment:
-  #     - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER}
-  #     - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD}
-  #   ports:
-  #     - "5672:5672"
-  #     - "15672:15672"
-  #   networks:
-  #     - controlroom-network
-
