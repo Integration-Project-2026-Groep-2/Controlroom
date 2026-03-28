@@ -3,8 +3,8 @@ services:
     image: rabbitmq:3-management
     container_name: rabbitmq
     ports:
-      - "${PORT_KIBANA}:5601"   # AMQP
-      - "15672:15672"   # Management UI
+      - "5672:5672"
+      - "15672:15672"
     environment:
       - ${RABBITMQ_USER}
       - ${RABBITMQ_PASSWORD}
