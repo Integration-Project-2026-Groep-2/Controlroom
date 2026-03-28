@@ -19,7 +19,9 @@ func TestProducerUser(t *testing.T) {
 	validate := validator.New()
 
 	// 1. Connect to RabbitMQ
-	conn, err := amqp.Dial("amqp://guest:guest@localhost:5671/")
+	//TODO(steven): find way to do this with env variable
+	//connectionString := fmt.Sprintf("amqp://root:admin@127.0.0.1:5672")
+	conn, err := amqp.Dial("amqp://root:admin@127.0.0.1:5672")
 	if err != nil {
 		log.Fatalf("❌ Failed to connect to RabbitMQ: %v", err)
 	}
@@ -35,6 +37,34 @@ func TestProducerUser(t *testing.T) {
 	err = ch.ExchangeDeclare("user.topic", "direct", true, false, false, false, nil)
 	if err != nil {
 		log.Fatalf("Failed to declare exchange: %v", err)
+	}
+
+	// Declare a queue
+
+	q, err := ch.QueueDeclare(
+		"crm.user.confirmed", // name
+		true,                 // durable (survives server restarts)
+		false,                // delete when unused
+		false,                // exclusive (only used by this connection)
+		false,                // no-wait
+		nil,                  // arguments
+	)
+	if err != nil {
+		log.Fatalf("Failed to declare a queue: %v", err)
+	}
+
+	// TODO(steven): change routing key to actual key
+	// Routing key: "temp.routing.consumers"
+	err = ch.QueueBind(
+		q.Name,                   // queue name
+		"temp.routing.consumers", // routing key
+		"user.topic",             // exchange
+		false,
+		nil,
+	)
+
+	if err != nil {
+		log.Fatalf("Failed to bind queue to exchange: %v", err)
 	}
 
 	fmt.Println("🚀 Producer started! Sending data every 5 seconds... (Press CTRL+C to exit)")
