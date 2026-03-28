@@ -1,4 +1,24 @@
-﻿services:
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - controlroom-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_running"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:9.3.1
     container_name: elasticsearch
@@ -8,6 +28,7 @@
       - ES_JAVA_OPTS=-Xms1g -Xmx1g
     ports:
       - "${PORT_ELASTICSEARCH}:9200"
+      - "${PORT_ELASTICSEARCH_TRANSPORT}:9300"
     volumes:
       - elasticsearch:/usr/share/elasticsearch/data
     networks:
@@ -35,9 +56,13 @@
       dockerfile: Dockerfile
     container_name: controlroom
     depends_on:
-      - elasticsearch
+      rabbitmq:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
     environment:
-      - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@${RABBITMQ_HOST}:5672/
+      - RABBITMQ_HOST=${RABBITMQ_HOST}
       - ELASTICSEARCH_URL=http://elasticsearch:9200
     networks:
       - controlroom-network
