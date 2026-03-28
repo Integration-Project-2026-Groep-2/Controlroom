@@ -1,3 +1,4 @@
+// controlroom entry point
 package main
 
 import (
@@ -170,9 +171,9 @@ func main() {
 	go cr_rabbitmq.Consume(scCfg, scMsgs, ctx)
 	log.Println("StatusCheck consumer started")
 
-	// TODO(nasr): add logging stuff in the future
-
-	// ---------------------- shutdown stuff ----------------------
+	// NOTE(nasr): docker and kuberenets send a SIGTERM the sigChan keeps opens a channel
+	// that listens for that exact signal and for the time it hasn't received it
+	// the program keeps running
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
