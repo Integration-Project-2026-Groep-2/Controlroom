@@ -3,12 +3,12 @@ package logger
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
-	"time"
 	"net/http"
 	"os"
-	"errors"
 	"strings"
+	"time"
 )
 
 type Severity int8
@@ -47,8 +47,8 @@ func Log(message LogMessage) {
 		log.Printf("error: %w\n", err)
 	}
 
- 	req.Header.Set("Content-Type", "application/json")
-    req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
 }
 
 // logs to kibana only and to the stdout

@@ -19,7 +19,7 @@ func ConsumeHeartbeats(p *Processor, msgs <-chan amqp.Delivery, ctx context.Cont
 				return
 			}
 
-			err := processHeartbeat(p, msg.Body)
+			err := ProcessHeartbeat(p, msg.Body)
 			if err != nil {
 				msg.Nack(false, false)
 			} else {

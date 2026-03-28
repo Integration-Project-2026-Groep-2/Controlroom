@@ -15,10 +15,22 @@ import (
 	"integration-project-ehb/controlroom/pkg/xml/gen"
 )
 
+type DLQPublisher interface {
+	PublishWithContext(ctx context.Context, exchange, key string, mandatory, immediate bool, msg amqp.Publishing) error
+}
+
 type Processor struct {
 	es        *elasticsearch.Client
 	validator *validator.Validate
-	dlq       *amqp.Channel
+	dlq       DLQPublisher
+}
+
+func NewProcessor(es *elasticsearch.Client, dlq DLQPublisher) *Processor {
+	return &Processor{
+		es:        es,
+		validator: validator.New(),
+		dlq:       dlq,
+	}
 }
 
 func CreateProcessor(es *elasticsearch.Client, dlqCh *amqp.Channel) *Processor {
@@ -34,29 +46,32 @@ func CreateProcessor(es *elasticsearch.Client, dlqCh *amqp.Channel) *Processor {
 	}
 }
 
-func processHeartbeat(p *Processor, body []byte) error {
+func ProcessHeartbeat(p *Processor, body []byte) error {
 	var hb gen.Heartbeat
 
 	if err := xml.Unmarshal(body, &hb); err != nil {
-		return sendToDLQ(p.dlq, body, fmt.Sprintf("unmarshal error: %v", err))
+		sendToDLQ(p.dlq, body, fmt.Sprintf("unmarshal error: %v", err))
+		return err
 	}
 
 	if err := p.validator.Struct(hb); err != nil {
-		return sendToDLQ(p.dlq, body, fmt.Sprintf("validation error: %v", err))
+		sendToDLQ(p.dlq, body, fmt.Sprintf("validation error: %v", err))
+		return err
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	if err := indexHeartbeat(p.es, ctx, &hb); err != nil {
-		return sendToDLQ(p.dlq, body, fmt.Sprintf("index error: %v", err))
+		sendToDLQ(p.dlq, body, fmt.Sprintf("index error: %v", err))
+		return err
 	}
 
 	log.Printf("Indexed heartbeat: %s", hb.ServiceId)
 	return nil
 }
 
-func sendToDLQ(dlq *amqp.Channel, body []byte, reason string) error {
+func sendToDLQ(dlq DLQPublisher, body []byte, reason string) error {
 	err := dlq.PublishWithContext(
 		context.Background(),
 		"",

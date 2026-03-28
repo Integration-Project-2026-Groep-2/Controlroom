@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -33,11 +34,18 @@ func main() {
 	defer connUser.Close()
 	defer chUser.Close()
 
+	fmt.Printf("2 we are here")
 	// Elasticsearch
 	esClient, err := elasticsearch.NewDefaultClient()
 	if err != nil {
 		log.Fatalf("Failed to create Elasticsearch client: %v", err)
 	}
+	res, err := esClient.Info()
+	if err != nil {
+		log.Fatalf("Error connecting to Elasticsearch: %s", err)
+	}
+	defer res.Body.Close()
+	log.Println("Successfully connected to Elasticsearch!")
 
 	// DLQ channel
 	dlqCh, err := conn.Channel()

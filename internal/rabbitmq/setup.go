@@ -1,13 +1,16 @@
 package cr_rabbitmq
 
 import (
+	"fmt"
+	"os"
+
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 func SetupHeartbeatConsumer() (*amqp.Connection, *amqp.Channel, <-chan amqp.Delivery, error) {
 
-	// TODO(marwan): replace with secrets
-	conn, err := amqp.Dial("amqp://guest:guest@rabbitmq:5672/")
+	url := os.Getenv("RABBITMQ_URL")
+	conn, err := amqp.Dial(url)
 
 	if err != nil {
 		return nil, nil, nil, err
@@ -15,7 +18,7 @@ func SetupHeartbeatConsumer() (*amqp.Connection, *amqp.Channel, <-chan amqp.Deli
 
 	ch, err := conn.Channel()
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, fmt.Errorf("failed here")
 	}
 
 	err = ch.ExchangeDeclare(
