@@ -535,8 +535,8 @@ func resolveGoType(xsdType string) string {
 		return gt
 	}
 	local := xsdType
-	if i := strings.Index(xsdType, ":"); i >= 0 {
-		local = xsdType[i+1:]
+	if _, after, ok := strings.Cut(xsdType, ":"); ok {
+		local = after
 	}
 	return goIdent(local)
 }
