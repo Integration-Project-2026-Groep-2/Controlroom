@@ -9,6 +9,7 @@ package main
 import (
 	"context"
 	"encoding/xml"
+	"integration-project-ehb/controlroom/pkg/xml_gen"
 	"testing"
 	"time"
 
@@ -17,7 +18,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"integration-project-ehb/controlroom/internal/heartbeat"
-	"integration-project-ehb/controlroom/pkg/xml/gen"
 )
 
 type mockDLQ struct {
@@ -54,7 +54,7 @@ func TestProcessHeartbeat_ValidXML_SendsToDLQOnESError(t *testing.T) {
 	dlq := &mockDLQ{}
 	p := newTestProcessor(dlq)
 
-	hb := gen.Heartbeat{ServiceId: "test-service", Timestamp: time.Now().UTC()}
+	hb := xml_gen.Heartbeat{ServiceId: "test-service", Timestamp: time.Now().UTC()}
 	body, _ := xml.Marshal(hb)
 
 	// ES client heeft geen echte verbinding, dus indexing faalt → DLQ

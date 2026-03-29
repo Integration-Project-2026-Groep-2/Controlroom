@@ -13,6 +13,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"integration-project-ehb/controlroom/pkg/xml_gen"
 	"os"
 	"testing"
 	"time"
@@ -21,8 +22,6 @@ import (
 	"github.com/elastic/go-elasticsearch/v9/esapi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"integration-project-ehb/controlroom/pkg/xml/gen"
 )
 
 // newESClient bouwt een ES client op basis van omgevingsvariabelen.
@@ -60,7 +59,7 @@ func TestElasticsearch_Connect(t *testing.T) {
 func TestElasticsearch_IndexHeartbeat(t *testing.T) {
 	es := newESClient(t)
 
-	hb := gen.Heartbeat{
+	hb := xml_gen.Heartbeat{
 		ServiceId: "index-test-service",
 		Timestamp: time.Now().UTC(),
 	}

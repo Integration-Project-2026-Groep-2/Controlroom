@@ -4,14 +4,13 @@ import (
 	"context"
 	"encoding/xml"
 	"fmt"
+	"integration-project-ehb/controlroom/pkg/xml_gen"
 	"log"
 	"testing"
 	"time"
 
 	"github.com/go-playground/validator/v10"
 	amqp "github.com/rabbitmq/amqp091-go"
-
-	"integration-project-ehb/controlroom/pkg/xml/gen"
 )
 
 func TestProducer(t *testing.T) {
@@ -44,8 +43,8 @@ func TestProducer(t *testing.T) {
 		now := time.Now().UTC()
 
 		// Create dummy data
-		hbCRM := gen.Heartbeat{ServiceId: "Service-CRM", Timestamp: now}
-		hbFacturatie := gen.Heartbeat{ServiceId: "Service-Facturatie", Timestamp: now}
+		hbCRM := xml_gen.Heartbeat{ServiceId: "Service-CRM", Timestamp: now}
+		hbFacturatie := xml_gen.Heartbeat{ServiceId: "Service-Facturatie", Timestamp: now}
 
 		// Validate & Send CRM Heartbeat
 		if err := validate.Struct(hbCRM); err == nil {

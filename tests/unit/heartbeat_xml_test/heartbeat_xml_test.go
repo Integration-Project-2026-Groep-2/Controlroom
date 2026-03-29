@@ -10,17 +10,16 @@ package main
 
 import (
 	"encoding/xml"
+	"integration-project-ehb/controlroom/pkg/xml_gen"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
-
-	"integration-project-ehb/controlroom/pkg/xml/gen"
 )
 
 func TestHeartbeat_MarshalUnmarshal(t *testing.T) {
-	original := gen.Heartbeat{
+	original := xml_gen.Heartbeat{
 		ServiceId: "test-service",
 		Timestamp: time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC),
 	}
@@ -28,7 +27,7 @@ func TestHeartbeat_MarshalUnmarshal(t *testing.T) {
 	data, err := xml.Marshal(original)
 	assert.NoError(t, err)
 
-	var result gen.Heartbeat
+	var result xml_gen.Heartbeat
 	err = xml.Unmarshal(data, &result)
 	assert.NoError(t, err)
 
@@ -37,7 +36,7 @@ func TestHeartbeat_MarshalUnmarshal(t *testing.T) {
 }
 
 func TestHeartbeat_XMLTagNames(t *testing.T) {
-	hb := gen.Heartbeat{ServiceId: "svc", Timestamp: time.Now().UTC()}
+	hb := xml_gen.Heartbeat{ServiceId: "svc", Timestamp: time.Now().UTC()}
 
 	data, err := xml.Marshal(hb)
 	assert.NoError(t, err)

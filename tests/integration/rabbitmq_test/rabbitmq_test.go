@@ -16,6 +16,7 @@ import (
 	"context"
 	"encoding/xml"
 	"fmt"
+	"integration-project-ehb/controlroom/pkg/xml_gen"
 	"testing"
 	"time"
 
@@ -23,7 +24,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"integration-project-ehb/controlroom/pkg/xml/gen"
 	"os"
 )
 
@@ -113,7 +113,7 @@ func TestRabbitMQ_PublishAndReceive(t *testing.T) {
 	msgs, err := ch.Consume(q.Name, "", false, true, false, false, nil)
 	require.NoError(t, err)
 
-	hb := gen.Heartbeat{ServiceId: "test-publish-receive", Timestamp: time.Now().UTC()}
+	hb := xml_gen.Heartbeat{ServiceId: "test-publish-receive", Timestamp: time.Now().UTC()}
 	body, err := xml.Marshal(hb)
 	require.NoError(t, err)
 

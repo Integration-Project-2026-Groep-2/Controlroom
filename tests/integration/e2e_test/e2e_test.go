@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
+	"integration-project-ehb/controlroom/pkg/xml_gen"
 	"os"
 	"testing"
 	"time"
@@ -30,7 +31,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"integration-project-ehb/controlroom/internal/heartbeat"
-	"integration-project-ehb/controlroom/pkg/xml/gen"
 )
 
 func rabbitmqURL() string {
@@ -145,7 +145,7 @@ func TestE2E_ValidHeartbeat_IndexedInES(t *testing.T) {
 	publish, cancel := setupConsumer(t, conn, es)
 	defer cancel()
 
-	hb := gen.Heartbeat{
+	hb := xml_gen.Heartbeat{
 		ServiceId: fmt.Sprintf("e2e-valid-%d", time.Now().UnixNano()),
 		Timestamp: time.Now().UTC(),
 	}
@@ -228,7 +228,7 @@ func TestE2E_MultipleServices_AllIndexed(t *testing.T) {
 	docIDs := make([]string, len(services))
 
 	for i, svc := range services {
-		hb := gen.Heartbeat{ServiceId: svc, Timestamp: now}
+		hb := xml_gen.Heartbeat{ServiceId: svc, Timestamp: now}
 		docIDs[i] = fmt.Sprintf("%s-%d", svc, now.Unix())
 
 		body, err := xml.Marshal(hb)
