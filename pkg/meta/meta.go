@@ -535,18 +535,72 @@ func resolveGoType(xsdType string) string {
 		return gt
 	}
 	local := xsdType
-	if i := strings.Index(xsdType, ":"); i >= 0 {
-		local = xsdType[i+1:]
+	if _, after, ok := strings.Cut(xsdType, ":"); ok {
+		local = after
 	}
 	return goIdent(local)
 }
 
+// jsonKey converts a camelCase or PascalCase XSD name to snake_case for JSON tags.
+// e.g. "serviceId" -> "service_id", "Timestamp" -> "timestamp"
+func jsonKey(name string) string {
+	var out []rune
+	runes := []rune(name)
+	for i, r := range runes {
+		if i > 0 && unicode.IsUpper(r) && !unicode.IsUpper(runes[i-1]) {
+			out = append(out, '_')
+		}
+		out = append(out, unicode.ToLower(r))
+	}
+	return string(out)
+}
+
+// isRequired reports whether an XSD element or attribute is required.
+// Elements are required when minOccurs is absent (defaults to 1) or explicitly "1".
+// Attributes are required when use="required".
+func isRequired(attrs Attrs, isAttr bool) bool {
+	if isAttr {
+		return attrs.Use == "required"
+	}
+	return attrs.MinOcc == "" || attrs.MinOcc == "1"
+}
+
 // structField holds data for one Go struct field.
 type structField struct {
-	GoName string
-	GoType string
-	XMLTag string
-	IsAttr bool
+	GoName   string
+	GoType   string
+	XMLTag   string
+	IsAttr   bool
+	JSONTag  string
+	Validate string
+}
+
+// buildTag composes the full struct tag string from a structField.
+func buildTag(f structField) string {
+	var xmlPart, jsonPart, validatePart string
+
+	switch {
+	case f.XMLTag == ",chardata":
+		xmlPart = `xml:",chardata"`
+	case f.IsAttr:
+		xmlPart = fmt.Sprintf(`xml:"%s,attr"`, f.XMLTag)
+	default:
+		xmlPart = fmt.Sprintf(`xml:"%s"`, f.XMLTag)
+	}
+
+	parts := []string{xmlPart}
+
+	if f.JSONTag != "" {
+		jsonPart = fmt.Sprintf(`json:"%s"`, f.JSONTag)
+		parts = append(parts, jsonPart)
+	}
+
+	if f.Validate != "" {
+		validatePart = fmt.Sprintf(`validate:"%s"`, f.Validate)
+		parts = append(parts, validatePart)
+	}
+
+	return "`" + strings.Join(parts, " ") + "`"
 }
 
 // collectFields walks direct children of a node and returns fields for the
@@ -581,11 +635,17 @@ func collectFields(node *Node) []structField {
 			if isSlice {
 				goType = "[]" + goType
 			}
+			validate := ""
+			if isRequired(child.Attrs, false) {
+				validate = "required"
+			}
 			fields = append(fields, structField{
-				GoName: goIdent(name),
-				GoType: goType,
-				XMLTag: name,
-				IsAttr: false,
+				GoName:   goIdent(name),
+				GoType:   goType,
+				XMLTag:   name,
+				IsAttr:   false,
+				JSONTag:  jsonKey(name),
+				Validate: validate,
 			})
 
 		case TAG_ATTRIBUTE:
@@ -597,11 +657,17 @@ func collectFields(node *Node) []structField {
 			if child.Attrs.Type != "" {
 				goType = resolveGoType(child.Attrs.Type)
 			}
+			validate := ""
+			if isRequired(child.Attrs, true) {
+				validate = "required"
+			}
 			fields = append(fields, structField{
-				GoName: goIdent(name),
-				GoType: goType,
-				XMLTag: name,
-				IsAttr: true,
+				GoName:   goIdent(name),
+				GoType:   goType,
+				XMLTag:   name,
+				IsAttr:   true,
+				JSONTag:  jsonKey(name),
+				Validate: validate,
 			})
 		}
 	}
@@ -640,15 +706,17 @@ func collectSimpleContentFields(node *Node) (fields []structField, ok bool) {
 			if ext.Attrs.Base != "" {
 				goType = resolveGoType(ext.Attrs.Base)
 			}
-			// chardata field for the element text value
+			// chardata field for the element text value — no json/validate on the raw Value field
 			fields = append(fields, structField{
-				GoName: "Value",
-				GoType: goType,
-				XMLTag: ",chardata",
-				IsAttr: false,
+				GoName:   "Value",
+				GoType:   goType,
+				XMLTag:   ",chardata",
+				IsAttr:   false,
+				JSONTag:  "value",
+				Validate: "",
 			})
 			// attributes on the extension
-			for attr := ext.First; attr != nil; attr = attr.Next {
+			for attr := ext.First; attr != nil; attr = ext.Next {
 				if attr.Tag != TAG_ATTRIBUTE || attr.Attrs.Name == "" {
 					continue
 				}
@@ -656,11 +724,17 @@ func collectSimpleContentFields(node *Node) (fields []structField, ok bool) {
 				if attr.Attrs.Type != "" {
 					attrType = resolveGoType(attr.Attrs.Type)
 				}
+				validate := ""
+				if isRequired(attr.Attrs, true) {
+					validate = "required"
+				}
 				fields = append(fields, structField{
-					GoName: goIdent(attr.Attrs.Name),
-					GoType: attrType,
-					XMLTag: attr.Attrs.Name,
-					IsAttr: true,
+					GoName:   goIdent(attr.Attrs.Name),
+					GoType:   attrType,
+					XMLTag:   attr.Attrs.Name,
+					IsAttr:   true,
+					JSONTag:  jsonKey(attr.Attrs.Name),
+					Validate: validate,
 				})
 			}
 			return fields, true
@@ -755,17 +829,10 @@ func writeStruct(buf *strings.Builder, name string, fields []structField) {
 	buf.WriteString(" struct {\n")
 
 	xmlElem := strings.ToLower(name[:1]) + name[1:]
-	fmt.Fprintf(buf, "\tXMLName xml.Name `xml:\"%s\"`\n", xmlElem)
+	fmt.Fprintf(buf, "\tXMLName xml.Name `xml:\"%s\" json:\"%s\"`\n", xmlElem, xmlElem)
 
 	for _, f := range fields {
-		var tag string
-		if f.XMLTag == ",chardata" {
-			tag = "`xml:\",chardata\"`"
-		} else if f.IsAttr {
-			tag = fmt.Sprintf("`xml:\"%s,attr\"`", f.XMLTag)
-		} else {
-			tag = fmt.Sprintf("`xml:\"%s\"`", f.XMLTag)
-		}
+		tag := buildTag(f)
 		fmt.Fprintf(buf, "\t%-24s %-20s %s\n", f.GoName, f.GoType, tag)
 	}
 	buf.WriteString("}\n\n")
