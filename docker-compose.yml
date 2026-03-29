@@ -30,6 +30,7 @@
         condition: service_healthy
     networks:
       - controlroom-network
+
   controlroom:
     build:
       context: .

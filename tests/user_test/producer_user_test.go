@@ -97,7 +97,7 @@ func TestProducerUser(t *testing.T) {
 			BadgeCode:   "SPKR-2026-X",
 			IsActive:    true,
 			GdprConsent: true,
-			ConfirmedAt: gen.ISO8601DateTimeType("2026-03-28T13:45:00Z"),
+			ConfirmedAt: gen.ISO8601DateTimeType(time.Now().Format(time.RFC3339)),
 		}
 
 		// Validate & Send adminUser
@@ -117,8 +117,8 @@ func TestProducerUser(t *testing.T) {
 			fmt.Println("📤 Sent: Facturatie Heartbeat")
 		}
 
-		fmt.Println("--- Waiting 5 seconds ---")
-		time.Sleep(5 * time.Second)
+		fmt.Println("--- Waiting 60 seconds ---")
+		time.Sleep(60 * time.Second)
 	}
 
 }
