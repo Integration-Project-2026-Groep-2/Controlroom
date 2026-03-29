@@ -1,4 +1,4 @@
-package heartbeat
+package userobject
 
 import (
 	"context"
@@ -7,19 +7,20 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-func ConsumeHeartbeats(p *Processor, msgs <-chan amqp.Delivery, ctx context.Context) {
+func ConsumeUserObjects(p *Processor, msgs <-chan amqp.Delivery, ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			log.Println("Heartbeat consumer shutting down...")
+			log.Println("UserObject consumer shutting down...")
 			return
 
 		case msg, ok := <-msgs:
 			if !ok {
+				log.Fatalf("User consumer Failed.")
 				return
 			}
 
-			err := ProcessHeartbeat(p, msg.Body)
+			err := ProcessUserObject(p, msg.Body)
 			if err != nil {
 				msg.Nack(false, false)
 			} else {

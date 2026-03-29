@@ -8,6 +8,7 @@
       - ES_JAVA_OPTS=-Xms1g -Xmx1g
     ports:
       - "${PORT_ELASTICSEARCH}:9200"
+      - "${PORT_ELASTICSEARCH_TRANSPORT}:9300"
     volumes:
       - elasticsearch:/usr/share/elasticsearch/data
     networks:
@@ -17,7 +18,6 @@
       interval: 10s
       timeout: 5s
       retries: 10
-
   kibana:
     image: docker.elastic.co/kibana/kibana:9.3.1
     container_name: kibana
@@ -38,7 +38,8 @@
     depends_on:
       - elasticsearch
     environment:
-      - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@${RABBITMQ_HOST}:5672/
+      - RABBITMQ_HOST=${RABBITMQ_HOST}
       - ELASTICSEARCH_URL=http://elasticsearch:9200
     networks:
       - controlroom-network
@@ -49,5 +50,6 @@ networks:
     driver: bridge
 
 volumes:
+  rabbitmq_data:
   elasticsearch:
     driver: local
