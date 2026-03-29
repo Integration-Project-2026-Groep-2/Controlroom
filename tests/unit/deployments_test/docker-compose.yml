@@ -11,11 +11,11 @@ services:
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:
-      - controlroom_controlroom-network
+      - cr_controlroom-network
     restart: unless-stopped
 
 networks:
-  controlroom_controlroom-network:
+  cr_controlroom-network:
     external: true
 
 volumes:
