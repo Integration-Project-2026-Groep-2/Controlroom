@@ -36,7 +36,7 @@ func indexUser(es *elasticsearch.Client, ctx context.Context, uo *gen.UserConfir
 
 	req := esapi.IndexRequest{
 		Index:      "users",
-		DocumentID: fmt.Sprintf("%s-%d", uo.Id, uo.ConfirmedAt),
+		DocumentID: fmt.Sprintf("%s-%v", uo.Id, uo.ConfirmedAt),
 		Body:       bytes.NewReader(jsonData),
 		Refresh:    "true",
 	}
