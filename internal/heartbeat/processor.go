@@ -4,15 +4,13 @@ import (
 	"context"
 	"encoding/xml"
 	"fmt"
+	"integration-project-ehb/controlroom/pkg/xml_gen"
 	"log"
 	"time"
 
 	elasticsearch "github.com/elastic/go-elasticsearch/v9"
 	"github.com/go-playground/validator/v10"
 	amqp "github.com/rabbitmq/amqp091-go"
-
-	// generated structs
-	"integration-project-ehb/controlroom/pkg/xml/gen"
 )
 
 type DLQPublisher interface {
@@ -47,7 +45,7 @@ func CreateProcessor(es *elasticsearch.Client, dlqCh *amqp.Channel) *Processor {
 }
 
 func ProcessHeartbeat(p *Processor, body []byte) error {
-	var hb gen.Heartbeat
+	var hb xml_gen.Heartbeat
 
 	if err := xml.Unmarshal(body, &hb); err != nil {
 		sendToDLQ(p.dlq, body, fmt.Sprintf("unmarshal error: %v", err))

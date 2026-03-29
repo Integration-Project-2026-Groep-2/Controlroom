@@ -7,7 +7,8 @@ package main
 import (
 	"flag"
 	"fmt"
-	"integration-project-ehb/controlroom/pkg/meta"
+	"integration-project-ehb/controlroom/pkg/metaxml"
+	"integration-project-ehb/controlroom/pkg/metasexp"
 	"log"
 	"os"
 )
@@ -23,11 +24,12 @@ const (
 // NOTE(nasr): parsing command line arguments for defining the source foulders where the xml files can be found and the destination folder for throwing in the structs
 var (
 	base = flag.String("path", "pkg/xml/", "path to folder containing xsd files")
-	out  = flag.String("out", "pkg/xml/gen/", "path to folder where .go files are written")
+	out  = flag.String("out", "pkg/xml_gen/", "path to folder where .go files are written")
 )
 
 func main() {
 	flag.Parse()
+
 
 	// =============================================================================
 	// folder handling
@@ -47,25 +49,25 @@ func main() {
 		if entry.IsDir() {
 			continue
 		}
-		if !meta.IsXsd(entry.Name()) {
+		if !metaxml.IsXsd(entry.Name()) {
 			continue
 		}
 
 		name := entry.Name()
 
-		var lexer meta.MetaLexer
+		var lexer metaxml.MetaLexer
 		if err := lexer.LoadFile(*base, name); err != nil {
 			fmt.Printf("%s  FAIL%s  %s %s%v%s\n", clRed+clBold, clReset, name, clGray, err, clReset)
 			continue
 		}
 
-		var ast meta.AST
+		var ast metaxml.AST
 		if err := lexer.Lex(&ast); err != nil {
 			fmt.Printf("%s  FAIL%s  %s %s%v%s\n", clRed+clBold, clReset, name, clGray, err, clReset)
 			continue
 		}
 
-		if err := meta.WriteGoStruct(&ast, *out, name); err != nil {
+		if err := metaxml.WriteGoStruct(&ast, *out, name); err != nil {
 			fmt.Printf("%s  FAIL%s  %s %s%v%s\n", clRed+clBold, clReset, name, clGray, err, clReset)
 			continue
 		}

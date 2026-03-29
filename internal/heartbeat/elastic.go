@@ -5,14 +5,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"integration-project-ehb/controlroom/pkg/xml_gen"
 	"time"
 
 	"github.com/elastic/go-elasticsearch/v9"
 	"github.com/elastic/go-elasticsearch/v9/esapi"
-	"integration-project-ehb/controlroom/pkg/xml/gen"
 )
 
-func indexHeartbeat(es *elasticsearch.Client, ctx context.Context, hb *gen.Heartbeat) error {
+func indexHeartbeat(es *elasticsearch.Client, ctx context.Context, hb *xml_gen.Heartbeat) error {
+	// TODO(nasr): find a way to replace this witth a generated reference.
+	// we dont want to make an document indexer per new recceiver
 	doc := map[string]interface{}{
 		"serviceId": hb.ServiceId,
 		"timestamp": hb.Timestamp,
