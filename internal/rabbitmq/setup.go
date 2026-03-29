@@ -7,17 +7,17 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-func SetupHeartbeatConsumer() (*amqp.Connection, *amqp.Channel, <-chan amqp.Delivery, error) {
+func SetupHeartbeatConsumer(*amqp.Connection) (*amqp.Channel, <-chan amqp.Delivery, error) {
 
 	conn, err := amqp.Dial(os.Getenv("RABBITMQ_URL"))
 
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
 	ch, err := conn.Channel()
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed here")
+		return nil, nil, fmt.Errorf("failed here")
 	}
 
 	err = ch.ExchangeDeclare(
@@ -30,7 +30,7 @@ func SetupHeartbeatConsumer() (*amqp.Connection, *amqp.Channel, <-chan amqp.Deli
 		nil,
 	)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
 	qHeartbeat, err := ch.QueueDeclare(
@@ -42,7 +42,7 @@ func SetupHeartbeatConsumer() (*amqp.Connection, *amqp.Channel, <-chan amqp.Deli
 		nil,
 	)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
 	err = ch.QueueBind(
@@ -53,12 +53,12 @@ func SetupHeartbeatConsumer() (*amqp.Connection, *amqp.Channel, <-chan amqp.Deli
 		nil,
 	)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
 	err = ch.Qos(10, 0, false)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
 	msgs, err := ch.Consume(
@@ -71,22 +71,22 @@ func SetupHeartbeatConsumer() (*amqp.Connection, *amqp.Channel, <-chan amqp.Deli
 		nil,
 	)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
-	return conn, ch, msgs, nil
+	return ch, msgs, nil
 }
 
-func SetupUserConsumer() (*amqp.Connection, *amqp.Channel, <-chan amqp.Delivery, error) {
+func SetupUserConsumer(*amqp.Connection) (*amqp.Channel, <-chan amqp.Delivery, error) {
 	conn, err := amqp.Dial(os.Getenv("RABBITMQ_URL"))
 
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
 	ch, err := conn.Channel()
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
 	err = ch.ExchangeDeclare(
@@ -99,19 +99,19 @@ func SetupUserConsumer() (*amqp.Connection, *amqp.Channel, <-chan amqp.Delivery,
 		nil,
 	)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
 	Quser, err := ch.QueueDeclare(
 		"crm.user.confirmed",
-		false,
 		true,
+		false,
 		false,
 		false,
 		nil,
 	)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
 	err = ch.QueueBind(
@@ -123,12 +123,12 @@ func SetupUserConsumer() (*amqp.Connection, *amqp.Channel, <-chan amqp.Delivery,
 		nil,
 	)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
 	err = ch.Qos(10, 0, false)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
 	msgs, err := ch.Consume(
@@ -141,8 +141,8 @@ func SetupUserConsumer() (*amqp.Connection, *amqp.Channel, <-chan amqp.Delivery,
 		nil,
 	)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
-	return conn, ch, msgs, nil
+	return ch, msgs, nil
 }
