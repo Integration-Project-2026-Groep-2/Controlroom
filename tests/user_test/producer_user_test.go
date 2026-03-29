@@ -21,7 +21,7 @@ func TestProducerUser(t *testing.T) {
 	// 1. Connect to RabbitMQ
 	//TODO(steven): find way to do this with env variable
 	//connectionString := fmt.Sprintf("amqp://root:admin@127.0.0.1:5672")
-	conn, err := amqp.Dial("amqp://root:admin@127.0.0.1:5672")
+	conn, err := amqp.Dial("amqp://guest:guest@127.0.0.1:5672")
 	if err != nil {
 		log.Fatalf("❌ Failed to connect to RabbitMQ: %v", err)
 	}

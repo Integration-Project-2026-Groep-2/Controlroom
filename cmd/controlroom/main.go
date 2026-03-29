@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -13,34 +12,31 @@ import (
 	userobject "integration-project-ehb/controlroom/internal/userObject"
 
 	elasticsearch "github.com/elastic/go-elasticsearch/v9"
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 func main() {
 	log.Println("Starting Controlroom...")
 
-	// RabbitMQ setup
-	conn, ch, msgs, err := cr_rabbitmq.SetupHeartbeatConsumer()
+	conn, err := amqp.Dial(os.Getenv("RABBITMQ_URL"))
+
 	if err != nil {
 		log.Fatalf("RabbitMQ setup failed: %v", err)
 	}
 	defer conn.Close()
+
+	// RabbitMQ setup
+	ch, msgs, err := cr_rabbitmq.SetupHeartbeatConsumer(conn)
+	if err != nil {
+		log.Fatalf("RabbitMQ setup failed: %v", err)
+	}
 	defer ch.Close()
 
 	// Setup consumer of user
-	connUser, chUser, msgsUser, errUser := cr_rabbitmq.SetupUserConsumer()
+	chUser, msgsUser, errUser := cr_rabbitmq.SetupUserConsumer(conn)
 	if err != nil {
 		log.Fatalf("setup of User Consumer failed: %v", errUser)
 	}
-	defer connUser.Close()
-	defer chUser.Close()
-
-	fmt.Printf("2 we are here")
-	// Setup consumer of user
-	connUser, chUser, msgsUser, errUser := cr_rabbitmq.SetupUserConsumer()
-	if err != nil {
-		log.Fatalf("setup of User Consumer failed: %v", errUser)
-	}
-	defer connUser.Close()
 	defer chUser.Close()
 
 	// Elasticsearch
