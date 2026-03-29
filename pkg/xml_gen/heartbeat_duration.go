@@ -13,7 +13,6 @@ var _ = time.Time{}
 
 type MillisecondDurationType struct {
 	XMLName xml.Name `xml:"millisecondDurationType" json:"millisecondDurationType"`
-	Value                    uint                 `xml:",chardata" json:"value"`
-	Unit                     string               `xml:"unit,attr" json:"unit"`
+	Value   uint     `xml:",chardata" json:"value"`
+	Unit    string   `xml:"unit,attr" json:"unit"`
 }
-

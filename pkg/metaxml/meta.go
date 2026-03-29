@@ -494,7 +494,7 @@ func (ml *MetaLexer) Lex(ast *AST) error {
 			continue
 		}
 
-		// Always pushChild — self-closing tags are children of the current node
+		// Always pushChild self-closing tags are children of the current node
 		// just like opening tags. The only difference is we immediately pop back
 		// so the cursor does not descend into them (they have no children).
 		ast.pushChild(node)

@@ -7,8 +7,8 @@ package main
 import (
 	"flag"
 	"fmt"
-	"integration-project-ehb/controlroom/pkg/metaxml"
 	"integration-project-ehb/controlroom/pkg/metasexp"
+	"integration-project-ehb/controlroom/pkg/metaxml"
 	"log"
 	"os"
 )
@@ -29,7 +29,6 @@ var (
 
 func main() {
 	flag.Parse()
-
 
 	// =============================================================================
 	// folder handling

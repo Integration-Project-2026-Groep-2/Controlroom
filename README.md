@@ -38,7 +38,7 @@ Kibana: http://localhost:5601
 2. Create data view `heartbeats`, timestamp field `@timestamp`
 3. Create data view `users`, timestamp field `@timestamp`
 
- :: responsible: Thomas Heusdens
+For questions contact Thomas Heusdens.
 
 
 ## Tests
@@ -47,4 +47,4 @@ Kibana: http://localhost:5601
 go test ./tests/...
 ```
 
-responsible: Marwan Makouh
+For questions contact Marwan Makouh.

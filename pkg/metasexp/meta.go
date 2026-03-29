@@ -1,7 +1,6 @@
 package metasexp
 
 import (
-
 	"fmt"
 	"os"
 	"path/filepath"
@@ -39,7 +38,6 @@ type Token struct {
 	Type   TokenType
 	Lexeme []byte
 }
-
 
 // MetaLexer holds the raw SEXP byte stream, the token list, and the read position.
 type MetaLexer struct {
@@ -99,27 +97,41 @@ func PushNode(tok Token, ast *AST) error {
 	AST.Parent.Lexeme = tok
 }
 
+func (ml *MetaLexer) consume() (Token, error) {
+
+	start := ml.Position
+
+	for ml.current() != ' ' || ml.current() != ')' {
+
+		ml.advance()
+	}
+
+	end := ml.Position
+
+	return ml.Stream[start:end]
+
+}
+
 func (ml *MetaLexer) Lex() ([]Token, error) {
 
 	var tokens []Token
 
 	for !ml.aatEnd() {
 
-		if ml.Current == '(' {
+		if ml.Current == '(' || ml.Current == ')' {
 
-			ml.advance()
+			token, err := consumeToken
+			if err != nil {
+				goto ignore
+			}
+
+			append(tokens, ConsumeToken())
 		}
 
-		if ml.Current == ')' {
-
-			ml.advance()
-		}
-
-
+	ignore:
 		//
-			ml.advance()
+		ml.advance()
 	}
 
 	return nil, nil
 }
-
