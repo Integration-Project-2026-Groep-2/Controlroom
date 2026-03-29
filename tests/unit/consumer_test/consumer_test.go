@@ -5,7 +5,6 @@
 //
 // Test 2 (StopsOnClosedChannel): simuleert een weggevallen RabbitMQ verbinding via een gesloten channel
 // → verwacht dat ConsumeHeartbeats binnen 1 seconde stopt.
-//
 package main
 
 import (
