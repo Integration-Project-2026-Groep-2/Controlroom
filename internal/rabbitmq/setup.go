@@ -8,7 +8,6 @@ import (
 )
 
 func SetupHeartbeatConsumer(*amqp.Connection) (*amqp.Channel, <-chan amqp.Delivery, error) {
-
 	conn, err := amqp.Dial(os.Getenv("RABBITMQ_URL"))
 
 	if err != nil {
@@ -17,11 +16,25 @@ func SetupHeartbeatConsumer(*amqp.Connection) (*amqp.Channel, <-chan amqp.Delive
 
 	ch, err := conn.Channel()
 	if err != nil {
+		// TODO(nasr): replace with logging
 		return nil, nil, fmt.Errorf("failed here")
 	}
 
 	err = ch.ExchangeDeclare(
 		"control_room_exchange",
+		"direct",
+		true,
+		false,
+		false,
+		false,
+		nil,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	err = ch.ExchangeDeclare(
+		"heartbeat.direct",
 		"direct",
 		true,
 		false,
@@ -49,6 +62,17 @@ func SetupHeartbeatConsumer(*amqp.Connection) (*amqp.Channel, <-chan amqp.Delive
 		qHeartbeat.Name,
 		"routing.heartbeat",
 		"control_room_exchange",
+		false,
+		nil,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	err = ch.QueueBind(
+		qHeartbeat.Name,
+		"routing.heartbeat",
+		"heartbeat.direct",
 		false,
 		nil,
 	)
@@ -102,6 +126,19 @@ func SetupUserConsumer(*amqp.Connection) (*amqp.Channel, <-chan amqp.Delivery, e
 		return nil, nil, err
 	}
 
+	err = ch.ExchangeDeclare(
+		"heartbeat.direct",
+		"direct",
+		true,
+		false,
+		false,
+		false,
+		nil,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	Quser, err := ch.QueueDeclare(
 		"crm.user.confirmed",
 		true,
@@ -119,6 +156,17 @@ func SetupUserConsumer(*amqp.Connection) (*amqp.Channel, <-chan amqp.Delivery, e
 		// TODO(Steven) Add actual routing key when exists
 		"temp.routing.consumers",
 		"user.topic",
+		false,
+		nil,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	err = ch.QueueBind(
+		Quser.Name,
+		"routing.user.confirmed",
+		"heartbeat.direct",
 		false,
 		nil,
 	)
