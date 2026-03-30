@@ -2,195 +2,103 @@ package cr_rabbitmq
 
 import (
 	"fmt"
-	"os"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-func SetupHeartbeatConsumer(*amqp.Connection) (*amqp.Channel, <-chan amqp.Delivery, error) {
-	conn, err := amqp.Dial(os.Getenv("RABBITMQ_URL"))
-
-	if err != nil {
-		return nil, nil, err
-	}
-
-	ch, err := conn.Channel()
-	if err != nil {
-		// TODO(nasr): replace with logging
-		return nil, nil, fmt.Errorf("failed here")
-	}
-
-	err = ch.ExchangeDeclare(
-		"control_room_exchange",
-		"direct",
-		true,
-		false,
-		false,
-		false,
-		nil,
-	)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	err = ch.ExchangeDeclare(
-		"heartbeat.direct",
-		"direct",
-		true,
-		false,
-		false,
-		false,
-		nil,
-	)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	qHeartbeat, err := ch.QueueDeclare(
-		"heartbeat_queue",
-		false,
-		true,
-		false,
-		false,
-		nil,
-	)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	err = ch.QueueBind(
-		qHeartbeat.Name,
-		"routing.heartbeat",
-		"control_room_exchange",
-		false,
-		nil,
-	)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	err = ch.QueueBind(
-		qHeartbeat.Name,
-		"routing.heartbeat",
-		"heartbeat.direct",
-		false,
-		nil,
-	)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	err = ch.Qos(10, 0, false)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	msgs, err := ch.Consume(
-		qHeartbeat.Name,
-		"",
-		false,
-		false,
-		false,
-		false,
-		nil,
-	)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return ch, msgs, nil
+type InternalRabbitMQ struct {
+	Conn  *amqp.Connection
+	Chans map[string]*amqp.Channel
 }
 
-func SetupUserConsumer(*amqp.Connection) (*amqp.Channel, <-chan amqp.Delivery, error) {
-	conn, err := amqp.Dial(os.Getenv("RABBITMQ_URL"))
-
-	if err != nil {
-		return nil, nil, err
+func SetupHeartbeatConsumer(ir *InternalRabbitMQ) (<-chan amqp.Delivery, error) {
+	// NOTE(nasr): code cleanup
+	wrap := func(err error) error {
+		return fmt.Errorf("SetupHeartbeatConsumer: %w", err)
 	}
 
-	ch, err := conn.Channel()
+	ch, err := ir.Conn.Channel()
 	if err != nil {
-		return nil, nil, err
+		// TODO(nasr): replace with logging
+		return nil, wrap(err)
 	}
 
-	err = ch.ExchangeDeclare(
-		"user.topic",
-		"direct",
-		true,
-		false,
-		false,
-		false,
-		nil,
-	)
-	if err != nil {
-		return nil, nil, err
+	if err = ch.ExchangeDeclare("control_room_exchange", "direct", true, false, false, false, nil); err != nil {
+		return nil, wrap(err)
+	}
+	if err = ch.ExchangeDeclare("heartbeat.direct", "direct", true, false, false, false, nil); err != nil {
+		return nil, wrap(err)
 	}
 
-	err = ch.ExchangeDeclare(
-		"heartbeat.direct",
-		"direct",
-		true,
-		false,
-		false,
-		false,
-		nil,
-	)
+	q, err := ch.QueueDeclare("heartbeat_queue", false, true, false, false, nil)
 	if err != nil {
-		return nil, nil, err
+		return nil, wrap(err)
 	}
 
-	Quser, err := ch.QueueDeclare(
-		"crm.user.confirmed",
-		true,
-		false,
-		false,
-		false,
-		nil,
-	)
-	if err != nil {
-		return nil, nil, err
+	if err = ch.QueueBind(q.Name, "routing.heartbeat", "control_room_exchange", false, nil); err != nil {
+		return nil, wrap(err)
+	}
+	if err = ch.QueueBind(q.Name, "routing.heartbeat", "heartbeat.direct", false, nil); err != nil {
+		return nil, wrap(err)
 	}
 
-	err = ch.QueueBind(
-		Quser.Name,
-		// TODO(Steven) Add actual routing key when exists
-		"temp.routing.consumers",
-		"user.topic",
-		false,
-		nil,
-	)
-	if err != nil {
-		return nil, nil, err
+	// NOTE(nasr): prefetch count, size and if application is true or false
+	// set to 6 because 6 microservices?
+
+	if err = ch.Qos(6, 0, true); err != nil {
+		return nil, wrap(err)
 	}
 
-	err = ch.QueueBind(
-		Quser.Name,
-		"routing.user.confirmed",
-		"heartbeat.direct",
-		false,
-		nil,
-	)
+	msgs, err := ch.Consume(q.Name, "", false, false, false, false, nil)
 	if err != nil {
-		return nil, nil, err
+		return nil, wrap(err)
 	}
 
-	err = ch.Qos(10, 0, false)
-	if err != nil {
-		return nil, nil, err
+	ir.Chans["heartbeat"] = ch
+	return msgs, nil
+}
+
+func SetupUserConsumer(ir *InternalRabbitMQ) (<-chan amqp.Delivery, error) {
+	wrap := func(err error) error {
+		return fmt.Errorf("SetupUserConsumer: %w", err)
 	}
 
-	msgs, err := ch.Consume(
-		Quser.Name,
-		"",
-		false,
-		false,
-		false,
-		false,
-		nil,
-	)
+	ch, err := ir.Conn.Channel()
 	if err != nil {
-		return nil, nil, err
+		return nil, wrap(err)
 	}
 
-	return ch, msgs, nil
+	if err = ch.ExchangeDeclare("user.topic", "direct", true, false, false, false, nil); err != nil {
+		return nil, wrap(err)
+	}
+	if err = ch.ExchangeDeclare("heartbeat.direct", "direct", true, false, false, false, nil); err != nil {
+		return nil, wrap(err)
+	}
+
+	q, err := ch.QueueDeclare("crm.user.confirmed", true, false, false, false, nil)
+	if err != nil {
+		return nil, wrap(err)
+	}
+
+	if err = ch.QueueBind(q.Name,
+		// TODO(Steven): Add actual routing key when exists
+		"temp.routing.consumers", "user.topic", false, nil); err != nil {
+		return nil, wrap(err)
+	}
+	if err = ch.QueueBind(q.Name, "routing.user.confirmed", "heartbeat.direct", false, nil); err != nil {
+		return nil, wrap(err)
+	}
+
+	// NOTE(nasr): prefetch count, size and if application is true or false
+	if err = ch.Qos(10, 0, false); err != nil {
+		return nil, wrap(err)
+	}
+
+	msgs, err := ch.Consume(q.Name, "", false, false, false, false, nil)
+	if err != nil {
+		return nil, wrap(err)
+	}
+
+	ir.Chans["user"] = ch
+	return msgs, nil
 }

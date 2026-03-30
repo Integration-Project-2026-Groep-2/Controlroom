@@ -16,63 +16,89 @@ import (
 )
 
 func main() {
-	log.Println("Starting Controlroom...")
 
+	// =============================================================================
+	// RabbitMQ connection
 	conn, err := amqp.Dial(os.Getenv("RABBITMQ_URL"))
-
 	if err != nil {
-		log.Fatalf("RabbitMQ setup failed: %v", err)
+		log.Fatalf("RabbitMQ connection failed: %v", err)
 	}
 	defer conn.Close()
 
-	// RabbitMQ setup
-	ch, msgs, err := cr_rabbitmq.SetupHeartbeatConsumer(conn)
-	if err != nil {
-		log.Fatalf("RabbitMQ setup failed: %v", err)
+	ir := &cr_rabbitmq.InternalRabbitMQ{
+		Conn:  conn,
+		Chans: make(map[string]*amqp.Channel),
 	}
-	defer ch.Close()
 
-	// Setup consumer of user
-	chUser, msgsUser, errUser := cr_rabbitmq.SetupUserConsumer(conn)
+	// =============================================================================
+
+	// =============================================================================
+	// RabbitMQ consumers
+	msgs, err := cr_rabbitmq.SetupHeartbeatConsumer(ir)
 	if err != nil {
-		log.Fatalf("setup of User Consumer failed: %v", errUser)
+		log.Fatalf("SetupHeartbeatConsumer failed: %v", err)
 	}
-	defer chUser.Close()
 
+	msgsUser, err := cr_rabbitmq.SetupUserConsumer(ir)
+	if err != nil {
+		log.Fatalf("SetupUserConsumer failed: %v", err)
+	}
+
+	defer func() {
+		for _, ch := range ir.Chans {
+			ch.Close()
+		}
+	}()
+	// =============================================================================
+
+	// =============================================================================
 	// Elasticsearch
 	esClient, err := elasticsearch.NewDefaultClient()
 	if err != nil {
 		log.Fatalf("Failed to create Elasticsearch client: %v", err)
 	}
+	// =============================================================================
+
+	// =============================================================================
 	res, err := esClient.Info()
 	if err != nil {
-		log.Fatalf("Error connecting to Elasticsearch: %s", err)
+		log.Fatalf("Error connecting to Elasticsearch: %v", err)
 	}
 	defer res.Body.Close()
 	log.Println("Successfully connected to Elasticsearch!")
+	// =============================================================================
 
+	// =============================================================================
 	// DLQ channel
 	dlqCh, err := conn.Channel()
 	if err != nil {
 		log.Fatalf("Failed to open DLQ channel: %v", err)
 	}
 	defer dlqCh.Close()
+	// =============================================================================
 
+	// =============================================================================
+	// Processors
 	processor := heartbeat.CreateProcessor(esClient, dlqCh)
 	processorUser := userobject.CreateProcessor(esClient, dlqCh)
+	// =============================================================================
 
+	// =============================================================================
 	// Graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	// =============================================================================
 
+	// =============================================================================
 	go heartbeat.ConsumeHeartbeats(processor, msgs, ctx)
 	go userobject.ConsumeUserObjects(processorUser, msgsUser, ctx)
+	// =============================================================================
 
+	// =============================================================================
 	log.Println("Controlroom is running...")
-
 	<-sigChan
 	log.Println("Shutting down...")
 	cancel()
