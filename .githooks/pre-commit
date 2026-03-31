@@ -1,0 +1,13 @@
+#!/bin/sh
+
+files=$(git diff --cached --name-only --diff-filter=ACM | grep '\.go$')
+
+if [ -z "$files" ]; then
+    exit 0
+fi
+
+go fmt $files
+go fix $files
+go vet ./...
+
+echo "$files" | xargs git add
