@@ -1,33 +1,28 @@
 name: build and deploy
 
 on:
-  push:
-    branches: [main]
+  workflow_run:
+    workflows: ["ci"]
+    types:
+      - completed
+    branches:
+      - main
 
 env:
   SERVICE_NAME: controlroom
   IMAGE: ghcr.io/integration-project-2026-groep-2/controlroom
 
 jobs:
-  # NOTE(nasr): wait for tests to finish
-  wait-for-ci:
-    name: Wait for CI
-    runs-on: ubuntu-latest
-    steps:
-      - name: Wait for CI workflow
-        uses: lewagon/wait-on-check-action@v1.3.4
-        with:
-          ref: ${{ github.sha }}
-          check-name: "E2E Tests"
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          wait-interval: 15
-
   build-and-push:
     name: Build and Push
     runs-on: ubuntu-latest
-    needs: wait-for-ci
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -36,22 +31,25 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Set short SHA
+        run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
+
       - name: Build image
         run: |
-          SHORT_SHA=${GITHUB_SHA::7}
-          docker build -t ${{ env.IMAGE }}:sha-${SHORT_SHA} .
-          docker tag ${{ env.IMAGE }}:sha-${SHORT_SHA} ${{ env.IMAGE }}:latest-dev
+          docker build -t ${{ env.IMAGE }}:sha-${{ env.SHORT_SHA }} .
+          docker tag ${{ env.IMAGE }}:sha-${{ env.SHORT_SHA }} ${{ env.IMAGE }}:latest-dev
 
       - name: Push tags
         run: |
-          SHORT_SHA=${GITHUB_SHA::7}
-          docker push ${{ env.IMAGE }}:sha-${SHORT_SHA}
+          docker push ${{ env.IMAGE }}:sha-${{ env.SHORT_SHA }}
           docker push ${{ env.IMAGE }}:latest-dev
 
   deploy-dev:
     name: Deploy to Dev
     runs-on: ubuntu-latest
     needs: build-and-push
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
     steps:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1

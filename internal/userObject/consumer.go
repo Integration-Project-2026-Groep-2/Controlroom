@@ -16,7 +16,10 @@ func ConsumeUserObjects(p *Processor, msgs <-chan amqp.Delivery, ctx context.Con
 
 		case msg, ok := <-msgs:
 			if !ok {
-				log.Fatalf("User consumer Failed.")
+				// NOTE(nasr): dont exit just like this????
+				// just crashing the program for no reason :(
+				// log.Fatalf("User consumer Failed.")
+				log.Printf("User consumer Failed.")
 				return
 			}
 
