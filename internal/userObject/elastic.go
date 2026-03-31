@@ -14,7 +14,7 @@ import (
 )
 
 func indexUser(es *elasticsearch.Client, ctx context.Context, uo *gen.UserConfirmed) error {
-	doc := map[string]interface{}{
+	doc := map[string]any{
 		"Id":          uo.Id,
 		"Email":       uo.Email,
 		"FirstName":   uo.FirstName,
