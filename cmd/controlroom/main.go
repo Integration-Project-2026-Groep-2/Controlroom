@@ -9,7 +9,7 @@ import (
 
 	"integration-project-ehb/controlroom/internal/heartbeat"
 	cr_rabbitmq "integration-project-ehb/controlroom/internal/rabbitmq"
-	userobject "integration-project-ehb/controlroom/internal/userObject"
+	userobject "integration-project-ehb/controlroom/internal/userobject"
 
 	elasticsearch "github.com/elastic/go-elasticsearch/v9"
 	amqp "github.com/rabbitmq/amqp091-go"

@@ -14,7 +14,7 @@ import (
 
 	amqp "github.com/rabbitmq/amqp091-go"
 
-	userobject "integration-project-ehb/controlroom/internal/userObject"
+	userobject "integration-project-ehb/controlroom/internal/userobject"
 )
 
 func TestConsumeUsers_StopsOnContextCancel(t *testing.T) {

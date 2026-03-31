@@ -30,7 +30,7 @@ const (
 type EmailType string
 
 type UserConfirmed struct {
-	XMLName     xml.Name            `xml:"userConfirmed" json:"userConfirmed"`
+	XMLName     xml.Name            `xml:"UserConfirmed" json:"UserConfirmed"`
 	Id          UUIDType            `xml:"id" json:"id" validate:"required"`
 	Email       EmailType           `xml:"email" json:"email" validate:"required"`
 	FirstName   string              `xml:"firstName" json:"first_name" validate:"required"`
