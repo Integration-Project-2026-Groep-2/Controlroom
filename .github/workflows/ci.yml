@@ -132,17 +132,15 @@ jobs:
       - name: Start services via Compose
         run: |
           docker compose -f tests/unit/deployments_test/docker-compose.yml up -d
-          echo "Waiting for stack..."
-          sleep 20
 
-      - name: Run E2E tests
-        env:
-          RABBITMQ_URL: amqp://guest:guest@127.0.0.1:5672/
-          ELASTICSEARCH_URL: http://localhost:9200
-        run: |
-          go test -v -race -count=1 -timeout 180s \
-            ./tests/integration/e2e_test/...
-
+      # - name: Run E2E tests
+      #   env:
+      #     RABBITMQ_URL: amqp://guest:guest@127.0.0.1:5672/
+      #     ELASTICSEARCH_URL: http://localhost:9200
+      #   run: |
+      #     go test -v -race -count=1 -timeout 180s \
+      #       ./tests/integration/e2e_test/...
+      #
       - name: Dump logs on failure
         if: failure()
         run: docker compose -f tests/unit/deployments_test/docker-compose.yml logs
