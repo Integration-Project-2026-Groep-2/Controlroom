@@ -13,6 +13,7 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
@@ -28,6 +29,12 @@ jobs:
       - name: Verify modules
         run: go mod verify
 
+      - name: Check formatting
+        run: test -z "$(go fmt ./...)"
+
+      - name: Go vet
+        run: go vet ./...
+
       - name: Build controlroom
         run: go build -v ./cmd/controlroom/...
 
@@ -38,6 +45,7 @@ jobs:
     name: Unit Tests
     runs-on: ubuntu-latest
     needs: build
+
     steps:
       - uses: actions/checkout@v4
 
@@ -48,12 +56,7 @@ jobs:
           cache: true
 
       - name: Run unit tests
-        run: |
-          go test -v -race -count=1 \
-            ./tests/unit/... \
-            ./tests/heartbeat_test/... \
-            ./tests/user_test/... \
-            ./pkg/...
+        run: go test -v -race -count=1 ./tests/unit/...
 
   integration:
     name: Integration Tests
@@ -81,9 +84,7 @@ jobs:
           - 9200:9200
         env:
           discovery.type: single-node
-          # NOTE(nasr): would require generating a key, too much hassle
           xpack.security.enabled: "false"
-          # NOTE(nasr): lower than what we use for prod
           ES_JAVA_OPTS: "-Xms512m -Xmx512m"
         options: >-
           --health-cmd "curl -sf http://localhost:9200/_cluster/health"
@@ -109,12 +110,10 @@ jobs:
 
       - name: Run integration tests
         env:
-          RABBITMQ_URL: amqp://guest:guest@localhost:5672/
+          RABBITMQ_URL: amqp://guest:guest@127.0.0.1:5672/
           ELASTICSEARCH_URL: http://localhost:9200
         run: |
-          go test -v -race -count=1 -timeout 120s \
-            ./tests/integration/rabbitmq_test/... \
-            ./tests/integration/elasticsearch_test/...
+          go test -v -race -count=1 -timeout 120s ./tests/integration/...
 
   e2e:
     name: E2E Tests
@@ -133,12 +132,12 @@ jobs:
       - name: Start services via Compose
         run: |
           docker compose -f tests/unit/deployments_test/docker-compose.yml up -d
-          echo "Waiting for stack to be healthy..."
+          echo "Waiting for stack..."
           sleep 20
 
       - name: Run E2E tests
         env:
-          RABBITMQ_URL: amqp://guest:guest@localhost:5672/
+          RABBITMQ_URL: amqp://guest:guest@127.0.0.1:5672/
           ELASTICSEARCH_URL: http://localhost:9200
         run: |
           go test -v -race -count=1 -timeout 180s \

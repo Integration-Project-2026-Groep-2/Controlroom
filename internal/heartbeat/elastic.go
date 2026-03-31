@@ -14,7 +14,7 @@ import (
 )
 
 func indexHeartbeat(es *elasticsearch.Client, ctx context.Context, hb *gen.Heartbeat) error {
-	doc := map[string]interface{}{
+	doc := map[string]any{
 		"serviceId": hb.ServiceId,
 		"timestamp": hb.Timestamp,
 		"indexed":   time.Now(),
