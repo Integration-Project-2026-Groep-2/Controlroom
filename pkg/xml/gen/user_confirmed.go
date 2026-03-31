@@ -30,16 +30,16 @@ const (
 type EmailType string
 
 type UserConfirmed struct {
-	XMLName     xml.Name            `xml:"userConfirmed"`
-	Id          UUIDType            `xml:"id"`
-	Email       EmailType           `xml:"email"`
-	FirstName   string              `xml:"firstName"`
-	LastName    string              `xml:"lastName"`
-	Phone       string              `xml:"phone"`
-	Role        UserRoleType        `xml:"role"`
-	CompanyId   UUIDType            `xml:"companyId"`
-	BadgeCode   string              `xml:"badgeCode"`
-	IsActive    bool                `xml:"isActive"`
-	GdprConsent bool                `xml:"gdprConsent"`
-	ConfirmedAt ISO8601DateTimeType `xml:"confirmedAt"`
+	XMLName     xml.Name            `xml:"userConfirmed" json:"userConfirmed"`
+	Id          UUIDType            `xml:"id" json:"id" validate:"required"`
+	Email       EmailType           `xml:"email" json:"email" validate:"required"`
+	FirstName   string              `xml:"firstName" json:"first_name" validate:"required"`
+	LastName    string              `xml:"lastName" json:"last_name" validate:"required"`
+	Phone       string              `xml:"phone" json:"phone"`
+	Role        UserRoleType        `xml:"role" json:"role" validate:"required"`
+	CompanyId   UUIDType            `xml:"companyId" json:"company_id"`
+	BadgeCode   string              `xml:"badgeCode" json:"badge_code"`
+	IsActive    bool                `xml:"isActive" json:"is_active" validate:"required"`
+	GdprConsent bool                `xml:"gdprConsent" json:"gdpr_consent" validate:"required"`
+	ConfirmedAt ISO8601DateTimeType `xml:"confirmedAt" json:"confirmed_at" validate:"required"`
 }
