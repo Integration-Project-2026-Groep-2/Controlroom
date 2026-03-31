@@ -66,7 +66,7 @@ func TestElasticsearch_IndexHeartbeat(t *testing.T) {
 	}
 	docID := fmt.Sprintf("%s-%d", hb.ServiceId, hb.Timestamp.Unix())
 
-	doc := map[string]interface{}{
+	doc := map[string]any{
 		"serviceId": hb.ServiceId,
 		"timestamp": hb.Timestamp,
 		"indexed":   time.Now(),
@@ -96,7 +96,7 @@ func TestElasticsearch_DocumentRetrievable(t *testing.T) {
 	es := newESClient(t)
 
 	docID := fmt.Sprintf("retrieve-test-%d", time.Now().UnixNano())
-	doc := map[string]interface{}{
+	doc := map[string]any{
 		"serviceId": "retrieve-test-service",
 		"timestamp": time.Now().UTC(),
 	}
@@ -136,8 +136,8 @@ func TestElasticsearch_UniqueDocumentID(t *testing.T) {
 	docID := fmt.Sprintf("upsert-test-%d", time.Now().UnixNano())
 
 	// Indexeer hetzelfde document-ID twee keer met andere inhoud
-	for i := 0; i < 2; i++ {
-		doc := map[string]interface{}{
+	for i := range 2 {
+		doc := map[string]any{
 			"serviceId": "upsert-test-service",
 			"timestamp": time.Now().UTC(),
 			"poging":    i,
@@ -166,7 +166,7 @@ func TestElasticsearch_UniqueDocumentID(t *testing.T) {
 	require.NoError(t, err)
 	defer countRes.Body.Close()
 
-	var result map[string]interface{}
+	var result map[string]any
 	err = json.NewDecoder(countRes.Body).Decode(&result)
 	require.NoError(t, err)
 
