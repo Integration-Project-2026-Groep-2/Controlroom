@@ -1,4 +1,4 @@
-name: build and deploy
+name: CI/CD Dev
 
 on:
   workflow_run:
@@ -14,30 +14,22 @@ env:
 
 jobs:
   build-and-push:
-    name: Build and Push
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+      - uses: actions/checkout@v4
 
-      - name: Log in to GHCR
+      - name: Log in to registry
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set short SHA
-        run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
-
       - name: Build image
         run: |
-          docker build -t ${{ env.IMAGE }}:sha-${{ env.SHORT_SHA }} .
-          docker tag ${{ env.IMAGE }}:sha-${{ env.SHORT_SHA }} ${{ env.IMAGE }}:latest-dev
+          SHORT_SHA=${GITHUB_SHA::7}
+          docker build -t ${{ env.IMAGE }}:sha-${SHORT_SHA} .
+          docker tag ${{ env.IMAGE }}:sha-${SHORT_SHA} ${{ env.IMAGE }}:latest-dev
 
       - name: Push tags
         run: |
@@ -46,13 +38,10 @@ jobs:
           docker push ${{ env.IMAGE }}:latest-dev
 
   deploy-dev:
-    name: Deploy to Dev
-    runs-on: ubuntu-latest
     needs: build-and-push
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
-
+    runs-on: ubuntu-latest
     steps:
-      - name: Deploy via SSH
+      - name: Deploy to Dev
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.DEPLOY_HOST }}
