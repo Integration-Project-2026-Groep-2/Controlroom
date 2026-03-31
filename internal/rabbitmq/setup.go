@@ -68,7 +68,7 @@ func SetupUserConsumer(ir *InternalRabbitMQ) (<-chan amqp.Delivery, error) {
 		return nil, wrap(err)
 	}
 
-	if err = ch.ExchangeDeclare("user.topic", "direct", true, false, false, false, nil); err != nil {
+	if err = ch.ExchangeDeclare("user.topic", "topic", true, false, false, false, nil); err != nil {
 		return nil, wrap(err)
 	}
 	if err = ch.ExchangeDeclare("heartbeat.direct", "direct", true, false, false, false, nil); err != nil {
