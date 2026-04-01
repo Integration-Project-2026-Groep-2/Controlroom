@@ -29,9 +29,6 @@ var (
 func main() {
 	flag.Parse()
 
-	// =============================================================================
-	// folder handling
-	// =============================================================================
 	if err := os.MkdirAll(*out, 0755); err != nil {
 		log.Fatalf("xmlgen: failed to create output directory: %v", err)
 	}
@@ -40,9 +37,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("xmlgen: failed to read directory: %v", err)
 	}
-	// =============================================================================
 
-	// =============================================================================
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue
@@ -72,5 +67,4 @@ func main() {
 
 		fmt.Printf("%s  ok  %s  %s\n", clGreen+clBold, clReset, name)
 	}
-	// =============================================================================
 }

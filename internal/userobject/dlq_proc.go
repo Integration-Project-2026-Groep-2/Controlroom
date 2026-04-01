@@ -12,29 +12,11 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 
 	// generated structs
+	"integration-project-ehb/controlroom/internal/cr_rabbitmq"
 	"integration-project-ehb/controlroom/pkg/xml/gen"
 )
 
-type Processor struct {
-	Es        *elasticsearch.Client
-	Validator *validator.Validate
-	Dlq       *amqp.Channel
-}
-
-func CreateProcessor(es *elasticsearch.Client, dlqCh *amqp.Channel) *Processor {
-	_, err := dlqCh.QueueDeclare("user_dlq", true, false, false, false, nil)
-	if err != nil {
-		log.Printf("Failed to declare DLQ: %v", err)
-	}
-
-	return &Processor{
-		Es:        es,
-		Validator: validator.New(),
-		Dlq:       dlqCh,
-	}
-}
-
-func ProcessUserObject(p *Processor, body []byte) error {
+func ProcessUserObject(p *cr_rabbitmq.Processor, body []byte) error {
 	var uo gen.UserConfirmed
 
 	if err := xml.Unmarshal(body, &uo); err != nil {
@@ -49,20 +31,15 @@ func ProcessUserObject(p *Processor, body []byte) error {
 	defer cancel()
 
 	if err := indexUser(p.Es, ctx, &uo); err != nil {
-		return sendToDLQ(p.Dlq, body, fmt.Sprintf("index error: %v", err))
+		return sendToUserDLQ(p.Dlq, body, fmt.Sprintf("index error: %v", err))
 	}
 
 	log.Printf("Indexed User: %s", uo.Id)
 	return nil
 }
 
-func sendToDLQ(dlq *amqp.Channel, body []byte, reason string) error {
-	err := dlq.PublishWithContext(
-		context.Background(),
-		"",
-		"user_dlq",
-		false,
-		false,
+func sendToUserDLQ(dlq *amqp.Channel, body []byte, reason string) error {
+	err := dlq.PublishWithContext(context.Background(), "", "user_dlq", false, false,
 		amqp.Publishing{
 			ContentType: "application/xml",
 			Body:        body,

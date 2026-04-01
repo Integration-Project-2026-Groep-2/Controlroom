@@ -19,12 +19,6 @@ type DLQPublisher interface {
 	PublishWithContext(ctx context.Context, exchange, key string, mandatory, immediate bool, msg amqp.Publishing) error
 }
 
-type Processor struct {
-	es        *elasticsearch.Client
-	validator *validator.Validate
-	dlq       DLQPublisher
-}
-
 func NewProcessor(es *elasticsearch.Client, dlq DLQPublisher) *Processor {
 	return &Processor{
 		es:        es,

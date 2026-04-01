@@ -7,8 +7,8 @@ import (
 	"os/signal"
 	"syscall"
 
+	cr_rabbitmq "integration-project-ehb/controlroom/internal/cr_rabbitmq"
 	"integration-project-ehb/controlroom/internal/heartbeat"
-	cr_rabbitmq "integration-project-ehb/controlroom/internal/rabbitmq"
 	userobject "integration-project-ehb/controlroom/internal/userobject"
 
 	elasticsearch "github.com/elastic/go-elasticsearch/v9"

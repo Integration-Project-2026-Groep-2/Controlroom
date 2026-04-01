@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           elementFormDefault="qualified">
+
+  <xs:element name="StatusCheck" type="StatusCheckType"/>
+
+  <xs:complexType name="StatusCheckType">
+    <xs:sequence>
+      <xs:element name="serviceId"        type="xs:string"/>
+      <xs:element name="timestamp"        type="xs:dateTime"/>
+      <xs:element name="status"           type="ServiceStatusEnum"/>
+      <xs:element name="uptime"           type="SecondDurationType"/>
+      <xs:element name="systemLoad"       type="SystemLoadType"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:simpleType name="ServiceStatusEnum">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="healthy"/>
+      <xs:enumeration value="degraded"/>
+      <xs:enumeration value="unhealthy"/>
+      <xs:enumeration value="unknown"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:complexType name="SecondDurationType">
+    <xs:simpleContent>
+      <xs:extension base="xs:nonNegativeInteger">
+        <xs:attribute name="unit" type="xs:string" fixed="s"/>
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
+
+  <xs:complexType name="SystemLoadType">
+    <xs:sequence>
+      <xs:element name="cpu"    type="RatioType"/>
+      <xs:element name="memory" type="RatioType"/>
+      <xs:element name="disk"   type="RatioType"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:simpleType name="RatioType">
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="0.0"/>
+      <xs:maxInclusive value="1.0"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+</xs:schema>
