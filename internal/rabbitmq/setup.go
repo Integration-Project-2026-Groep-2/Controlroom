@@ -2,6 +2,7 @@ package cr_rabbitmq
 
 import (
 	"fmt"
+
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -57,10 +58,12 @@ func SetupUserConsumer(ir *InternalRabbitMQ) (<-chan amqp.Delivery, error) {
 		return nil, wrap(err)
 	}
 
+	// NOTE(Steven): move Queue and exchange names to seperate scheme files
 	if err = ch.ExchangeDeclare("user.topic", "topic", true, false, false, false, nil); err != nil {
 		return nil, wrap(err)
 	}
 
+	// NOTE(Steven): move Queue and exchange names to seperate scheme files
 	q, err := ch.QueueDeclare("crm.user.confirmed", true, false, false, false, nil)
 	if err != nil {
 		return nil, wrap(err)

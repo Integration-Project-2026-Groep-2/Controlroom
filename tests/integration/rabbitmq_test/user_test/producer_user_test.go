@@ -32,11 +32,13 @@ func TestProducerUser(t *testing.T) {
 	}
 	defer ch.Close()
 
+	// NOTE(Steven): move Queue and exchange names to seperate scheme files
 	err = ch.ExchangeDeclare("user.topic", "direct", true, false, false, false, nil)
 	if err != nil {
 		log.Fatalf("Failed to declare exchange: %v", err)
 	}
 
+	// NOTE(Steven): move Queue and exchange names to seperate scheme files
 	q, err := ch.QueueDeclare(
 		"crm.user.confirmed", // name
 		true,                 // durable (survives server restarts)

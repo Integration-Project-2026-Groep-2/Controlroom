@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified">
+
+
+    <xs:simpleType name="BelgianVatNumberType">
+        <xs:restriction base="xs:string">
+            <xs:pattern value="BE[0-9]{10}"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:element name="CompanyConfirmed">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="id"          type="UUIDType"/>
+                <xs:element name="vatNumber"   type="BelgianVatNumberType"/>
+                <xs:element name="name"        type="xs:string"/>
+                <xs:element name="email"       type="EmailType"/>
+                <xs:element name="isActive"    type="xs:boolean"/>
+                <xs:element name="confirmedAt" type="ISO8601DateTimeType"/>
+            </xs:sequence>
+        </xs:complexType>
+  </xs:element>
+</xs:schema>

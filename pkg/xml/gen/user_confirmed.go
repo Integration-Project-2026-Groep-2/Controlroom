@@ -11,10 +11,6 @@ import (
 var _ = xml.Name{}
 var _ = time.Time{}
 
-type ISO8601DateTimeType string
-
-type UUIDType string
-
 type UserRoleType string
 
 const (
@@ -26,8 +22,6 @@ const (
 	UserRoleTypeBARSTAFF       UserRoleType = "BAR_STAFF"
 	UserRoleTypeADMIN          UserRoleType = "ADMIN"
 )
-
-type EmailType string
 
 type UserConfirmed struct {
 	XMLName     xml.Name            `xml:"userConfirmed" json:"userConfirmed"`
