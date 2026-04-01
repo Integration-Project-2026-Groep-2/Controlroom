@@ -1,4 +1,4 @@
-name: CI/CD Dev
+name: deployment
 
 on:
   workflow_run:
