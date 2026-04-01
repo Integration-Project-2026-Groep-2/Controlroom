@@ -14,7 +14,7 @@ import (
 
 const (
 	rabbitmqURL      = "amqp://guest:guest@localhost:5672/"
-	exchangeName     = "control_room_exchange"
+	exchangeName     = "heartbeat.direct"
 	routingKey       = "routing.heartbeat"
 	testQueue        = "test.heartbeat_queue"
 	roundTripTimeout = 5 * time.Second

@@ -32,7 +32,7 @@ func TestProducerUser(t *testing.T) {
 	}
 	defer ch.Close()
 
-	err = ch.ExchangeDeclare("user.topic", "direct", true, false, false, false, nil)
+	err = ch.ExchangeDeclare("user.topic", "topic", true, false, false, false, nil)
 	if err != nil {
 		log.Fatalf("Failed to declare exchange: %v", err)
 	}
