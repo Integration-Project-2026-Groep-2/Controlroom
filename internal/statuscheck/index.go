@@ -1,23 +1,26 @@
-package userobject
+package statuscheck
 
 import (
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"integration-project-ehb/controlroom/pkg/gen"
 	"time"
-
-	"integration-project-ehb/controlroom/pkg/xml/gen"
 
 	"github.com/elastic/go-elasticsearch/v9"
 	"github.com/elastic/go-elasticsearch/v9/esapi"
 )
 
-func indexUser(es *elasticsearch.Client, ctx context.Context, uo *gen.UserConfirmed) error {
+func indexStatusCheck(es *elasticsearch.Client, ctx context.Context, sct *gen.StatusCheckType) error {
+
 	doc := map[string]any{
-		"Id":      uo.Id,
-		"Role":    uo.Role,
-		"indexed": time.Now(),
+		"service_id":  sct.ServiceId,
+		"timestamp":   sct.Timestamp,
+		"status":      sct.Status,
+		"uptime":      sct.Uptime,
+		"system_load": sct.SystemLoad,
+		"indexed":     time.Now(),
 	}
 
 	jsonData, err := json.Marshal(doc)
@@ -26,8 +29,8 @@ func indexUser(es *elasticsearch.Client, ctx context.Context, uo *gen.UserConfir
 	}
 
 	req := esapi.IndexRequest{
-		Index:      "users",
-		DocumentID: fmt.Sprintf("%s-%v", uo.Id, uo.ConfirmedAt),
+		Index:      "statuscheck",
+		DocumentID: fmt.Sprintf("%s-%d", sct.ServiceId, sct.Timestamp.Unix()),
 		Body:       bytes.NewReader(jsonData),
 		Refresh:    "true",
 	}

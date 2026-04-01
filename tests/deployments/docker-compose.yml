@@ -11,7 +11,7 @@ services:
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:
-      - cr_controlroom-network
+      - controlroom-network
     restart: unless-stopped
 
   elasticsearch:
@@ -27,12 +27,7 @@ services:
     volumes:
       - elasticsearch:/usr/share/elasticsearch/data
     networks:
-      - cr_controlroom-network
-    healthcheck:
-      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q '\"status\":\"green\\|yellow\"'"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
+      - controlroom-network
     restart: unless-stopped
 
   kibana:
@@ -43,32 +38,26 @@ services:
     environment:
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
       - XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY=${KIBANA_ENCRYPTION_KEY}
-    depends_on:
-      elasticsearch:
-        condition: service_healthy
     networks:
-      - cr_controlroom-network
+      - controlroom-network
     restart: unless-stopped
 
   controlroom:
     build:
-      context: ../../../
+      context: ../../
       dockerfile: Dockerfile
     container_name: controlroom
     environment:
       - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@${RABBITMQ_HOST}:5672/
       - RABBITMQ_HOST=${RABBITMQ_HOST}
       - ELASTICSEARCH_URL=http://elasticsearch:9200
-    depends_on:
-      elasticsearch:
-        condition: service_healthy
     networks:
-      - cr_controlroom-network
+      - controlroom-network
     restart: unless-stopped
 
 networks:
-  cr_controlroom-network:
-    name: cr_controlroom-network
+  controlroom-network:
+    name: controlroom-network
     driver: bridge
 
 volumes:

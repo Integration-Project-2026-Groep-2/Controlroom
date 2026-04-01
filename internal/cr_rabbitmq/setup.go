@@ -2,15 +2,9 @@ package cr_rabbitmq
 
 import (
 	"fmt"
-	"strings"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
-
-type InternalRabbitMQ struct {
-	Conn  *amqp.Connection
-	Chans map[string]*amqp.Channel
-}
 
 type ConsumerInfo struct {
 	Name      string
@@ -53,11 +47,21 @@ type Qos struct {
 	Global        bool
 }
 
+// SetupDLQ declares the dead letter queue. Call once at startup.
+func SetupDLQ(dlqCh *amqp.Channel, dlqName string) error {
+	if dlqName == "" {
+		dlqName = "dlq"
+	}
+	_, err := dlqCh.QueueDeclare(dlqName, true, false, false, false, nil)
+	return err
+}
+
 func SetupConsumer(ir *InternalRabbitMQ, cons *ConsumerInfo, ex *Exchange, queue *Queue, bind *BindInfo, qos *Qos) (<-chan amqp.Delivery, error) {
+
+	// NOTE(nasr): @Steven nice good catch but we're handling this in the meta program now but good job finding it!!
+	// i thought i'd remove the caps because that is the json convention but that was an oopsies i guess
 	wrap := func(err error) error {
-		// Simple code to make the first letter a capital
-		// Source: https://stackoverflow.com/questions/70206380/how-to-capitalize-the-first-letter-of-a-string
-		return fmt.Errorf("Setup%sconsumer: %w", (strings.ToUpper(cons.Name[:1]) + cons.Name[1:]), err)
+		return fmt.Errorf("failed to setup user consumer: %w", err)
 	}
 
 	ch, err := ir.Conn.Channel()

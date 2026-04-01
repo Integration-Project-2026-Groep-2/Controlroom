@@ -90,25 +90,27 @@ const (
 )
 
 // NOTE(nasr): AI generated XSD to Go mapping
+// TODO(nasr): don't forget when types are not found just add them to the mapping
 var XsdToGo = map[string]string{
-	"xs:string":          "string",
-	"xs:boolean":         "bool",
-	"xs:int":             "int",
-	"xs:integer":         "int",
-	"xs:long":            "int64",
-	"xs:short":           "int16",
-	"xs:byte":            "int8",
-	"xs:float":           "float32",
-	"xs:double":          "float64",
-	"xs:decimal":         "float64",
-	"xs:dateTime":        "time.Time",
-	"xs:date":            "time.Time",
-	"xs:time":            "time.Time",
-	"xs:duration":        "time.Duration",
-	"xs:base64Binary":    "[]byte",
-	"xs:hexBinary":       "[]byte",
-	"xs:anyURI":          "string",
-	"xs:positiveInteger": "uint",
+	"xs:string":             "string",
+	"xs:boolean":            "bool",
+	"xs:int":                "int",
+	"xs:integer":            "int",
+	"xs:long":               "int64",
+	"xs:short":              "int16",
+	"xs:byte":               "int8",
+	"xs:float":              "float32",
+	"xs:double":             "float64",
+	"xs:decimal":            "float64",
+	"xs:dateTime":           "time.Time",
+	"xs:date":               "time.Time",
+	"xs:time":               "time.Time",
+	"xs:duration":           "time.Duration",
+	"xs:base64Binary":       "[]byte",
+	"xs:hexBinary":          "[]byte",
+	"xs:anyURI":             "string",
+	"xs:positiveInteger":    "uint",
+	"xs:nonNegativeInteger": "uint",
 }
 
 // Attrs holds the parsed XML attributes of a single element node.
@@ -506,7 +508,7 @@ func (ml *MetaLexer) Lex(ast *AST) error {
 	return nil
 }
 
-// goIdent converts an XSD name to a capitalised Go exported identifier.
+// goIdent converts an XSD name to a capitalized Go exported identifier.
 func goIdent(name string) string {
 	if name == "" {
 		return "Unknown"

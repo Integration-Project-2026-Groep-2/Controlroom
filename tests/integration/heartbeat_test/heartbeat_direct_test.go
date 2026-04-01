@@ -1,3 +1,4 @@
+// testing if the heartbeat lifecycle works
 package producer_test
 
 import (
@@ -9,14 +10,14 @@ import (
 	"github.com/go-playground/validator/v10"
 	amqp "github.com/rabbitmq/amqp091-go"
 
-	"integration-project-ehb/controlroom/pkg/xml/gen"
+	"integration-project-ehb/controlroom/pkg/gen"
 )
 
 const (
 	rabbitmqURL      = "amqp://guest:guest@localhost:5672/"
 	exchangeName     = "heartbeat.direct"
 	routingKey       = "routing.heartbeat"
-	testQueue        = "test.heartbeat_queue"
+	testQueue        = "heartbeat_queue"
 	roundTripTimeout = 5 * time.Second
 )
 
@@ -52,7 +53,7 @@ func TestHeartbeatRoundTrip(t *testing.T) {
 	}
 
 	// Declare a temporary queue for the test
-	q, err := subCh.QueueDeclare(testQueue, false, true, false, false, nil)
+	q, err := subCh.QueueDeclare(testQueue, true, false, false, false, nil)
 	if err != nil {
 		t.Fatalf("failed to declare test queue: %v", err)
 	}
@@ -62,14 +63,14 @@ func TestHeartbeatRoundTrip(t *testing.T) {
 		t.Fatalf("failed to bind queue: %v", err)
 	}
 
-	msgs, err := subCh.Consume(q.Name, "", true, false, false, false, nil)
+	msgs, err := subCh.Consume(q.Name, "", false, false, false, false, nil)
 	if err != nil {
 		t.Fatalf("failed to start consumer: %v", err)
 	}
 
 	// Build and validate heartbeat
-	hb := gen.Heartbeat{
-		ServiceId: "Service-CRM",
+	hb := gen.HeartbeatType{
+		ServiceId: "test-service",
 		Timestamp: time.Now().UTC(),
 	}
 	if err = validate.Struct(hb); err != nil {
@@ -103,7 +104,7 @@ func TestHeartbeatRoundTrip(t *testing.T) {
 			t.Fatal("consumer channel closed unexpectedly")
 		}
 
-		var received gen.Heartbeat
+		var received gen.HeartbeatType
 		if err = xml.Unmarshal(msg.Body, &received); err != nil {
 			t.Fatalf("failed to unmarshal received message: %v", err)
 		}

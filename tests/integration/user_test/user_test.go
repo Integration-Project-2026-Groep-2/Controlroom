@@ -11,25 +11,23 @@ import (
 
 	"github.com/go-playground/validator/v10"
 	amqp "github.com/rabbitmq/amqp091-go"
-	"integration-project-ehb/controlroom/pkg/xml/gen"
+	"integration-project-ehb/controlroom/pkg/gen"
 )
 
 func TestProducerUser(t *testing.T) {
+
 	validate := validator.New()
 
-	// Load RabbitMQ connection from env or use default
 	connStr := os.Getenv("RABBITMQ_URL")
 	if connStr == "" {
 		connStr = "amqp://guest:guest@127.0.0.1:5672"
 	}
-	log.Printf("got string")
 
 	conn, err := amqp.Dial(connStr)
 	if err != nil {
-		log.Fatalf("❌ Failed to connect to RabbitMQ: %v", err)
+		log.Fatalf("Failed to connect to RabbitMQ: %v", err)
 	}
 
-	log.Printf("connect rabbitmq")
 	defer conn.Close()
 
 	ch, err := conn.Channel()
@@ -38,34 +36,21 @@ func TestProducerUser(t *testing.T) {
 	}
 	defer ch.Close()
 
-	err = ch.ExchangeDeclare("user.topic", "topic", true, false, false, false, nil)
+	err = ch.ExchangeDeclare("user.topic", "topic", false, false, false, false, nil)
 	if err != nil {
 		log.Fatalf("Failed to declare exchange: %v", err)
 	}
 
 	log.Printf("exchange declareed")
 
-	// Declare queue for confirmed users
-	q, err := ch.QueueDeclare(
-		"crm.user.confirmed", // name
-		true,                 // durable
-		false,                // delete when unused
-		false,                // exclusive
-		false,                // no-wait
-		nil,                  // arguments
-	)
+	// TODO(nasr): replace with steven struct
+	q, err := ch.QueueDeclare("crm.user.confirmed", true, false, false, false, nil)
+
 	if err != nil {
 		log.Fatalf("Failed to declare queue: %v", err)
 	}
 
-	// Bind queue to exchange with correct routing key
-	err = ch.QueueBind(
-		q.Name,
-		"crm.user.confirmed", // routing key matches the queue/event type
-		"user.topic",
-		false,
-		nil,
-	)
+	err = ch.QueueBind(q.Name, "crm.user.confirmed", "user.topic", false, nil)
 	if err != nil {
 		log.Fatalf("Failed to bind queue to exchange: %v", err)
 	}
@@ -97,10 +82,9 @@ func TestProducerUser(t *testing.T) {
 			ConfirmedAt: gen.ISO8601DateTimeType("2026-03-28T13:45:00Z"),
 		}
 
-		// Validate & send adminUser
 		if err := validate.Struct(adminUser); err == nil {
 			xmlData, _ := xml.Marshal(adminUser)
-			fmt.Printf("Publishing: %s\n", string(xmlData)) // DEBUG
+			fmt.Printf("Publishing: %s\n", string(xmlData))
 			err := ch.PublishWithContext(
 				context.Background(),
 				"user.topic",
@@ -121,7 +105,6 @@ func TestProducerUser(t *testing.T) {
 			log.Printf("Admin user validation failed: %v", err)
 		}
 
-		// Validate & send speakerUser
 		if err := validate.Struct(speakerUser); err == nil {
 			xmlData, _ := xml.Marshal(speakerUser)
 			err := ch.PublishWithContext(

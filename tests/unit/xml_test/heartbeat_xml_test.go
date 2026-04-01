@@ -6,7 +6,7 @@
 // Test 2 (XMLTagNames): controleert of de XML de juiste tagnamen heeft (<heartbeat>, <serviceId>).
 // Dit is belangrijk omdat andere services berichten sturen met deze exacte tagnamen.
 // Als de tags veranderen, begrijpen services elkaar niet meer.
-package main
+package xml_test
 
 import (
 	"encoding/xml"
@@ -16,11 +16,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"integration-project-ehb/controlroom/pkg/xml/gen"
+	"integration-project-ehb/controlroom/pkg/gen"
 )
 
-func TestHeartbeat_MarshalUnmarshal(t *testing.T) {
-	original := gen.Heartbeat{
+func TestUser_MarshalUnmarshal(t *testing.T) {
+	original := gen.HeartbeatType{
 		ServiceId: "test-service",
 		Timestamp: time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC),
 	}
@@ -28,7 +28,7 @@ func TestHeartbeat_MarshalUnmarshal(t *testing.T) {
 	data, err := xml.Marshal(original)
 	assert.NoError(t, err)
 
-	var result gen.Heartbeat
+	var result gen.HeartbeatType
 	err = xml.Unmarshal(data, &result)
 	assert.NoError(t, err)
 
@@ -36,13 +36,14 @@ func TestHeartbeat_MarshalUnmarshal(t *testing.T) {
 	assert.Equal(t, original.Timestamp.UTC(), result.Timestamp.UTC())
 }
 
-func TestHeartbeat_XMLTagNames(t *testing.T) {
-	hb := gen.Heartbeat{ServiceId: "svc", Timestamp: time.Now().UTC()}
+func TestUser_XMLTagNames(t *testing.T) {
+	hb := gen.HeartbeatType{ServiceId: "svc", Timestamp: time.Now().UTC()}
 
 	data, err := xml.Marshal(hb)
 	assert.NoError(t, err)
 
 	xmlStr := string(data)
-	assert.True(t, strings.Contains(xmlStr, "<heartbeat>"), "root tag moet <heartbeat> zijn")
-	assert.True(t, strings.Contains(xmlStr, "<serviceId>"), "veld tag moet <serviceId> zijn")
+
+	assert.True(t, strings.Contains(xmlStr, "<HeartbeatType>"), "expected tag to be <Heartbeat>")
+	assert.True(t, strings.Contains(xmlStr, "<serviceId>"), "expected tag to be <serviceId>")
 }

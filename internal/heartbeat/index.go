@@ -1,4 +1,4 @@
-package statuscheck
+package heartbeat
 
 import (
 	"bytes"
@@ -7,13 +7,14 @@ import (
 	"fmt"
 	"time"
 
-	"integration-project-ehb/controlroom/pkg/xml/gen"
+	"integration-project-ehb/controlroom/pkg/gen"
 
 	"github.com/elastic/go-elasticsearch/v9"
 	"github.com/elastic/go-elasticsearch/v9/esapi"
 )
 
-func indexStatusCheck(es *elasticsearch.Client, ctx context.Context, hb *gen.Heartbeat) error {
+func indexHeartbeat(es *elasticsearch.Client, ctx context.Context, hb *gen.HeartbeatType) error {
+
 	doc := map[string]any{
 		"serviceId": hb.ServiceId,
 		"timestamp": hb.Timestamp,
@@ -21,21 +22,24 @@ func indexStatusCheck(es *elasticsearch.Client, ctx context.Context, hb *gen.Hea
 	}
 
 	jsonData, err := json.Marshal(doc)
+
 	if err != nil {
 		return err
 	}
 
 	req := esapi.IndexRequest{
-		Index:      "statuscheck",
+		Index:      "heartbeats",
 		DocumentID: fmt.Sprintf("%s-%d", hb.ServiceId, hb.Timestamp.Unix()),
 		Body:       bytes.NewReader(jsonData),
 		Refresh:    "true",
 	}
 
 	res, err := req.Do(ctx, es)
+
 	if err != nil {
 		return err
 	}
+
 	defer res.Body.Close()
 
 	if res.IsError() {

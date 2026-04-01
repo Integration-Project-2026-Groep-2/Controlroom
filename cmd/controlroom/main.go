@@ -7,152 +7,178 @@ import (
 	"os/signal"
 	"syscall"
 
-	cr_rabbitmq "integration-project-ehb/controlroom/internal/cr_rabbitmq"
-	"integration-project-ehb/controlroom/internal/heartbeat"
-	userobject "integration-project-ehb/controlroom/internal/userobject"
-
 	elasticsearch "github.com/elastic/go-elasticsearch/v9"
 	amqp "github.com/rabbitmq/amqp091-go"
+
+	"integration-project-ehb/controlroom/internal/cr_rabbitmq"
+	"integration-project-ehb/controlroom/internal/heartbeat"
+	"integration-project-ehb/controlroom/internal/statuscheck"
+	"integration-project-ehb/controlroom/internal/userobject"
 )
 
 func main() {
+	// Elasticsearch client
+	esClient, err := elasticsearch.NewDefaultClient()
+	if err != nil {
+		log.Fatalf("elasticsearch client: %v", err)
+	}
+	res, err := esClient.Info()
+	if err != nil {
+		log.Fatalf("elasticsearch connect: %v", err)
+	}
+	defer res.Body.Close()
+	log.Println("Connected to Elasticsearch")
 
-	// =============================================================================
 	// RabbitMQ connection
 	conn, err := amqp.Dial(os.Getenv("RABBITMQ_URL"))
 	if err != nil {
-		log.Fatalf("RabbitMQ connection failed: %v", err)
+		log.Fatalf("rabbitmq dial: %v", err)
 	}
 	defer conn.Close()
+	log.Println("Connected to RabbitMQ")
 
-	ir := &cr_rabbitmq.InternalRabbitMQ{
-		Conn:  conn,
-		Chans: make(map[string]*amqp.Channel),
-	}
-
-	// =============================================================================
-
-	// =============================================================================
-	// RabbitMQ consumers
-
-	Consumer := &cr_rabbitmq.ConsumerInfo{
-		Name:      "heartbeat",
-		Consumer:  "",
-		AutoAck:   false,
-		Exclusive: false,
-		NoLocal:   false,
-		NoWait:    false,
-		Args:      nil,
-	}
-
-	Exchange := &cr_rabbitmq.Exchange{
-		Name:       "heartbeat.direct",
-		Kind:       "direct",
-		Durable:    true,
-		AutoDelete: false,
-		Internal:   false,
-		NoWait:     false,
-		Args:       nil,
-	}
-
-	Queue := &cr_rabbitmq.Queue{
-		Name:       "heartbeat_queue",
-		Durable:    true,
-		AutoDelete: false,
-		Exclusive:  false,
-		NoWait:     false,
-		Args:       nil,
-	}
-
-	Bind := &cr_rabbitmq.BindInfo{
-		Key:    "routing.heartbeat",
-		NoWait: false,
-		Args:   nil,
-	}
-
-	// TODO(nasr): verify prefetch count with team (currently 6 for 6 microservices)
-	Qos := &cr_rabbitmq.Qos{
-		PrefetchCount: 6,
-		PrefetchSize:  0,
-		Global:        true,
-	}
-
-	msgs, err := cr_rabbitmq.SetupConsumer(ir, Consumer, Exchange, Queue, Bind, Qos)
-	if err != nil {
-		log.Fatalf("SetupHeartbeatConsumer failed: %v", err)
-	}
-
-	Consumer.Name = "user"
-	Exchange.Name = "user.topic"
-	Exchange.Kind = "topic"
-	Queue.Name = "crm.user.confirmed"
-	// TODO(Steven): Add actual routing key when exists
-	Bind.Key = "temp.routing.consumers"
-	// TODO(nasr): verify prefetch count with team
-	Qos.PrefetchCount = 10
-	Qos.Global = false
-
-	msgsUser, err := cr_rabbitmq.SetupConsumer(ir, Consumer, Exchange, Queue, Bind, Qos)
-	if err != nil {
-		log.Fatalf("SetupUserConsumer failed: %v", err)
-	}
-
-	defer func() {
-		for _, ch := range ir.Chans {
-			ch.Close()
-		}
-	}()
-	// =============================================================================
-
-	// =============================================================================
-	// Elasticsearch
-	esClient, err := elasticsearch.NewDefaultClient()
-	if err != nil {
-		log.Fatalf("Failed to create Elasticsearch client: %v", err)
-	}
-	// =============================================================================
-
-	// =============================================================================
-	res, err := esClient.Info()
-	if err != nil {
-		log.Fatalf("Error connecting to Elasticsearch: %v", err)
-	}
-	defer res.Body.Close()
-	log.Println("Successfully connected to Elasticsearch!")
-	// =============================================================================
-
-	// =============================================================================
-	// DLQ channel
+	// DLQ channel (shared)
 	dlqCh, err := conn.Channel()
 	if err != nil {
-		log.Fatalf("Failed to open DLQ channel: %v", err)
+		log.Fatalf("dlq channel: %v", err)
 	}
 	defer dlqCh.Close()
-	// =============================================================================
 
-	// =============================================================================
-	// Processors
-	processor := heartbeat.CreateProcessor(esClient, dlqCh)
-	processorUser := userobject.CreateProcessor(esClient, dlqCh)
-	// =============================================================================
-
-	// =============================================================================
-	// Graceful shutdown
+	// Context for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	// Heartbeat consumer
+	hbCh, err := conn.Channel()
+	if err != nil {
+		log.Fatalf("heartbeat channel: %v", err)
+	}
+	defer hbCh.Close()
+
+	hbExchange := cr_rabbitmq.ExchangeInfo{
+		Name:    "heartbeat.direct",
+		Kind:    "direct",
+		Durable: true,
+	}
+	hbQueue := cr_rabbitmq.QueueInfo{
+		Name:    "heartbeat_queue",
+		Durable: true,
+	}
+	hbBinding := cr_rabbitmq.BindingInfo{
+		Key: "routing.heartbeat",
+	}
+
+	hbMsgs, err := cr_rabbitmq.SetupQueue(hbCh, hbExchange, hbQueue, hbBinding)
+	hbCh.Qos(5, 0, false)
+	hbCfg := &cr_rabbitmq.ConsumerConfig{
+		DLQCh:   dlqCh,
+		DLQName: "heartbeat_dlq",
+		Process: heartbeat.NewHeartbeatProcessor(esClient),
+	}
+
+	if err := cr_rabbitmq.SetupDLQ(hbCfg.DLQCh, hbCfg.DLQName); err != nil {
+		log.Fatalf("heartbeat dlq setup: %v", err)
+	}
+
+	if err != nil {
+		log.Fatalf("heartbeat setup: %v", err)
+	}
+
+	// NOTE(nasr): prefetch count 5 for reasonable throughput without hoarding memory
+	hbCh.Qos(5, 0, false)
+
+	go cr_rabbitmq.Consume(hbCfg, hbMsgs, ctx)
+	log.Println("Heartbeat consumer started")
+
+	// User consumer
+	userCh, err := conn.Channel()
+	if err != nil {
+		log.Fatalf("user channel: %v", err)
+	}
+	defer userCh.Close()
+
+	userExchange := cr_rabbitmq.ExchangeInfo{
+		Name: "user.topic",
+		Kind: "topic",
+	}
+	userQueue := cr_rabbitmq.QueueInfo{
+		Name:    "crm.user.confirmed",
+		Durable: true,
+	}
+	userBinding := cr_rabbitmq.BindingInfo{
+		Key: "crm.user.confirmed", // NOTE(nasr): [ DONE ]: Verify routing key with team
+	}
+
+	userMsgs, err := cr_rabbitmq.SetupQueue(userCh, userExchange, userQueue, userBinding)
+	if err != nil {
+		log.Fatalf("user setup: %v", err)
+	}
+
+	userCfg := &cr_rabbitmq.ConsumerConfig{
+		DLQCh:   dlqCh,
+		DLQName: "user_dlq",
+		Process: userobject.NewUserProcessor(esClient),
+	}
+	if err := cr_rabbitmq.SetupDLQ(userCfg.DLQCh, userCfg.DLQName); err != nil {
+		log.Fatalf("user dlq setup: %v", err)
+	}
+
+	// NOTE(nasr): prefetch count 10 for higher throughput, autoack disabled per consumer
+	userCh.Qos(10, 0, false)
+
+	go cr_rabbitmq.Consume(userCfg, userMsgs, ctx)
+	log.Println("User consumer started")
+
+	// StatusCheck consumer
+	scCh, err := conn.Channel()
+	if err != nil {
+		log.Fatalf("statuscheck channel: %v", err)
+	}
+	defer scCh.Close()
+
+	scExchange := cr_rabbitmq.ExchangeInfo{
+		Name:    "statuscheck.direct",
+		Kind:    "direct",
+		Durable: true,
+	}
+	scQueue := cr_rabbitmq.QueueInfo{
+		Name:    "statuscheck_queue",
+		Durable: true,
+	}
+	scBinding := cr_rabbitmq.BindingInfo{
+		Key: "routing.statuscheck",
+	}
+
+	scMsgs, err := cr_rabbitmq.SetupQueue(scCh, scExchange, scQueue, scBinding)
+	if err != nil {
+		log.Fatalf("statuscheck setup: %v", err)
+	}
+
+	scCfg := &cr_rabbitmq.ConsumerConfig{
+		DLQCh:   dlqCh,
+		DLQName: "statuscheck_dlq",
+		Process: statuscheck.NewStatusCheckProcessor(esClient),
+	}
+	if err := cr_rabbitmq.SetupDLQ(scCfg.DLQCh, scCfg.DLQName); err != nil {
+		log.Fatalf("statuscheck dlq setup: %v", err)
+	}
+
+	scCh.Qos(5, 0, false)
+
+	go cr_rabbitmq.Consume(scCfg, scMsgs, ctx)
+	log.Println("StatusCheck consumer started")
+
+	// Graceful shutdown
+	log.Println("Controlroom running. Press Ctrl+C to shutdown.")
+
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-	// =============================================================================
 
-	// =============================================================================
-	go heartbeat.ConsumeHeartbeats(processor, msgs, ctx)
-	go userobject.ConsumeUserObjects(processorUser, msgsUser, ctx)
-	// =============================================================================
-
-	// =============================================================================
-	log.Println("Controlroom is running...")
 	<-sigChan
-	log.Println("Shutting down...")
+	log.Println("Shutdown signal received, draining queues...")
 	cancel()
+
+	// Give consumers time to ack pending messages
+	// TODO(nasr): implement proper drain with timeout
+	// time.Sleep(2 * time.Second)
 }

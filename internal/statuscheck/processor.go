@@ -1,4 +1,4 @@
-package heartbeat
+package statuscheck
 
 import (
 	"context"
@@ -7,26 +7,25 @@ import (
 	"log"
 	"time"
 
-	"integration-project-ehb/controlroom/pkg/gen"
-
 	"github.com/elastic/go-elasticsearch/v9"
+	"integration-project-ehb/controlroom/pkg/gen"
 )
 
-func NewHeartbeatProcessor(es *elasticsearch.Client) func([]byte) error {
+func NewStatusCheckProcessor(es *elasticsearch.Client) func([]byte) error {
 	return func(body []byte) error {
-		var hb gen.HeartbeatType
-		if err := xml.Unmarshal(body, &hb); err != nil {
+		var sct gen.StatusCheckType
+		if err := xml.Unmarshal(body, &sct); err != nil {
 			return fmt.Errorf("unmarshal: %w", err)
 		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
-		if err := indexHeartbeat(es, ctx, &hb); err != nil {
+		if err := indexStatusCheck(es, ctx, &sct); err != nil {
 			return fmt.Errorf("index: %w", err)
 		}
 
-		log.Printf("Indexed Heartbeat: %s", hb.ServiceId)
+		log.Printf("Indexed status check: %s", sct.ServiceId)
 		return nil
 	}
 }

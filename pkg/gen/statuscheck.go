@@ -30,9 +30,9 @@ const (
 )
 
 type SecondDurationType struct {
-	XMLName xml.Name           `xml:"SecondDurationType" json:"SecondDurationType"`
-	Value   NonNegativeInteger `xml:",chardata" json:"value"`
-	Unit    string             `xml:"unit,attr" json:"unit"`
+	XMLName xml.Name `xml:"SecondDurationType" json:"SecondDurationType"`
+	Value   uint     `xml:",chardata" json:"value"`
+	Unit    string   `xml:"unit,attr" json:"unit"`
 }
 
 type SystemLoadType struct {
@@ -43,4 +43,3 @@ type SystemLoadType struct {
 }
 
 type RatioType string
-type NonNegativeInteger int64

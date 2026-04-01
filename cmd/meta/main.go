@@ -20,10 +20,10 @@ const (
 	clBold  = "\033[1m"
 )
 
-// NOTE(nasr): parsing command line arguments for defining the source foulders where the xml files can be found and the destination folder for throwing in the structs
+// NOTE(nasr): parsing command line arguments for defining the source foulders where the xsd files can be found and the destination folder for throwing in the structs
 var (
-	base = flag.String("path", "pkg/xml/", "path to folder containing xsd files")
-	out  = flag.String("out", "pkg/xml/gen/", "path to folder where .go files are written")
+	base = flag.String("path", "pkg/xsd/", "path to folder containing xsd files")
+	out  = flag.String("out", "pkg/gen/", "path to folder where .go files are written")
 )
 
 func main() {
