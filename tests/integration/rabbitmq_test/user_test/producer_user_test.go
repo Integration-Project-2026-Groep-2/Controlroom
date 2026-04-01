@@ -18,7 +18,6 @@ func TestProducerUser(t *testing.T) {
 
 	validate := validator.New()
 
-	// 1. Connect to RabbitMQ
 	//TODO(steven): find way to do this with env variable
 	//connectionString := fmt.Sprintf("amqp://root:admin@127.0.0.1:5672")
 	conn, err := amqp.Dial("amqp://guest:guest@127.0.0.1:5672")
@@ -33,13 +32,10 @@ func TestProducerUser(t *testing.T) {
 	}
 	defer ch.Close()
 
-	// 2. Declare the Exchange
 	err = ch.ExchangeDeclare("user.topic", "direct", true, false, false, false, nil)
 	if err != nil {
 		log.Fatalf("Failed to declare exchange: %v", err)
 	}
-
-	// Declare a queue
 
 	q, err := ch.QueueDeclare(
 		"crm.user.confirmed", // name
@@ -67,12 +63,10 @@ func TestProducerUser(t *testing.T) {
 		log.Fatalf("Failed to bind queue to exchange: %v", err)
 	}
 
-	fmt.Println("🚀 Producer started! Sending data every 5 seconds... (Press CTRL+C to exit)")
+	fmt.Println("Producer started! Sending data every 5 seconds... (Press CTRL+C to exit)")
 
-	// 3. The Infinite Sending Loop
-	for {
+	for range 10 {
 
-		// Create dummy data
 		adminUser := gen.UserConfirmed{
 			Id:          gen.UUIDType("550e8400-e29b-41d4-a716-446655440000"),
 			Email:       gen.EmailType("admin@event-platform.com"),
@@ -105,7 +99,7 @@ func TestProducerUser(t *testing.T) {
 		if err := validate.Struct(adminUser); err == nil {
 			xmlData, _ := xml.Marshal(adminUser)
 			ch.PublishWithContext(context.Background(), "user.topic", "temp.routing.consumers", false, false, amqp.Publishing{ContentType: "text/xml", Body: xmlData})
-			fmt.Println("📤 Sent: CRM Heartbeat")
+			fmt.Println("Sent: admin user received")
 		}
 
 		// Validate & Send speakerUser
@@ -114,11 +108,10 @@ func TestProducerUser(t *testing.T) {
 		if err := validate.Struct(speakerUser); err == nil {
 			xmlData, _ := xml.Marshal(speakerUser)
 			ch.PublishWithContext(context.Background(), "user.topic", "temp.routing.consumers", false, false, amqp.Publishing{ContentType: "text/xml", Body: xmlData})
-			fmt.Println("📤 Sent: Facturatie Heartbeat")
+			fmt.Println("Sent: validated and sent speaker user")
 		}
 
-		fmt.Println("--- Waiting 60 seconds ---")
-		time.Sleep(60 * time.Second)
+		time.Sleep(5 * time.Second)
 	}
 
 }

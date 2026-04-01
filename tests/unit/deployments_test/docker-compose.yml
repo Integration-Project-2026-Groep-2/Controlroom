@@ -11,12 +11,67 @@ services:
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:
-      - controlroom_controlroom-network
+      - cr_controlroom-network
+    restart: unless-stopped
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.3.1
+    container_name: elasticsearch
+    ports:
+      - "${PORT_ELASTICSEARCH}:9200"
+      - "${PORT_ELASTICSEARCH_TRANSPORT}:9300"
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+    volumes:
+      - elasticsearch:/usr/share/elasticsearch/data
+    networks:
+      - cr_controlroom-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q '\"status\":\"green\\|yellow\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:9.3.1
+    container_name: kibana
+    ports:
+      - "${PORT_KIBANA}:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY=${KIBANA_ENCRYPTION_KEY}
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - cr_controlroom-network
+    restart: unless-stopped
+
+  controlroom:
+    build:
+      context: ../../../
+      dockerfile: Dockerfile
+    container_name: controlroom
+    environment:
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@${RABBITMQ_HOST}:5672/
+      - RABBITMQ_HOST=${RABBITMQ_HOST}
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - cr_controlroom-network
     restart: unless-stopped
 
 networks:
-  controlroom_controlroom-network:
-    external: true
+  cr_controlroom-network:
+    name: cr_controlroom-network
+    driver: bridge
 
 volumes:
   rabbitmq_data:
+  elasticsearch:
+    driver: local

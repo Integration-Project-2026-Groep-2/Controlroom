@@ -248,9 +248,9 @@ func TestE2E_MultipleServices_AllIndexed(t *testing.T) {
 	}
 
 	// Controleer ook dat de documenten unieke IDs hebben via een count query
-	countBody, _ := json.Marshal(map[string]interface{}{
-		"query": map[string]interface{}{
-			"terms": map[string]interface{}{
+	countBody, _ := json.Marshal(map[string]any{
+		"query": map[string]any{
+			"terms": map[string]any{
 				"_id": docIDs,
 			},
 		},
@@ -263,7 +263,7 @@ func TestE2E_MultipleServices_AllIndexed(t *testing.T) {
 	require.NoError(t, err)
 	defer countRes.Body.Close()
 
-	var result map[string]interface{}
+	var result map[string]any
 	err = json.NewDecoder(countRes.Body).Decode(&result)
 	require.NoError(t, err)
 
