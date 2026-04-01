@@ -1,6 +1,6 @@
 // new logging system that logs internal errors to kibana instead of to stdout
 package internal_logger
-
+/*
 import (
 	"bytes"
 	"log"
@@ -83,3 +83,4 @@ func LogDebug(message LogMessage) error {
 	return message
 
 }
+*/
