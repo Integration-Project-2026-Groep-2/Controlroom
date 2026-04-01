@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"os"
 	"sync"
 	"time"
 
@@ -130,6 +131,8 @@ func (l *Logger) Error(msg string, err error, fields ...Field) {
 
 func (l *Logger) Fatal(msg string, err error, fields ...Field) {
 	l.log(FATAL, msg, err, fields)
+	time.Sleep(100 * time.Millisecond) // geef de ES goroutine tijd om te flushen
+	os.Exit(1)
 }
 
 func (l *Logger) log(sev Severity, msg string, err error, fields []Field) {

@@ -7,11 +7,12 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	// log blijft voor de Fatalf calls vóór de logger beschikbaar is
+
 	"integration-project-ehb/controlroom/internal/heartbeat"
 	cr_rabbitmq "integration-project-ehb/controlroom/internal/rabbitmq"
 	userobject "integration-project-ehb/controlroom/internal/userObject"
 	internal_logger "integration-project-ehb/controlroom/pkg/logger"
+
 	elasticsearch "github.com/elastic/go-elasticsearch/v9"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
@@ -19,48 +20,12 @@ import (
 func main() {
 
 	// =============================================================================
-	// RabbitMQ connection
-	conn, err := amqp.Dial(os.Getenv("RABBITMQ_URL"))
-	if err != nil {
-		log.Fatalf("RabbitMQ connection failed: %v", err)
-	}
-	defer conn.Close()
-
-	ir := &cr_rabbitmq.InternalRabbitMQ{
-		Conn:  conn,
-		Chans: make(map[string]*amqp.Channel),
-	}
-
-	// =============================================================================
-
-	// =============================================================================
-	// RabbitMQ consumers
-	msgs, err := cr_rabbitmq.SetupHeartbeatConsumer(ir)
-	if err != nil {
-		log.Fatalf("SetupHeartbeatConsumer failed: %v", err)
-	}
-
-	msgsUser, err := cr_rabbitmq.SetupUserConsumer(ir)
-	if err != nil {
-		log.Fatalf("SetupUserConsumer failed: %v", err)
-	}
-
-	defer func() {
-		for _, ch := range ir.Chans {
-			ch.Close()
-		}
-	}()
-	// =============================================================================
-
-	// =============================================================================
-	// Elasticsearch
+	// Elasticsearch + logger eerst — alle fouten erna gaan naar Kibana
 	esClient, err := elasticsearch.NewDefaultClient()
 	if err != nil {
 		log.Fatalf("Failed to create Elasticsearch client: %v", err)
 	}
-	// =============================================================================
 
-	// =============================================================================
 	res, err := esClient.Info()
 	if err != nil {
 		log.Fatalf("Error connecting to Elasticsearch: %v", err)
@@ -69,6 +34,44 @@ func main() {
 
 	logger := internal_logger.NewWithElastic(os.Stdout, "controlroom", esClient, "logs")
 	logger.Info("successfully connected to Elasticsearch")
+	// =============================================================================
+
+	// =============================================================================
+	// RabbitMQ connection
+	conn, err := amqp.Dial(os.Getenv("RABBITMQ_URL"))
+	if err != nil {
+		logger.Fatal("RabbitMQ connection failed", err,
+			internal_logger.String("url", os.Getenv("RABBITMQ_URL")),
+		)
+	}
+	defer conn.Close()
+	logger.Info("successfully connected to RabbitMQ",
+		internal_logger.String("host", os.Getenv("RABBITMQ_HOST")),
+	)
+
+	ir := &cr_rabbitmq.InternalRabbitMQ{
+		Conn:  conn,
+		Chans: make(map[string]*amqp.Channel),
+	}
+	// =============================================================================
+
+	// =============================================================================
+	// RabbitMQ consumers
+	msgs, err := cr_rabbitmq.SetupHeartbeatConsumer(ir)
+	if err != nil {
+		logger.Fatal("SetupHeartbeatConsumer failed", err)
+	}
+
+	msgsUser, err := cr_rabbitmq.SetupUserConsumer(ir)
+	if err != nil {
+		logger.Fatal("SetupUserConsumer failed", err)
+	}
+
+	defer func() {
+		for _, ch := range ir.Chans {
+			ch.Close()
+		}
+	}()
 	// =============================================================================
 
 	// =============================================================================
