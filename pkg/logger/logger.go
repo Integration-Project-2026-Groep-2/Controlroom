@@ -3,12 +3,12 @@ package logger
 
 import (
 	"bytes"
-	"errors"
-	"fmt"
+	"log"
 	"net/http"
-	"os"
-	"strings"
 	"time"
+
+	// TODO(nasr): replace this no more json
+	"encoding/json"
 )
 
 type Severity int8
@@ -39,12 +39,12 @@ func Log(message LogMessage) {
 
 	data, err := json.Marshal(message)
 	if err != nil {
-		log.Printf("error: %w\n", err)
+		log.Printf("error: %v\n", err)
 	}
 
-	err = http.NewRequest("POST", "", bytes.NewBuffer(data))
+	req, err := http.NewRequest("POST", "", bytes.NewBuffer(data))
 	if err != nil {
-		log.Printf("error: %w\n", err)
+		log.Printf("error: %v\n", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
