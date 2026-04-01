@@ -5,11 +5,14 @@ package internal_logger
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"sync"
 	"time"
 
 	"github.com/coreos/go-systemd/v22/journal"
+	"github.com/elastic/go-elasticsearch/v9"
+	"github.com/elastic/go-elasticsearch/v9/esapi"
 )
 
 // Severity geeft het log-niveau aan.
@@ -92,14 +95,21 @@ var pool = sync.Pool{
 
 // Logger schrijft JSON log-regels naar een io.Writer zonder tussenliggende
 // heap-allocaties. Voor severity hoger dan WARN wordt ook naar journald
+// gestuurd. Als es ingesteld is worden logs asynchroon naar Elasticsearch
 // gestuurd.
 type Logger struct {
 	w       io.Writer
 	service string
+	es      *elasticsearch.Client
+	esIndex string
 }
 
 func New(w io.Writer, service string) *Logger {
 	return &Logger{w: w, service: service}
+}
+
+func NewWithElastic(w io.Writer, service string, es *elasticsearch.Client, index string) *Logger {
+	return &Logger{w: w, service: service, es: es, esIndex: index}
 }
 
 func (l *Logger) Debug(msg string, fields ...Field) {
@@ -172,7 +182,28 @@ func (l *Logger) log(sev Severity, msg string, err error, fields []Field) {
 		journal.Send(msg, sev.journalPriority(), vars) //nolint:errcheck
 	}
 
+	// asynchroon naar Elasticsearch sturen als client ingesteld is
+	if l.es != nil {
+		payload := make([]byte, buf.Len()-1) // zonder trailing \n
+		copy(payload, buf.Bytes())
+		go l.indexToElastic(payload, time.Now())
+	}
+
 	pool.Put(buf)
+}
+
+func (l *Logger) indexToElastic(payload []byte, t time.Time) {
+	req := esapi.IndexRequest{
+		Index:      l.esIndex,
+		DocumentID: fmt.Sprintf("%s-%d", l.service, t.UnixNano()),
+		Body:       bytes.NewReader(payload),
+		Refresh:    "false",
+	}
+	res, err := req.Do(nil, l.es)
+	if err != nil {
+		return
+	}
+	res.Body.Close()
 }
 
 // writeEscaped schrijft s naar buf met minimale JSON-escaping (alleen " en \).

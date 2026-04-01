@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"integration-project-ehb/controlroom/pkg/gen"
+	"integration-project-ehb/controlroom/pkg/xml/gen"
 
 	"github.com/elastic/go-elasticsearch/v9"
 	"github.com/elastic/go-elasticsearch/v9/esapi"
