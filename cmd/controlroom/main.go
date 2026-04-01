@@ -34,12 +34,65 @@ func main() {
 
 	// =============================================================================
 	// RabbitMQ consumers
-	msgs, err := cr_rabbitmq.SetupHeartbeatConsumer(ir)
+
+	Consumer := &cr_rabbitmq.ConsumerInfo{
+		Name:      "heartbeat",
+		Consumer:  "",
+		AutoAck:   false,
+		Exclusive: false,
+		NoLocal:   false,
+		NoWait:    false,
+		Args:      nil,
+	}
+
+	Exchange := &cr_rabbitmq.Exchange{
+		Name:       "heartbeat.direct",
+		Kind:       "direct",
+		Durable:    true,
+		AutoDelete: false,
+		Internal:   false,
+		NoWait:     false,
+		Args:       nil,
+	}
+
+	Queue := &cr_rabbitmq.Queue{
+		Name:       "heartbeat_queue",
+		Durable:    true,
+		AutoDelete: false,
+		Exclusive:  false,
+		NoWait:     false,
+		Args:       nil,
+	}
+
+	Bind := &cr_rabbitmq.BindInfo{
+		Key:    "routing.heartbeat",
+		NoWait: false,
+		Args:   nil,
+	}
+
+	// TODO(nasr): verify prefetch count with team (currently 6 for 6 microservices)
+	Qos := &cr_rabbitmq.Qos{
+		PrefetchCount: 6,
+		PrefetchSize:  0,
+		Global:        true,
+	}
+
+	msgs, err := cr_rabbitmq.SetupConsumer(ir, Consumer, Exchange, Queue, Bind, Qos)
 	if err != nil {
 		log.Fatalf("SetupHeartbeatConsumer failed: %v", err)
 	}
 
-	msgsUser, err := cr_rabbitmq.SetupUserConsumer(ir)
+	Consumer.Name = "user"
+	Exchange.Name = "user.topic"
+	Exchange.Kind = "topic"
+	Queue.Name = "crm.user.confirmed"
+	// TODO(Steven): Add actual routing key when exists
+	Bind.Key = "temp.routing.consumers"
+	// TODO(nasr): verify prefetch count with team
+	Qos.PrefetchCount = 10
+	Qos.Global = false
+
+	msgsUser, err := cr_rabbitmq.SetupConsumer(ir, Consumer, Exchange, Queue, Bind, Qos)
 	if err != nil {
 		log.Fatalf("SetupUserConsumer failed: %v", err)
 	}
