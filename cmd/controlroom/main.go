@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	company "integration-project-ehb/controlroom/internal/company"
 	"integration-project-ehb/controlroom/internal/heartbeat"
 	cr_rabbitmq "integration-project-ehb/controlroom/internal/rabbitmq"
 	userobject "integration-project-ehb/controlroom/internal/userObject"
@@ -83,11 +84,11 @@ func main() {
 	}
 
 	Consumer.Name = "user"
-	Exchange.Name = "user.topic"
+	Exchange.Name = "contact.topic"
 	Exchange.Kind = "topic"
 	Queue.Name = "crm.user.confirmed"
 	// TODO(Steven): Add actual routing key when exists
-	Bind.Key = "temp.routing.consumers"
+	Bind.Key = "temp.routing.users"
 	// TODO(nasr): verify prefetch count with team
 	Qos.PrefetchCount = 10
 	Qos.Global = false
@@ -95,6 +96,21 @@ func main() {
 	msgsUser, err := cr_rabbitmq.SetupConsumer(ir, Consumer, Exchange, Queue, Bind, Qos)
 	if err != nil {
 		log.Fatalf("SetupUserConsumer failed: %v", err)
+	}
+
+	Consumer.Name = "company"
+	Exchange.Name = "contact.topic"
+	Exchange.Kind = "topic"
+	Queue.Name = "crm.company.confirmed"
+	// TODO(Steven): Add actual routing key when exists
+	Bind.Key = "temp.routing.users"
+	// TODO(nasr): verify prefetch count with team
+	Qos.PrefetchCount = 10
+	Qos.Global = false
+
+	msgsCompany, err := cr_rabbitmq.SetupConsumer(ir, Consumer, Exchange, Queue, Bind, Qos)
+	if err != nil {
+		log.Fatalf("SetupCompanyConsumer failed: %v", err)
 	}
 
 	defer func() {
@@ -134,6 +150,7 @@ func main() {
 	// Processors
 	processor := heartbeat.CreateProcessor(esClient, dlqCh)
 	processorUser := userobject.CreateProcessor(esClient, dlqCh)
+	processorCompany := company.CreateProcessor(esClient, dlqCh)
 	// =============================================================================
 
 	// =============================================================================
@@ -148,6 +165,7 @@ func main() {
 	// =============================================================================
 	go heartbeat.ConsumeHeartbeats(processor, msgs, ctx)
 	go userobject.ConsumeUserObjects(processorUser, msgsUser, ctx)
+	go company.ConsumeCompanies(processorCompany, msgsCompany, ctx)
 	// =============================================================================
 
 	// =============================================================================
