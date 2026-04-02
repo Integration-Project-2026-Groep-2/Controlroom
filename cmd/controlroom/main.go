@@ -69,7 +69,7 @@ func main() {
 	}
 
 	hbMsgs, err := cr_rabbitmq.SetupQueue(hbCh, hbExchange, hbQueue, hbBinding)
-	hbCh.Qos(5, 0, false)
+
 	hbCfg := &cr_rabbitmq.ConsumerConfig{
 		DLQCh:   dlqCh,
 		DLQName: "heartbeat_dlq",
@@ -84,8 +84,8 @@ func main() {
 		log.Fatalf("heartbeat setup: %v", err)
 	}
 
-	// NOTE(nasr): prefetch count 5 for reasonable throughput without hoarding memory
-	hbCh.Qos(5, 0, false)
+	// NOTE(nasr): prefetch count 18 for reasonable throughput without hoarding memory
+	hbCh.Qos(18, 0, false)
 
 	go cr_rabbitmq.Consume(hbCfg, hbMsgs, ctx)
 	log.Println("Heartbeat consumer started")
@@ -98,7 +98,7 @@ func main() {
 	defer userCh.Close()
 
 	userExchange := cr_rabbitmq.ExchangeInfo{
-		Name: "user.topic",
+		Name: "contact.topic",
 		Kind: "topic",
 	}
 	userQueue := cr_rabbitmq.QueueInfo{
@@ -106,7 +106,7 @@ func main() {
 		Durable: true,
 	}
 	userBinding := cr_rabbitmq.BindingInfo{
-		Key: "crm.user.confirmed", // NOTE(nasr): [ DONE ]: Verify routing key with team
+		Key: "crm.user.confirmed",
 	}
 
 	userMsgs, err := cr_rabbitmq.SetupQueue(userCh, userExchange, userQueue, userBinding)
@@ -145,6 +145,7 @@ func main() {
 		Name:    "statuscheck_queue",
 		Durable: true,
 	}
+	// NOTE(nasr): allows for crm.status.checked, kassa.status.checked, etc.
 	scBinding := cr_rabbitmq.BindingInfo{
 		Key: "routing.statuscheck",
 	}
@@ -168,9 +169,9 @@ func main() {
 	go cr_rabbitmq.Consume(scCfg, scMsgs, ctx)
 	log.Println("StatusCheck consumer started")
 
-	// Graceful shutdown
-	log.Println("Controlroom running. Press Ctrl+C to shutdown.")
+	// TODO(nasr): add logging stuff in the future
 
+	// ---------------------- shutdown stuff ----------------------
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 

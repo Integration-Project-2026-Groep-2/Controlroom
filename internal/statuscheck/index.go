@@ -15,12 +15,10 @@ import (
 func indexStatusCheck(es *elasticsearch.Client, ctx context.Context, sct *gen.StatusCheckType) error {
 
 	doc := map[string]any{
-		"service_id":  sct.ServiceId,
-		"timestamp":   sct.Timestamp,
-		"status":      sct.Status,
-		"uptime":      sct.Uptime,
-		"system_load": sct.SystemLoad,
-		"indexed":     time.Now(),
+		"service_id": sct.ServiceId,
+		"timestamp":  sct.Timestamp,
+		"uptime":     sct.Uptime,
+		"indexed":    time.Now(),
 	}
 
 	jsonData, err := json.Marshal(doc)

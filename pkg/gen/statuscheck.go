@@ -12,34 +12,15 @@ var _ = xml.Name{}
 var _ = time.Time{}
 
 type StatusCheckType struct {
-	XMLName    xml.Name           `xml:"StatusCheckType" json:"StatusCheckType"`
-	ServiceId  string             `xml:"serviceId" json:"service_id" validate:"required"`
-	Timestamp  time.Time          `xml:"timestamp" json:"timestamp" validate:"required"`
-	Status     ServiceStatusEnum  `xml:"status" json:"status" validate:"required"`
-	Uptime     SecondDurationType `xml:"uptime" json:"uptime" validate:"required"`
-	SystemLoad SystemLoadType     `xml:"systemLoad" json:"system_load" validate:"required"`
-}
-
-type ServiceStatusEnum string
-
-const (
-	ServiceStatusEnumHealthy   ServiceStatusEnum = "healthy"
-	ServiceStatusEnumDegraded  ServiceStatusEnum = "degraded"
-	ServiceStatusEnumUnhealthy ServiceStatusEnum = "unhealthy"
-	ServiceStatusEnumUnknown   ServiceStatusEnum = "unknown"
-)
-
-type SecondDurationType struct {
-	XMLName xml.Name `xml:"SecondDurationType" json:"SecondDurationType"`
-	Value   uint     `xml:",chardata" json:"value"`
-	Unit    string   `xml:"unit,attr" json:"unit"`
+	XMLName   xml.Name  `xml:"StatusCheckType" json:"StatusCheckType"`
+	ServiceId string    `xml:"serviceId" json:"service_id" validate:"required"`
+	Timestamp time.Time `xml:"timestamp" json:"timestamp" validate:"required"`
+	Uptime    uint      `xml:"uptime" json:"uptime" validate:"required"`
 }
 
 type SystemLoadType struct {
-	XMLName xml.Name  `xml:"SystemLoadType" json:"SystemLoadType"`
-	Cpu     RatioType `xml:"cpu" json:"cpu" validate:"required"`
-	Memory  RatioType `xml:"memory" json:"memory" validate:"required"`
-	Disk    RatioType `xml:"disk" json:"disk" validate:"required"`
+	XMLName xml.Name `xml:"SystemLoadType" json:"SystemLoadType"`
+	Cpu     float64  `xml:"cpu" json:"cpu" validate:"required"`
+	Memory  float64  `xml:"memory" json:"memory" validate:"required"`
+	Disk    float64  `xml:"disk" json:"disk" validate:"required"`
 }
-
-type RatioType string
