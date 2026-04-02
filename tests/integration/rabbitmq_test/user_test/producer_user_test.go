@@ -33,7 +33,7 @@ func TestProducerUser(t *testing.T) {
 	defer ch.Close()
 
 	// NOTE(Steven): move Queue and exchange names to seperate scheme files
-	err = ch.ExchangeDeclare("user.topic", "topic", true, false, false, false, nil)
+	err = ch.ExchangeDeclare("contact.topic", "topic", true, false, false, false, nil)
 	if err != nil {
 		log.Fatalf("Failed to declare exchange: %v", err)
 	}
@@ -54,9 +54,9 @@ func TestProducerUser(t *testing.T) {
 	// TODO(steven): change routing key to actual key
 	// Routing key: "temp.routing.consumers"
 	err = ch.QueueBind(
-		q.Name,                   // queue name
-		"temp.routing.consumers", // routing key
-		"user.topic",             // exchange
+		q.Name,               // queue name
+		"temp.routing.users", // routing key
+		"contact.topic",      // exchange
 		false,
 		nil,
 	)
@@ -100,7 +100,7 @@ func TestProducerUser(t *testing.T) {
 		// TODO(steven): replace temp routing key with actual key
 		if err := validate.Struct(adminUser); err == nil {
 			xmlData, _ := xml.Marshal(adminUser)
-			ch.PublishWithContext(context.Background(), "user.topic", "temp.routing.consumers", false, false, amqp.Publishing{ContentType: "text/xml", Body: xmlData})
+			ch.PublishWithContext(context.Background(), "contact.topic", "temp.routing.users", false, false, amqp.Publishing{ContentType: "text/xml", Body: xmlData})
 			fmt.Println("Sent: admin user received")
 		}
 
@@ -109,7 +109,7 @@ func TestProducerUser(t *testing.T) {
 
 		if err := validate.Struct(speakerUser); err == nil {
 			xmlData, _ := xml.Marshal(speakerUser)
-			ch.PublishWithContext(context.Background(), "user.topic", "temp.routing.consumers", false, false, amqp.Publishing{ContentType: "text/xml", Body: xmlData})
+			ch.PublishWithContext(context.Background(), "contact.topic", "temp.routing.users", false, false, amqp.Publishing{ContentType: "text/xml", Body: xmlData})
 			fmt.Println("Sent: validated and sent speaker user")
 		}
 

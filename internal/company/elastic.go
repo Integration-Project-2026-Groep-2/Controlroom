@@ -30,7 +30,7 @@ func indexCompany(es *elasticsearch.Client, ctx context.Context, comp *gen.Compa
 	}
 
 	req := esapi.IndexRequest{
-		Index:      "users",
+		Index:      "companies",
 		DocumentID: fmt.Sprintf("%s-%v", comp.Id, comp.ConfirmedAt),
 		Body:       bytes.NewReader(jsonData),
 		Refresh:    "true",

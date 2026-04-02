@@ -103,7 +103,7 @@ func main() {
 	Exchange.Kind = "topic"
 	Queue.Name = "crm.company.confirmed"
 	// TODO(Steven): Add actual routing key when exists
-	Bind.Key = "temp.routing.users"
+	Bind.Key = "temp.routing.companies"
 	// TODO(nasr): verify prefetch count with team
 	Qos.PrefetchCount = 10
 	Qos.Global = false
