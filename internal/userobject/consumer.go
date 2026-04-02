@@ -2,21 +2,22 @@ package userobject
 
 import (
 	"context"
-	"log"
 
 	amqp "github.com/rabbitmq/amqp091-go"
+
+	internal_logger "integration-project-ehb/controlroom/pkg/logger"
 )
 
-func ConsumeUserObjects(p *Processor, msgs <-chan amqp.Delivery, ctx context.Context) {
+func ConsumeUserObjects(p *Processor, msgs <-chan amqp.Delivery, ctx context.Context, log *internal_logger.Logger) {
 	for {
 		select {
 		case <-ctx.Done():
-			log.Println("UserObject consumer shutting down...")
+			log.Info("UserObject consumer shutting down")
 			return
 
 		case msg, ok := <-msgs:
 			if !ok {
-				log.Printf("User consumer Failed.")
+				log.Warn("User consumer channel closed unexpectedly")
 				return
 			}
 

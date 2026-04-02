@@ -9,6 +9,7 @@ package main
 import (
 	"context"
 	"encoding/xml"
+	"io"
 	"testing"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"integration-project-ehb/controlroom/internal/heartbeat"
+	internal_logger "integration-project-ehb/controlroom/pkg/logger"
 	"integration-project-ehb/controlroom/pkg/xml/gen"
 )
 
@@ -37,7 +39,7 @@ func newTestProcessor(dlq heartbeat.DLQPublisher) *heartbeat.Processor {
 	es, _ := elasticsearch.NewClient(elasticsearch.Config{
 		Addresses: []string{"http://localhost:9999"}, // nep URL zodat ES altijd faalt
 	})
-	return heartbeat.NewProcessor(es, dlq)
+	return heartbeat.NewProcessor(es, dlq, internal_logger.New(io.Discard, "test"))
 }
 
 func TestProcessHeartbeat_InvalidXML(t *testing.T) {

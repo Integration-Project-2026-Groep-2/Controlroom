@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/xml"
 	"fmt"
-	"log"
 	"time"
 
 	elasticsearch "github.com/elastic/go-elasticsearch/v9"
@@ -12,6 +11,7 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 
 	// generated structs
+	internal_logger "integration-project-ehb/controlroom/pkg/logger"
 	"integration-project-ehb/controlroom/pkg/xml/gen"
 )
 
@@ -23,39 +23,44 @@ type Processor struct {
 	es        *elasticsearch.Client
 	validator *validator.Validate
 	dlq       DLQPublisher
+	log       *internal_logger.Logger
 }
 
-func NewProcessor(es *elasticsearch.Client, dlq DLQPublisher) *Processor {
+func NewProcessor(es *elasticsearch.Client, dlq DLQPublisher, log *internal_logger.Logger) *Processor {
 	return &Processor{
 		es:        es,
 		validator: validator.New(),
 		dlq:       dlq,
+		log:       log,
 	}
 }
 
-func CreateProcessor(es *elasticsearch.Client, dlqCh *amqp.Channel) *Processor {
-	_, err := dlqCh.QueueDeclare("heartbeat_dlq", true, false, false, false, nil)
-	if err != nil {
-		log.Printf("Failed to declare DLQ: %v", err)
-	}
-
-	return &Processor{
+func CreateProcessor(es *elasticsearch.Client, dlqCh *amqp.Channel, log *internal_logger.Logger) *Processor {
+	p := &Processor{
 		es:        es,
 		validator: validator.New(),
 		dlq:       dlqCh,
+		log:       log,
 	}
+
+	_, err := dlqCh.QueueDeclare("heartbeat_dlq", true, false, false, false, nil)
+	if err != nil {
+		p.log.Error("Failed to declare DLQ", err)
+	}
+
+	return p
 }
 
 func ProcessHeartbeat(p *Processor, body []byte) error {
 	var hb gen.Heartbeat
 
 	if err := xml.Unmarshal(body, &hb); err != nil {
-		sendToDLQ(p.dlq, body, fmt.Sprintf("unmarshal error: %v", err))
+		sendToDLQ(p.dlq, p.log, body, fmt.Sprintf("unmarshal error: %v", err))
 		return err
 	}
 
 	if err := p.validator.Struct(hb); err != nil {
-		sendToDLQ(p.dlq, body, fmt.Sprintf("validation error: %v", err))
+		sendToDLQ(p.dlq, p.log, body, fmt.Sprintf("validation error: %v", err))
 		return err
 	}
 
@@ -63,15 +68,15 @@ func ProcessHeartbeat(p *Processor, body []byte) error {
 	defer cancel()
 
 	if err := indexHeartbeat(p.es, ctx, &hb); err != nil {
-		sendToDLQ(p.dlq, body, fmt.Sprintf("index error: %v", err))
+		sendToDLQ(p.dlq, p.log, body, fmt.Sprintf("index error: %v", err))
 		return err
 	}
 
-	log.Printf("Indexed heartbeat: %s", hb.ServiceId)
+	p.log.Info("Indexed heartbeat", internal_logger.String("service_id", hb.ServiceId))
 	return nil
 }
 
-func sendToDLQ(dlq DLQPublisher, body []byte, reason string) error {
+func sendToDLQ(dlq DLQPublisher, log *internal_logger.Logger, body []byte, reason string) error {
 	err := dlq.PublishWithContext(
 		context.Background(),
 		"",
@@ -89,7 +94,7 @@ func sendToDLQ(dlq DLQPublisher, body []byte, reason string) error {
 	)
 
 	if err != nil {
-		log.Printf("Failed to send to DLQ: %v", err)
+		log.Error("Failed to send to DLQ", err)
 	}
 
 	return err

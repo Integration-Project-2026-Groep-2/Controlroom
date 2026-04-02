@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pkill -f \"go run ./cmd/controlroom\")",
+      "Bash(pkill -f \"controlroom.exe\")"
+    ]
+  }
+}

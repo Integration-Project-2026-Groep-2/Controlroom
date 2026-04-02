@@ -2,16 +2,17 @@ package heartbeat
 
 import (
 	"context"
-	"log"
 
 	amqp "github.com/rabbitmq/amqp091-go"
+
+	internal_logger "integration-project-ehb/controlroom/pkg/logger"
 )
 
-func ConsumeHeartbeats(p *Processor, msgs <-chan amqp.Delivery, ctx context.Context) {
+func ConsumeHeartbeats(p *Processor, msgs <-chan amqp.Delivery, ctx context.Context, log *internal_logger.Logger) {
 	for {
 		select {
 		case <-ctx.Done():
-			log.Println("Heartbeat consumer shutting down...")
+			log.Info("Heartbeat consumer shutting down")
 			return
 
 		case msg, ok := <-msgs:

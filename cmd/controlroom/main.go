@@ -85,8 +85,8 @@ func main() {
 
 	// =============================================================================
 	// Processors
-	processor := heartbeat.CreateProcessor(esClient, dlqCh)
-	processorUser := userobject.CreateProcessor(esClient, dlqCh)
+	processor := heartbeat.CreateProcessor(esClient, dlqCh, logger)
+	processorUser := userobject.CreateProcessor(esClient, dlqCh, logger)
 	// =============================================================================
 
 	// =============================================================================
@@ -102,8 +102,8 @@ func main() {
 	// =============================================================================
 
 	// =============================================================================
-	go heartbeat.ConsumeHeartbeats(processor, msgs, ctx)
-	go userobject.ConsumeUserObjects(processorUser, msgsUser, ctx)
+	go heartbeat.ConsumeHeartbeats(processor, msgs, ctx, logger)
+	go userobject.ConsumeUserObjects(processorUser, msgsUser, ctx, logger)
 	// =============================================================================
 
 	// =============================================================================
