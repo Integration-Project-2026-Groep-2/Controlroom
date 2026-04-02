@@ -69,7 +69,7 @@ func TestHeartbeatRoundTrip(t *testing.T) {
 	}
 
 	// Build and validate heartbeat
-	hb := gen.HeartbeatType{
+	hb := gen.Heartbeat{
 		ServiceId: "test-service",
 		Timestamp: time.Now().UTC(),
 	}
@@ -104,7 +104,7 @@ func TestHeartbeatRoundTrip(t *testing.T) {
 			t.Fatal("consumer channel closed unexpectedly")
 		}
 
-		var received gen.HeartbeatType
+		var received gen.Heartbeat
 		if err = xml.Unmarshal(msg.Body, &received); err != nil {
 			t.Fatalf("failed to unmarshal received message: %v", err)
 		}

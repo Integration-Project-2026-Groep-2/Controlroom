@@ -15,7 +15,7 @@ import (
 // NOTE(nasr): returning a function independenant of es client to simplify mocking
 func NewHeartbeatProcessor(es *elasticsearch.Client) func([]byte) error {
 	return func(body []byte) error {
-		var hb gen.HeartbeatType
+		var hb gen.Heartbeat
 		if err := xml.Unmarshal(body, &hb); err != nil {
 			return fmt.Errorf("unmarshal: %w", err)
 		}

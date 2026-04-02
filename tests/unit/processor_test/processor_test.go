@@ -31,7 +31,7 @@ func TestProcessHeartbeat_ValidXML_ESUnavailable(t *testing.T) {
 	})
 	processor := heartbeat.NewHeartbeatProcessor(es)
 
-	hb := gen.HeartbeatType{
+	hb := gen.Heartbeat{
 		ServiceId: "test-service",
 		Timestamp: time.Now().UTC(),
 	}

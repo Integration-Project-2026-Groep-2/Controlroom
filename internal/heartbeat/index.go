@@ -13,7 +13,7 @@ import (
 	"github.com/elastic/go-elasticsearch/v9/esapi"
 )
 
-func indexHeartbeat(es *elasticsearch.Client, ctx context.Context, hb *gen.HeartbeatType) error {
+func indexHeartbeat(es *elasticsearch.Client, ctx context.Context, hb *gen.Heartbeat) error {
 
 	doc := map[string]any{
 		"serviceId": hb.ServiceId,

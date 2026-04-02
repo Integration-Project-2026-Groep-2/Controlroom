@@ -20,7 +20,7 @@ import (
 )
 
 func TestUser_MarshalUnmarshal(t *testing.T) {
-	original := gen.HeartbeatType{
+	original := gen.Heartbeat{
 		ServiceId: "test-service",
 		Timestamp: time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC),
 	}
@@ -28,7 +28,7 @@ func TestUser_MarshalUnmarshal(t *testing.T) {
 	data, err := xml.Marshal(original)
 	assert.NoError(t, err)
 
-	var result gen.HeartbeatType
+	var result gen.Heartbeat
 	err = xml.Unmarshal(data, &result)
 	assert.NoError(t, err)
 
@@ -37,13 +37,13 @@ func TestUser_MarshalUnmarshal(t *testing.T) {
 }
 
 func TestUser_XMLTagNames(t *testing.T) {
-	hb := gen.HeartbeatType{ServiceId: "svc", Timestamp: time.Now().UTC()}
+	hb := gen.Heartbeat{ServiceId: "svc", Timestamp: time.Now().UTC()}
 
 	data, err := xml.Marshal(hb)
 	assert.NoError(t, err)
 
 	xmlStr := string(data)
 
-	assert.True(t, strings.Contains(xmlStr, "<HeartbeatType>"), "expected tag to be <Heartbeat>")
+	assert.True(t, strings.Contains(xmlStr, "<Heartbeat>"), "expected tag to be <Heartbeat>")
 	assert.True(t, strings.Contains(xmlStr, "<serviceId>"), "expected tag to be <serviceId>")
 }

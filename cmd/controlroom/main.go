@@ -98,8 +98,9 @@ func main() {
 	defer userCh.Close()
 
 	userExchange := cr_rabbitmq.ExchangeInfo{
-		Name: "contact.topic",
-		Kind: "topic",
+		Name:    "contact.topic",
+		Kind:    "topic",
+		Durable: true,
 	}
 	userQueue := cr_rabbitmq.QueueInfo{
 		Name:    "crm.user.confirmed",
