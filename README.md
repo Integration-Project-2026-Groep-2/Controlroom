@@ -5,43 +5,63 @@ Receives, validates, and stores event-driven data (heartbeats, status checks, us
 ## Stack
 
 - Go 1.26
-- RabbitMQ — `amqp091-go`
-- Elasticsearch 9 — `go-elasticsearch/v9`
+- RabbitMQ (`amqp091-go`)
+- Elasticsearch 9 (`go-elasticsearch/v9`)
 - Kibana 9.3.1
-- Docker
 
-## Requirements
+## Quick Start
 
-- Docker Desktop running
-
-## Run
 ```bash
-# Start infrastructure
 docker compose up -d --build
 ```
 
-### local setup
+### Local Testing
 
-After running the initial docker compose and the controlroom network has been created.
+After the initial docker compose:
+
 ```bash
-cd ./tests/deployments_test
-docker compose up -d
+cd tests/deployments_test
+docker compose up -d --build
 ```
 
-RabbitMQ UI: http://localhost:15672
-Elasticsearch: http://localhost:9200
-Kibana: http://localhost:5601
+## Access Points
 
-## Kibana setup
+- **RabbitMQ UI**: http://localhost:15672
+- **Elasticsearch**: http://localhost:9200
+- **Kibana**: http://localhost:5601
 
-1. Go to Stack Management > Data Views
-2. Create data view `heartbeats`, timestamp field `@timestamp`
-3. Create data view `users`, timestamp field `@timestamp`
+## Kibana Configuration
 
+1. Go to **Stack Management** → **Data Views**
+2. Create the following data views with `@timestamp` as the timestamp field:
+   - `heartbeats`
+   - `statuscheck`
+   - `users`
 
-## Tests
+## Testing
 
 ```bash
 go test ./tests/...
 ```
 
+## Hosted
+
+[control-room.integration-project-2026-groep-2.my.be](https://control-room.integration-project-2026-groep-2.my.be)
+
+
+## Developers
+
+Marwan Makouh
+Thomas Heusdens
+Steven Deloof
+Abdellah El Morabit
+
+
+# Misc.
+
+We developed an extra package for the fun of it that generates go structs based on a given XSD.
+AI generation has been used for the file writing but the parsing and lexing is hand written.
+This simplified  our workflow to just drag and dropping XSD's developped by other teams in the `pkg/xml` folder and
+running the meta program.
+
+We're hoping on expanding this package in the future to generate code based on exchange and queue declarations.
