@@ -145,6 +145,11 @@ func (l *Logger) Panic(msg string, err error, fields ...Field) {
 	panic(msg)
 }
 
+// Flush waits for all in-flight Elasticsearch writes to complete.
+func (l *Logger) Flush() {
+	l.wg.Wait()
+}
+
 func (l *Logger) log(sev Severity, msg string, err error, fields []Field) {
 	buf := pool.Get().(*bytes.Buffer)
 	buf.Reset()
