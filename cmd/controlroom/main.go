@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -14,33 +13,41 @@ import (
 	"integration-project-ehb/controlroom/internal/heartbeat"
 	"integration-project-ehb/controlroom/internal/statuscheck"
 	"integration-project-ehb/controlroom/internal/userobject"
+	"integration-project-ehb/controlroom/pkg/logger"
 )
 
 func main() {
+	// Basic logger for startup sequence (no ES yet)
+	log := logger.New(os.Stdout, "controlroom")
+
 	// Elasticsearch client
 	esClient, err := elasticsearch.NewDefaultClient()
 	if err != nil {
-		log.Fatalf("elasticsearch client: %v", err)
+		log.Fatal("elasticsearch client", err)
 	}
 	res, err := esClient.Info()
 	if err != nil {
-		log.Fatalf("elasticsearch connect: %v", err)
+		log.Fatal("elasticsearch connect", err)
 	}
 	defer res.Body.Close()
-	log.Println("Connected to Elasticsearch")
+
+	// Upgrade to ES-backed logger now that connection is confirmed
+	log = logger.NewWithElastic(os.Stdout, "controlroom", esClient, "controlroom-logs")
+	defer log.Flush()
+	log.Info("connected to elasticsearch")
 
 	// RabbitMQ connection
 	conn, err := amqp.Dial(os.Getenv("RABBITMQ_URL"))
 	if err != nil {
-		log.Fatalf("rabbitmq dial: %v", err)
+		log.Fatal("rabbitmq dial", err)
 	}
 	defer conn.Close()
-	log.Println("Connected to RabbitMQ")
+	log.Info("connected to rabbitmq")
 
 	// DLQ channel (shared)
 	dlqCh, err := conn.Channel()
 	if err != nil {
-		log.Fatalf("dlq channel: %v", err)
+		log.Fatal("dlq channel", err)
 	}
 	defer dlqCh.Close()
 
@@ -51,7 +58,7 @@ func main() {
 	// Heartbeat consumer
 	hbCh, err := conn.Channel()
 	if err != nil {
-		log.Fatalf("heartbeat channel: %v", err)
+		log.Fatal("heartbeat channel", err)
 	}
 	defer hbCh.Close()
 
@@ -73,27 +80,28 @@ func main() {
 	hbCfg := &cr_rabbitmq.ConsumerConfig{
 		DLQCh:   dlqCh,
 		DLQName: "heartbeat_dlq",
-		Process: heartbeat.NewHeartbeatProcessor(esClient),
+		Process: heartbeat.NewHeartbeatProcessor(esClient, log),
+		Log:     log,
 	}
 
 	if err := cr_rabbitmq.SetupDLQ(hbCfg.DLQCh, hbCfg.DLQName); err != nil {
-		log.Fatalf("heartbeat dlq setup: %v", err)
+		log.Fatal("heartbeat dlq setup", err)
 	}
 
 	if err != nil {
-		log.Fatalf("heartbeat setup: %v", err)
+		log.Fatal("heartbeat setup", err)
 	}
 
 	// NOTE(nasr): prefetch count 18 for reasonable throughput without hoarding memory
 	hbCh.Qos(18, 0, false)
 
 	go cr_rabbitmq.Consume(hbCfg, hbMsgs, ctx)
-	log.Println("Heartbeat consumer started")
+	log.Info("heartbeat consumer started")
 
 	// User consumer
 	userCh, err := conn.Channel()
 	if err != nil {
-		log.Fatalf("user channel: %v", err)
+		log.Fatal("user channel", err)
 	}
 	defer userCh.Close()
 
@@ -112,28 +120,29 @@ func main() {
 
 	userMsgs, err := cr_rabbitmq.SetupQueue(userCh, userExchange, userQueue, userBinding)
 	if err != nil {
-		log.Fatalf("user setup: %v", err)
+		log.Fatal("user setup", err)
 	}
 
 	userCfg := &cr_rabbitmq.ConsumerConfig{
 		DLQCh:   dlqCh,
 		DLQName: "user_dlq",
-		Process: userobject.NewUserProcessor(esClient),
+		Process: userobject.NewUserProcessor(esClient, log),
+		Log:     log,
 	}
 	if err := cr_rabbitmq.SetupDLQ(userCfg.DLQCh, userCfg.DLQName); err != nil {
-		log.Fatalf("user dlq setup: %v", err)
+		log.Fatal("user dlq setup", err)
 	}
 
 	// NOTE(nasr): prefetch count 10 for higher throughput, autoack disabled per consumer
 	userCh.Qos(10, 0, false)
 
 	go cr_rabbitmq.Consume(userCfg, userMsgs, ctx)
-	log.Println("User consumer started")
+	log.Info("user consumer started")
 
 	// StatusCheck consumer
 	scCh, err := conn.Channel()
 	if err != nil {
-		log.Fatalf("statuscheck channel: %v", err)
+		log.Fatal("statuscheck channel", err)
 	}
 	defer scCh.Close()
 
@@ -153,31 +162,30 @@ func main() {
 
 	scMsgs, err := cr_rabbitmq.SetupQueue(scCh, scExchange, scQueue, scBinding)
 	if err != nil {
-		log.Fatalf("statuscheck setup: %v", err)
+		log.Fatal("statuscheck setup", err)
 	}
 
 	scCfg := &cr_rabbitmq.ConsumerConfig{
 		DLQCh:   dlqCh,
 		DLQName: "statuscheck_dlq",
-		Process: statuscheck.NewStatusCheckProcessor(esClient),
+		Process: statuscheck.NewStatusCheckProcessor(esClient, log),
+		Log:     log,
 	}
 	if err := cr_rabbitmq.SetupDLQ(scCfg.DLQCh, scCfg.DLQName); err != nil {
-		log.Fatalf("statuscheck dlq setup: %v", err)
+		log.Fatal("statuscheck dlq setup", err)
 	}
 
 	scCh.Qos(5, 0, false)
 
 	go cr_rabbitmq.Consume(scCfg, scMsgs, ctx)
-	log.Println("StatusCheck consumer started")
-
-	// TODO(nasr): add logging stuff in the future
+	log.Info("statuscheck consumer started")
 
 	// ---------------------- shutdown stuff ----------------------
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	<-sigChan
-	log.Println("Shutdown signal received, draining queues...")
+	log.Info("shutdown signal received")
 	cancel()
 
 	// Give consumers time to ack pending messages

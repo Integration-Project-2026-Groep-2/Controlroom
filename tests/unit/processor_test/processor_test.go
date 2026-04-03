@@ -2,6 +2,7 @@ package heartbeat_test
 
 import (
 	"encoding/xml"
+	"io"
 	"testing"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"integration-project-ehb/controlroom/internal/heartbeat"
 	"integration-project-ehb/controlroom/pkg/gen"
+	"integration-project-ehb/controlroom/pkg/logger"
 )
 
 // TestProcessHeartbeat_InvalidXML: malformed XML should fail during unmarshal
@@ -17,7 +19,7 @@ func TestProcessHeartbeat_InvalidXML(t *testing.T) {
 	es, _ := elasticsearch.NewClient(elasticsearch.Config{
 		Addresses: []string{"http://localhost:9999"},
 	})
-	processor := heartbeat.NewHeartbeatProcessor(es)
+	processor := heartbeat.NewHeartbeatProcessor(es, logger.New(io.Discard, "test"))
 
 	err := processor([]byte("invalid xml"))
 	assert.Error(t, err, "should fail on malformed XML")
@@ -29,7 +31,7 @@ func TestProcessHeartbeat_ValidXML_ESUnavailable(t *testing.T) {
 	es, _ := elasticsearch.NewClient(elasticsearch.Config{
 		Addresses: []string{"http://localhost:9999"},
 	})
-	processor := heartbeat.NewHeartbeatProcessor(es)
+	processor := heartbeat.NewHeartbeatProcessor(es, logger.New(io.Discard, "test"))
 
 	hb := gen.Heartbeat{
 		ServiceId: "test-service",
