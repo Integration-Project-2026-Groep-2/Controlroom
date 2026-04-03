@@ -10,7 +10,7 @@ require (
 )
 
 require (
-	github.com/coreos/go-systemd/v22 v22.7.0 // indirect
+	github.com/coreos/go-systemd/v22 v22.7.0 //direct
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/elastic/elastic-transport-go/v8 v8.8.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.12 // indirect
