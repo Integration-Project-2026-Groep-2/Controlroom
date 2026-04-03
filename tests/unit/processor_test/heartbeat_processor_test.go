@@ -1,4 +1,4 @@
-package heartbeat_test
+package processor_test
 
 import (
 	"encoding/xml"
