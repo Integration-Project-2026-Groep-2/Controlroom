@@ -2,10 +2,11 @@ package cr_rabbitmq
 
 import (
 	"context"
-	"log"
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
+
+	"integration-project-ehb/controlroom/pkg/logger"
 )
 
 type InternalRabbitMQ struct {
@@ -22,6 +23,7 @@ type ConsumerConfig struct {
 	DLQCh   *amqp.Channel
 	DLQName string
 	Process ProcessFunc
+	Log     *logger.Logger
 }
 
 // ExchangeInfo holds exchange declaration parameters.
@@ -105,10 +107,12 @@ func Consume(cfg *ConsumerConfig, msgs <-chan amqp.Delivery, ctx context.Context
 		cfg.DLQName = "dlq"
 	}
 
+	log := cfg.Log
+
 	for {
 		select {
 		case <-ctx.Done():
-			log.Println("Consumer shutting down...")
+			log.Info("consumer shutting down")
 			return
 		case msg, ok := <-msgs:
 			if !ok {
@@ -116,10 +120,10 @@ func Consume(cfg *ConsumerConfig, msgs <-chan amqp.Delivery, ctx context.Context
 			}
 			err := cfg.Process(msg.Body)
 			if err != nil {
-				log.Printf("Process failed: %v", err)
+				log.Error("process failed", err)
 				// Send to DLQ before nack
 				if dlqErr := SendToDLQ(cfg.DLQCh, cfg.DLQName, msg.Body, err.Error()); dlqErr != nil {
-					log.Printf("Failed to send to DLQ: %v", dlqErr)
+					log.Error("failed to send to DLQ", dlqErr)
 				}
 				msg.Nack(false, false)
 			} else {

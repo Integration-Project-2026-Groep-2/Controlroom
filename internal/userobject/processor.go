@@ -4,16 +4,16 @@ import (
 	"context"
 	"encoding/xml"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/elastic/go-elasticsearch/v9"
 	"integration-project-ehb/controlroom/pkg/gen"
+	"integration-project-ehb/controlroom/pkg/logger"
 )
 
 // ProcessUserObject unmarshals, validates, and indexes a user message.
 // Returns error to trigger DLQ routing via cr_rabbitmq consumer.
-func NewUserProcessor(es *elasticsearch.Client) func([]byte) error {
+func NewUserProcessor(es *elasticsearch.Client, log *logger.Logger) func([]byte) error {
 	return func(body []byte) error {
 		var uc gen.UserConfirmed
 		if err := xml.Unmarshal(body, &uc); err != nil {
@@ -27,7 +27,7 @@ func NewUserProcessor(es *elasticsearch.Client) func([]byte) error {
 			return fmt.Errorf("index: %w", err)
 		}
 
-		log.Printf("Indexed user object: %s", uc.Id)
+		log.Info("indexed user object", logger.String("id", string(uc.Id)))
 		return nil
 	}
 }
