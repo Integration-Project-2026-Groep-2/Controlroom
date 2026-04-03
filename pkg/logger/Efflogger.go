@@ -2,6 +2,7 @@ package logger
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -13,7 +14,18 @@ import (
 	"github.com/elastic/go-elasticsearch/v9/esapi"
 )
 
-// --- Severity methods (type defined in logger.go) ---
+// --- Severity ---
+
+type Severity int8
+
+const (
+	DEBUG Severity = 1
+	INFO  Severity = 2
+	WARN  Severity = 3
+	ERROR Severity = 4
+	FATAL Severity = 5
+	PANIC Severity = 6
+)
 
 func (s Severity) string() string {
 	switch s {
@@ -29,8 +41,6 @@ func (s Severity) string() string {
 		return "FATAL"
 	case PANIC:
 		return "PANIC"
-	case TRACE:
-		return "TRACE"
 	default:
 		return "UNKNOWN"
 	}
@@ -94,6 +104,7 @@ type Logger struct {
 	service string
 	es      *elasticsearch.Client
 	esIndex string
+	wg      sync.WaitGroup // tracks in-flight Elasticsearch goroutines
 }
 
 // New returns a Logger that writes to w.
@@ -124,8 +135,14 @@ func (l *Logger) Error(msg string, err error, fields ...Field) {
 
 func (l *Logger) Fatal(msg string, err error, fields ...Field) {
 	l.log(FATAL, msg, err, fields)
-	time.Sleep(100 * time.Millisecond) // give the ES goroutine time to flush
+	l.wg.Wait()
 	os.Exit(1)
+}
+
+func (l *Logger) Panic(msg string, err error, fields ...Field) {
+	l.log(PANIC, msg, err, fields)
+	l.wg.Wait()
+	panic(msg)
 }
 
 func (l *Logger) log(sev Severity, msg string, err error, fields []Field) {
@@ -180,22 +197,28 @@ func (l *Logger) log(sev Severity, msg string, err error, fields []Field) {
 
 	// send to Elasticsearch asynchronously if client is set
 	if l.es != nil {
-		payload := make([]byte, buf.Len()-1) // without trailing \n
-		copy(payload, buf.Bytes())
-		go l.indexToElastic(payload, time.Now())
+		if n := buf.Len() - 1; n > 0 { // exclude trailing \n; ES expects raw JSON
+			payload := make([]byte, n)
+			copy(payload, buf.Bytes())
+			l.wg.Add(1)
+			go l.indexToElastic(payload, time.Now())
+		}
 	}
 
 	pool.Put(buf)
 }
 
 func (l *Logger) indexToElastic(payload []byte, t time.Time) {
+	defer l.wg.Done()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 	req := esapi.IndexRequest{
 		Index:      l.esIndex,
 		DocumentID: fmt.Sprintf("%s-%d", l.service, t.UnixNano()),
 		Body:       bytes.NewReader(payload),
 		Refresh:    "false",
 	}
-	res, err := req.Do(nil, l.es)
+	res, err := req.Do(ctx, l.es)
 	if err != nil {
 		return
 	}
@@ -204,15 +227,33 @@ func (l *Logger) indexToElastic(payload []byte, t time.Time) {
 
 // --- Helpers ---
 
-// writeEscaped writes s into buf with minimal JSON escaping (only " and \).
+// writeEscaped writes s into buf with JSON string escaping per RFC 8259.
+// All control characters (0x00–0x1F) and the two structural characters
+// " and \ are escaped. No heap allocations.
 func writeEscaped(buf *bytes.Buffer, s string) {
+	const hex = "0123456789abcdef"
 	for i := 0; i < len(s); i++ {
 		c := s[i]
-		if c == '"' {
+		switch {
+		case c == '"':
 			buf.WriteString(`\"`)
-		} else if c == '\\' {
+		case c == '\\':
 			buf.WriteString(`\\`)
-		} else {
+		case c == '\n':
+			buf.WriteString(`\n`)
+		case c == '\r':
+			buf.WriteString(`\r`)
+		case c == '\t':
+			buf.WriteString(`\t`)
+		case c < 0x20:
+			// Remaining control characters: emit \u00XX
+			buf.WriteByte('\\')
+			buf.WriteByte('u')
+			buf.WriteByte('0')
+			buf.WriteByte('0')
+			buf.WriteByte(hex[c>>4])
+			buf.WriteByte(hex[c&0xF])
+		default:
 			buf.WriteByte(c)
 		}
 	}
