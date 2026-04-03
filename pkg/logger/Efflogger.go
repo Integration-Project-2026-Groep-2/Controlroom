@@ -27,7 +27,7 @@ const (
 	PANIC Severity = 6
 )
 
-func (s Severity) string() string {
+func (s Severity) String() string {
 	switch s {
 	case DEBUG:
 		return "DEBUG"
@@ -97,7 +97,7 @@ var pool = sync.Pool{
 }
 
 // Logger writes JSON log lines to an io.Writer without intermediate heap
-// allocations. For severity above WARN it also writes to journald. If es is
+// allocations. For ERROR and above it also writes to journald. If es is
 // set, logs are sent asynchronously to Elasticsearch.
 type Logger struct {
 	w       io.Writer
@@ -150,7 +150,7 @@ func (l *Logger) log(sev Severity, msg string, err error, fields []Field) {
 	buf.Reset()
 
 	buf.WriteString(`{"level":"`)
-	buf.WriteString(sev.string())
+	buf.WriteString(sev.String())
 	buf.WriteString(`","@timestamp":"`)
 	var tmp [35]byte
 	buf.Write(time.Now().UTC().AppendFormat(tmp[:0], time.RFC3339Nano))
@@ -168,7 +168,7 @@ func (l *Logger) log(sev Severity, msg string, err error, fields []Field) {
 
 	for _, f := range fields {
 		buf.WriteString(`,"`)
-		buf.WriteString(f.key)
+		writeEscaped(buf, f.key)
 		buf.WriteString(`":`)
 		switch f.kind {
 		case kindString:
@@ -183,11 +183,11 @@ func (l *Logger) log(sev Severity, msg string, err error, fields []Field) {
 	buf.WriteString("}\n")
 	l.w.Write(buf.Bytes()) //nolint:errcheck
 
-	// also send to journald for severity above WARN
-	if sev > WARN {
+	// also send to journald for ERROR and above
+	if sev >= ERROR {
 		vars := map[string]string{
 			"SERVICE":  l.service,
-			"SEVERITY": sev.string(),
+			"SEVERITY": sev.String(),
 		}
 		if err != nil {
 			vars["ERROR"] = err.Error()
@@ -222,7 +222,7 @@ func (l *Logger) indexToElastic(payload []byte, t time.Time) {
 	if err != nil {
 		return
 	}
-	res.Body.Close()
+	res.Body.Close() //nolint:errcheck
 }
 
 // --- Helpers ---
