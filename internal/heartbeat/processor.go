@@ -4,16 +4,16 @@ import (
 	"context"
 	"encoding/xml"
 	"fmt"
-	"log"
 	"time"
 
 	"integration-project-ehb/controlroom/pkg/gen"
+	"integration-project-ehb/controlroom/pkg/logger"
 
 	"github.com/elastic/go-elasticsearch/v9"
 )
 
 // NOTE(nasr): returning a function independenant of es client to simplify mocking
-func NewHeartbeatProcessor(es *elasticsearch.Client) func([]byte) error {
+func NewHeartbeatProcessor(es *elasticsearch.Client, log *logger.Logger) func([]byte) error {
 	return func(body []byte) error {
 		var hb gen.Heartbeat
 		if err := xml.Unmarshal(body, &hb); err != nil {
@@ -27,7 +27,7 @@ func NewHeartbeatProcessor(es *elasticsearch.Client) func([]byte) error {
 			return fmt.Errorf("index: %w", err)
 		}
 
-		log.Printf("Indexed Heartbeat: %s", hb.ServiceId)
+		log.Info("indexed heartbeat", logger.String("service_id", hb.ServiceId))
 		return nil
 	}
 }

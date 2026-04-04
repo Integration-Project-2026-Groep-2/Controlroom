@@ -47,3 +47,5 @@ Thumbs.db
 tmp/
 temp/
 .key
+.claude/settings.local.json
+efflogger-uitleg.txt
