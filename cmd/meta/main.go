@@ -8,7 +8,6 @@ import (
 	"flag"
 	"fmt"
 	"integration-project-ehb/controlroom/pkg/meta"
-	"log"
 	"os"
 )
 
@@ -30,12 +29,14 @@ func main() {
 	flag.Parse()
 
 	if err := os.MkdirAll(*out, 0755); err != nil {
-		log.Fatalf("xmlgen: failed to create output directory: %v", err)
+		fmt.Fprintf(os.Stderr, "xmlgen: failed to create output directory: %v\n", err)
+		os.Exit(1)
 	}
 
 	entries, err := os.ReadDir(*base)
 	if err != nil {
-		log.Fatalf("xmlgen: failed to read directory: %v", err)
+		fmt.Fprintf(os.Stderr, "xmlgen: failed to read directory: %v\n", err)
+		os.Exit(1)
 	}
 
 	for _, entry := range entries {
