@@ -3,8 +3,6 @@ package user_test
 import (
 	"context"
 	"encoding/xml"
-	"fmt"
-	"log"
 	"os"
 	"testing"
 	"time"
@@ -26,7 +24,7 @@ func TestProducerUser(t *testing.T) {
 
 	conn, err := amqp.Dial(connStr)
 	if err != nil {
-		log.Fatalf("Failed to connect to RabbitMQ: %v", err)
+		t.Fatalf("Failed to connect to RabbitMQ: %v", err)
 	}
 
 	defer func(conn *amqp.Connection) {
@@ -38,7 +36,7 @@ func TestProducerUser(t *testing.T) {
 
 	ch, err := conn.Channel()
 	if err != nil {
-		log.Fatalf("Failed to open channel: %v", err)
+		t.Fatalf("Failed to open channel: %v", err)
 	}
 	defer func(ch *amqp.Channel) {
 		err := ch.Close()
@@ -49,24 +47,24 @@ func TestProducerUser(t *testing.T) {
 
 	err = ch.ExchangeDeclare("user.topic", "topic", false, false, false, false, nil)
 	if err != nil {
-		log.Fatalf("Failed to declare exchange: %v", err)
+		t.Fatalf("Failed to declare exchange: %v", err)
 	}
 
-	log.Printf("exchange declareed")
+	t.Log("exchange declared")
 
 	// TODO(nasr): replace with steven struct
 	q, err := ch.QueueDeclare("crm.user.confirmed", true, false, false, false, nil)
 
 	if err != nil {
-		log.Fatalf("Failed to declare queue: %v", err)
+		t.Fatalf("Failed to declare queue: %v", err)
 	}
 
 	err = ch.QueueBind(q.Name, "crm.user.confirmed", "user.topic", false, nil)
 	if err != nil {
-		log.Fatalf("Failed to bind queue to exchange: %v", err)
+		t.Fatalf("Failed to bind queue to exchange: %v", err)
 	}
 
-	fmt.Println("Producer started! Sending data every 5 seconds... (Press CTRL+C to exit)")
+	t.Log("Producer started! Sending data every 5 seconds...")
 
 	for range 10 {
 		// Admin user
@@ -95,7 +93,7 @@ func TestProducerUser(t *testing.T) {
 
 		if err := validate.Struct(adminUser); err == nil {
 			xmlData, _ := xml.Marshal(adminUser)
-			fmt.Printf("Publishing: %s\n", string(xmlData))
+			t.Logf("Publishing: %s", string(xmlData))
 			err := ch.PublishWithContext(
 				context.Background(),
 				"user.topic",
@@ -108,12 +106,12 @@ func TestProducerUser(t *testing.T) {
 				},
 			)
 			if err != nil {
-				log.Printf("Failed to publish admin user: %v", err)
+				t.Logf("Failed to publish admin user: %v", err)
 			} else {
-				fmt.Println("✓ Sent: admin user confirmed")
+				t.Log("Sent: admin user confirmed")
 			}
 		} else {
-			log.Printf("Admin user validation failed: %v", err)
+			t.Logf("Admin user validation failed: %v", err)
 		}
 
 		if err := validate.Struct(speakerUser); err == nil {
@@ -130,12 +128,12 @@ func TestProducerUser(t *testing.T) {
 				},
 			)
 			if err != nil {
-				log.Printf("Failed to publish speaker user: %v", err)
+				t.Logf("Failed to publish speaker user: %v", err)
 			} else {
-				fmt.Println("✓ Sent: speaker user confirmed")
+				t.Log("Sent: speaker user confirmed")
 			}
 		} else {
-			log.Printf("Speaker user validation failed: %v", err)
+			t.Logf("Speaker user validation failed: %v", err)
 		}
 
 		time.Sleep(5 * time.Second)
