@@ -6,7 +6,7 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-type ConsumerInfo struct {
+type consumerInfo struct {
 	Name      string
 	Consumer  string
 	AutoAck   bool
@@ -16,7 +16,7 @@ type ConsumerInfo struct {
 	Args      amqp.Table
 }
 
-type Exchange struct {
+type exchange struct {
 	Name       string
 	Kind       string
 	Durable    bool
@@ -26,7 +26,7 @@ type Exchange struct {
 	Args       amqp.Table
 }
 
-type Queue struct {
+type queue struct {
 	Name       string
 	Durable    bool
 	AutoDelete bool
@@ -35,13 +35,13 @@ type Queue struct {
 	Args       amqp.Table
 }
 
-type BindInfo struct {
+type bindInfo struct {
 	Key    string
 	NoWait bool
 	Args   amqp.Table
 }
 
-type Qos struct {
+type qos struct {
 	PrefetchCount int
 	PrefetchSize  int
 	Global        bool
@@ -56,7 +56,8 @@ func SetupDLQ(dlqCh *amqp.Channel, dlqName string) error {
 	return err
 }
 
-func SetupConsumer(ir *InternalRabbitMQ, cons *ConsumerInfo, ex *Exchange, queue *Queue, bind *BindInfo, qos *Qos) (<-chan amqp.Delivery, error) {
+// setupConsumer TODO(nasr): implement this function in the entry point
+func _(ir *internalRabbitMQ, cons *consumerInfo, ex *exchange, queue *queue, bind *bindInfo, qos *qos) (<-chan amqp.Delivery, error) {
 
 	// NOTE(nasr): @Steven nice good catch but we're handling this in the meta program now but good job finding it!!
 	// i thought i'd remove the caps because that is the json convention but that was an oopsies i guess

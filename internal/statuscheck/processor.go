@@ -7,8 +7,9 @@ import (
 	"log"
 	"time"
 
-	"github.com/elastic/go-elasticsearch/v9"
 	"integration-project-ehb/controlroom/pkg/gen"
+
+	"github.com/elastic/go-elasticsearch/v9"
 )
 
 func NewStatusCheckProcessor(es *elasticsearch.Client) func([]byte) error {

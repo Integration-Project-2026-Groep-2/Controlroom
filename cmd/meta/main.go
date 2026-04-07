@@ -48,7 +48,7 @@ func main() {
 
 		name := entry.Name()
 
-		var lexer meta.MetaLexer
+		var lexer meta.Lexer
 		if err := lexer.LoadFile(*base, name); err != nil {
 			fmt.Printf("%s  FAIL%s  %s %s%v%s\n", clRed+clBold, clReset, name, clGray, err, clReset)
 			continue

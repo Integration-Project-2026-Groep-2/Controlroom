@@ -2,12 +2,13 @@ package main
 
 import (
 	"context"
+	"io"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
 
-	elasticsearch "github.com/elastic/go-elasticsearch/v9"
+	"github.com/elastic/go-elasticsearch/v9"
 	amqp "github.com/rabbitmq/amqp091-go"
 
 	"integration-project-ehb/controlroom/internal/cr_rabbitmq"
@@ -26,7 +27,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("elasticsearch connect: %v", err)
 	}
-	defer res.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+
+		}
+	}(res.Body)
 	log.Println("Connected to Elasticsearch")
 
 	// RabbitMQ connection
@@ -34,7 +40,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("rabbitmq dial: %v", err)
 	}
-	defer conn.Close()
+	defer func(conn *amqp.Connection) {
+		err := conn.Close()
+		if err != nil {
+
+		}
+	}(conn)
 	log.Println("Connected to RabbitMQ")
 
 	// DLQ channel (shared)
@@ -42,7 +53,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("dlq channel: %v", err)
 	}
-	defer dlqCh.Close()
+	defer func(dlqCh *amqp.Channel) {
+		err := dlqCh.Close()
+		if err != nil {
+
+		}
+	}(dlqCh)
 
 	// Context for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
@@ -53,7 +69,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("heartbeat channel: %v", err)
 	}
-	defer hbCh.Close()
+	defer func(hbCh *amqp.Channel) {
+		err := hbCh.Close()
+		if err != nil {
+
+		}
+	}(hbCh)
 
 	hbExchange := cr_rabbitmq.ExchangeInfo{
 		Name:    "heartbeat.direct",
@@ -85,7 +106,10 @@ func main() {
 	}
 
 	// NOTE(nasr): prefetch count 18 for reasonable throughput without hoarding memory
-	hbCh.Qos(18, 0, false)
+	err = hbCh.Qos(18, 0, false)
+	if err != nil {
+		return
+	}
 
 	go cr_rabbitmq.Consume(hbCfg, hbMsgs, ctx)
 	log.Println("Heartbeat consumer started")
@@ -95,7 +119,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("user channel: %v", err)
 	}
-	defer userCh.Close()
+	defer func(userCh *amqp.Channel) {
+		err := userCh.Close()
+		if err != nil {
+
+		}
+	}(userCh)
 
 	userExchange := cr_rabbitmq.ExchangeInfo{
 		Name:    "contact.topic",
@@ -125,7 +154,10 @@ func main() {
 	}
 
 	// NOTE(nasr): prefetch count 10 for higher throughput, autoack disabled per consumer
-	userCh.Qos(10, 0, false)
+	err = userCh.Qos(10, 0, false)
+	if err != nil {
+		return
+	}
 
 	go cr_rabbitmq.Consume(userCfg, userMsgs, ctx)
 	log.Println("User consumer started")
@@ -135,7 +167,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("statuscheck channel: %v", err)
 	}
-	defer scCh.Close()
+	defer func(scCh *amqp.Channel) {
+		err := scCh.Close()
+		if err != nil {
+
+		}
+	}(scCh)
 
 	scExchange := cr_rabbitmq.ExchangeInfo{
 		Name:    "statuscheck.direct",
@@ -165,7 +202,10 @@ func main() {
 		log.Fatalf("statuscheck dlq setup: %v", err)
 	}
 
-	scCh.Qos(5, 0, false)
+	err = scCh.Qos(5, 0, false)
+	if err != nil {
+		return
+	}
 
 	go cr_rabbitmq.Consume(scCfg, scMsgs, ctx)
 	log.Println("StatusCheck consumer started")

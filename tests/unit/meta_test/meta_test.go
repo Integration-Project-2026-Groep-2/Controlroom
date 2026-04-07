@@ -24,7 +24,7 @@ func writeXSD(t *testing.T, name, content string) (dir string) {
 
 func lexAndParse(t *testing.T, dir, name string) meta.AST {
 	t.Helper()
-	var lexer meta.MetaLexer
+	var lexer meta.Lexer
 	require.NoError(t, lexer.LoadFile(dir, name))
 	var ast meta.AST
 	require.NoError(t, lexer.Lex(&ast))
@@ -48,14 +48,14 @@ func TestIsXsd_False(t *testing.T) {
 // ---- LoadFile ---------------------------------------------------------------
 
 func TestLoadFile_MissingFile(t *testing.T) {
-	var lexer meta.MetaLexer
+	var lexer meta.Lexer
 	err := lexer.LoadFile("/does/not/exist", "nope.xsd")
 	assert.Error(t, err)
 }
 
 func TestLoadFile_ValidFile(t *testing.T) {
 	dir := writeXSD(t, "simple.xsd", `<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"/>`)
-	var lexer meta.MetaLexer
+	var lexer meta.Lexer
 	err := lexer.LoadFile(dir, "simple.xsd")
 	assert.NoError(t, err)
 }
@@ -173,10 +173,8 @@ func TestWriteGoStruct_ProducesGoFile(t *testing.T) {
   </xs:complexType>
 </xs:schema>`
 	dir := writeXSD(t, "heartbeat.xsd", xsd)
-	ast := lexAndParse(t, dir, "heartbeat.xsd")
-
 	outDir := t.TempDir()
-	err := meta.WriteGoStruct(&ast, outDir, "heartbeat.xsd")
+	err := meta.WriteGoStruct(new(lexAndParse(t, dir, "heartbeat.xsd")), outDir, "heartbeat.xsd")
 	require.NoError(t, err)
 
 	// file should exist
@@ -194,10 +192,8 @@ func TestWriteGoStruct_OutputContainsPackageGen(t *testing.T) {
   </xs:complexType>
 </xs:schema>`
 	dir := writeXSD(t, "ping.xsd", xsd)
-	ast := lexAndParse(t, dir, "ping.xsd")
-
 	outDir := t.TempDir()
-	require.NoError(t, meta.WriteGoStruct(&ast, outDir, "ping.xsd"))
+	require.NoError(t, meta.WriteGoStruct(new(lexAndParse(t, dir, "ping.xsd")), outDir, "ping.xsd"))
 
 	content, err := os.ReadFile(filepath.Join(outDir, "ping.go"))
 	require.NoError(t, err)
@@ -220,10 +216,8 @@ func TestWriteGoStruct_EnumConstantsEmitted(t *testing.T) {
   </xs:simpleType>
 </xs:schema>`
 	dir := writeXSD(t, "color.xsd", xsd)
-	ast := lexAndParse(t, dir, "color.xsd")
-
 	outDir := t.TempDir()
-	require.NoError(t, meta.WriteGoStruct(&ast, outDir, "color.xsd"))
+	require.NoError(t, meta.WriteGoStruct(new(lexAndParse(t, dir, "color.xsd")), outDir, "color.xsd"))
 
 	content, err := os.ReadFile(filepath.Join(outDir, "color.go"))
 	require.NoError(t, err)
@@ -243,10 +237,8 @@ func TestWriteGoStruct_HyphenatedFilenameBecomesUnderscore(t *testing.T) {
   </xs:complexType>
 </xs:schema>`
 	dir := writeXSD(t, "my-type.xsd", xsd)
-	ast := lexAndParse(t, dir, "my-type.xsd")
-
 	outDir := t.TempDir()
-	require.NoError(t, meta.WriteGoStruct(&ast, outDir, "my-type.xsd"))
+	require.NoError(t, meta.WriteGoStruct(new(lexAndParse(t, dir, "my-type.xsd")), outDir, "my-type.xsd"))
 
 	// hyphens must become underscores in the output filename
 	_, err := os.Stat(filepath.Join(outDir, "my_type.go"))

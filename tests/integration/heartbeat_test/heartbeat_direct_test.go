@@ -37,15 +37,30 @@ func TestHeartbeatRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to connect to RabbitMQ: %v", err)
 	}
-	defer conn.Close()
+	defer func(conn *amqp.Connection) {
+		err := conn.Close()
+		if err != nil {
+
+		}
+	}(conn)
 
 	// Producer channel
 	pubCh := setupChannel(t, conn)
-	defer pubCh.Close()
+	defer func(pubCh *amqp.Channel) {
+		err := pubCh.Close()
+		if err != nil {
+
+		}
+	}(pubCh)
 
 	// Consumer channel
 	subCh := setupChannel(t, conn)
-	defer subCh.Close()
+	defer func(subCh *amqp.Channel) {
+		err := subCh.Close()
+		if err != nil {
+
+		}
+	}(subCh)
 
 	// Declare exchange
 	if err = pubCh.ExchangeDeclare(exchangeName, "direct", true, false, false, false, nil); err != nil {
@@ -57,7 +72,12 @@ func TestHeartbeatRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to declare test queue: %v", err)
 	}
-	defer subCh.QueueDelete(q.Name, false, false, false)
+	defer func(subCh *amqp.Channel, name string, ifUnused, ifEmpty, noWait bool) {
+		_, err := subCh.QueueDelete(name, ifUnused, ifEmpty, noWait)
+		if err != nil {
+
+		}
+	}(subCh, q.Name, false, false, false)
 
 	if err = subCh.QueueBind(q.Name, routingKey, exchangeName, false, nil); err != nil {
 		t.Fatalf("failed to bind queue: %v", err)

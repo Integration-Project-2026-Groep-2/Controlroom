@@ -5,11 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"time"
+
+	"integration-project-ehb/controlroom/pkg/gen"
 
 	"github.com/elastic/go-elasticsearch/v9"
 	"github.com/elastic/go-elasticsearch/v9/esapi"
-	"integration-project-ehb/controlroom/pkg/gen"
 )
 
 // indexUser marshals a UserConfirmed to JSON and indexes it in Elasticsearch.
@@ -36,7 +38,12 @@ func indexUser(es *elasticsearch.Client, ctx context.Context, uo *gen.UserConfir
 	if err != nil {
 		return fmt.Errorf("index: %w", err)
 	}
-	defer res.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+
+		}
+	}(res.Body)
 
 	if res.IsError() {
 		return fmt.Errorf("elasticsearch: %s", res.String())

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"integration-project-ehb/controlroom/pkg/gen"
+	"io"
 	"time"
 
 	"github.com/elastic/go-elasticsearch/v9"
@@ -37,7 +38,13 @@ func indexStatusCheck(es *elasticsearch.Client, ctx context.Context, sct *gen.St
 	if err != nil {
 		return err
 	}
-	defer res.Body.Close()
+
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+
+		}
+	}(res.Body)
 
 	if res.IsError() {
 		return fmt.Errorf("elasticsearch error: %s", res.String())

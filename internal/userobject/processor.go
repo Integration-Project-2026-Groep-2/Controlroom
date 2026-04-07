@@ -7,11 +7,12 @@ import (
 	"log"
 	"time"
 
-	"github.com/elastic/go-elasticsearch/v9"
 	"integration-project-ehb/controlroom/pkg/gen"
+
+	"github.com/elastic/go-elasticsearch/v9"
 )
 
-// ProcessUserObject unmarshals, validates, and indexes a user message.
+// NewUserProcessor ProcessUserObject unmarshals, validates, and indexes a user message.
 // Returns error to trigger DLQ routing via cr_rabbitmq consumer.
 func NewUserProcessor(es *elasticsearch.Client) func([]byte) error {
 	return func(body []byte) error {

@@ -18,80 +18,31 @@ type TagType string
 
 // NOTE(nasr): AI generated list of xsd tags
 const (
-	TAG_SCHEMA          TagType = "schema"
-	TAG_ELEMENT         TagType = "element"
-	TAG_COMPLEX_TYPE    TagType = "complexType"
-	TAG_SIMPLE_TYPE     TagType = "simpleType"
-	TAG_SEQUENCE        TagType = "sequence"
-	TAG_RESTRICTION     TagType = "restriction"
-	TAG_ENUMERATION     TagType = "enumeration"
-	TAG_SIMPLE_CONTENT  TagType = "simpleContent"
-	TAG_COMPLEX_CONTENT TagType = "complexContent"
-	TAG_EXTENSION       TagType = "extension"
-	TAG_ATTRIBUTE       TagType = "attribute"
-	TAG_CHOICE          TagType = "choice"
-	TAG_ALL             TagType = "all"
+	tagSchema         TagType = "schema"
+	tagElement        TagType = "element"
+	tagComplexType    TagType = "complexType"
+	tagSimpleType     TagType = "simpleType"
+	tagSequence       TagType = "sequence"
+	tagRestriction    TagType = "restriction"
+	tagEnumeration    TagType = "enumeration"
+	tagSimpleContent  TagType = "simpleContent"
+	tagComplexContent TagType = "complexContent"
+	tagExtension      TagType = "extension"
+	tagAttribute      TagType = "attribute"
+	tagChoice         TagType = "choice"
+	tagAll            TagType = "all"
 )
 
-// TokenType represents a single lexical token class produced by the lexer.
-type TokenType byte
+// tokenType represents a single lexical token class produced by the lexer.
+type tokenType byte
 
 const (
-	TOKEN_UNDEFINED_EOF TokenType = iota
-	TOKEN_SCHEMA_OPENING
-	TOKEN_ELEMENT_OPENING
-	TOKEN_COMPLEX_TYPE_OPENING
-	TOKEN_SIMPLE_TYPE_OPENING
-	TOKEN_SEQUENCE_OPENING
-	TOKEN_RESTRICTION_OPENING
-	TOKEN_ENUMERATION_OPENING
-	TOKEN_SIMPLE_CONTENT_OPENING
-	TOKEN_COMPLEX_CONTENT_OPENING
-	TOKEN_EXTENSION_OPENING
-	TOKEN_ATTRIBUTE_OPENING
-	TOKEN_CHOICE_OPENING
-	TOKEN_ALL_OPENING
-	TOKEN_SCHEMA_CLOSING
-	TOKEN_ELEMENT_CLOSING
-	TOKEN_COMPLEX_TYPE_CLOSING
-	TOKEN_SIMPLE_TYPE_CLOSING
-	TOKEN_SEQUENCE_CLOSING
-	TOKEN_RESTRICTION_CLOSING
-	TOKEN_ENUMERATION_CLOSING
-	TOKEN_SIMPLE_CONTENT_CLOSING
-	TOKEN_COMPLEX_CONTENT_CLOSING
-	TOKEN_EXTENSION_CLOSING
-	TOKEN_ATTRIBUTE_CLOSING
-	TOKEN_CHOICE_CLOSING
-	TOKEN_ALL_CLOSING
-	TOKEN_ATTR_NAME
-	TOKEN_ATTR_TYPE
-	TOKEN_ATTR_BASE
-	TOKEN_ATTR_VALUE
-	TOKEN_ATTR_FIXED
-	TOKEN_ATTR_ELEMENT_FORM_DEFAULT
-	TOKEN_ATTR_XMLNS
-	TOKEN_TYPE_STRING
-	TOKEN_TYPE_DATETIME
-	TOKEN_TYPE_INT
-	TOKEN_TYPE_BOOLEAN
-	TOKEN_TYPE_DECIMAL
-	TOKEN_IDENT
-	TOKEN_STRING_LIT
-
-	// =============================================================================
-	TOKEN_COLON    TokenType = ':'
-	TOKEN_EQUALS   TokenType = '='
-	TOKEN_SLASH    TokenType = '/'
-	TOKEN_LANGLE   TokenType = '<'
-	TOKEN_RANGLE   TokenType = '>'
-	TOKEN_QUESTION TokenType = '?'
-	TOKEN_QUOTE    TokenType = '"'
+	tokenUndefinedEof tokenType = iota
 )
 
-// NOTE(nasr): AI generated XSD to Go mapping
+// xsdToGo NOTE(nasr): AI generated XSD to Go mapping
 // TODO(nasr): don't forget when types are not found just add them to the mapping
-var XsdToGo = map[string]string{
+var xsdToGo = map[string]string{
 	"xs:string":             "string",
 	"xs:boolean":            "bool",
 	"xs:int":                "int",
@@ -113,8 +64,8 @@ var XsdToGo = map[string]string{
 	"xs:nonNegativeInteger": "uint",
 }
 
-// Attrs holds the parsed XML attributes of a single element node.
-type Attrs struct {
+// attrs holds the parsed XML attributes of a single element node.
+type attrs struct {
 	Name   string
 	Type   string
 	Base   string
@@ -125,52 +76,46 @@ type Attrs struct {
 	Use    string
 }
 
-// Sequence represents a parsed XSD sequence compositor.
-type Sequence struct {
-	Type TagType
-	Attr string
-}
-
-// Node is a single node in the AST.
-// Tag is the XSD tag type. Attrs holds all parsed XML attributes.
+// node is a single node in the AST.
+// Tag is the XSD tag type. attrs holds all parsed XML attributes.
 // Next is the next sibling, First/Last are the first/last child, Parent is the enclosing node.
-type Node struct {
+type node struct {
 	Tag    TagType
-	Attrs  Attrs
-	Next   *Node
-	Parent *Node
-	First  *Node
-	Last   *Node
+	Attrs  attrs
+	Next   *node
+	Parent *node
+	First  *node
+	Last   *node
 }
 
 // AST holds the root of the parsed syntax tree and a cursor used during parsing.
 // Abstract syntax tree
 type AST struct {
-	Root    *Node
-	Current *Node
+	Root    *node
+	Current *node
 }
 
-// Token is a single lexical unit produced by MetaLexer.
-type Token struct {
-	Type   TokenType
+// token is a single lexical unit produced by MetaLexer.
+type token struct {
+	Type   tokenType
 	Lexeme []byte
 	Tag    TagType
 }
 
-// MetaLexer holds the raw XSD byte stream, the token list, and the read position.
-type MetaLexer struct {
+// Lexer MetaLexer holds the raw XSD byte stream, the token list, and the read position.
+type Lexer struct {
 	Stream   []byte
-	Tokens   []Token
+	Tokens   []token
 	Position int
 }
 
-// MetaError is a structured parse/IO error.
-type MetaError struct {
+// metaError is a structured parse/IO error.
+type metaError struct {
 	FileName string
 	Content  string
 }
 
-func (e *MetaError) Error() string {
+func (e *metaError) Error() string {
 	return fmt.Sprintf("error in %s: %s", e.FileName, e.Content)
 }
 
@@ -180,10 +125,10 @@ func IsXsd(fileName string) bool {
 }
 
 // LoadFile reads the XSD file at path/file into the lexer stream.
-func (ml *MetaLexer) LoadFile(path string, file string) error {
+func (ml *Lexer) LoadFile(path string, file string) error {
 	content, err := os.ReadFile(filepath.Join(path, file))
 	if err != nil {
-		return &MetaError{
+		return &metaError{
 			FileName: file,
 			Content:  fmt.Sprintf("failed to open file >>> %v <<<", err),
 		}
@@ -197,21 +142,21 @@ func (ml *MetaLexer) LoadFile(path string, file string) error {
 // Lexer helper functions
 // =============================================================================
 
-func (ml *MetaLexer) current() byte {
+func (ml *Lexer) current() byte {
 	return ml.Stream[ml.Position]
 }
 
-func (ml *MetaLexer) atEnd() bool {
+func (ml *Lexer) atEnd() bool {
 	return ml.Position >= len(ml.Stream)
 }
 
-func (ml *MetaLexer) advance() {
+func (ml *Lexer) advance() {
 	if !ml.atEnd() {
 		ml.Position++
 	}
 }
 
-func (ml *MetaLexer) peek() byte {
+func (ml *Lexer) peek() byte {
 	if ml.Position+1 < len(ml.Stream) {
 		return ml.Stream[ml.Position+1]
 	}
@@ -224,7 +169,7 @@ func isWhiteSpace(c byte) bool {
 	return c == ' ' || c == '\t' || c == '\n' || c == '\r'
 }
 
-func (ml *MetaLexer) skipWhiteSpace() {
+func (ml *Lexer) skipWhiteSpace() {
 	for !ml.atEnd() && isWhiteSpace(ml.current()) {
 		ml.advance()
 	}
@@ -241,7 +186,7 @@ func isTagDelim(c byte) bool {
 }
 
 // readUntil reads bytes up to (but not including) any byte where stop returns true.
-func (ml *MetaLexer) readUntil(stop func(byte) bool) []byte {
+func (ml *Lexer) readUntil(stop func(byte) bool) []byte {
 	start := ml.Position
 	for !ml.atEnd() && !stop(ml.current()) {
 		ml.advance()
@@ -251,7 +196,7 @@ func (ml *MetaLexer) readUntil(stop func(byte) bool) []byte {
 
 // readQuotedString reads past the opening '"', collects until closing '"', and
 // advances past it. Returns the content between the quotes.
-func (ml *MetaLexer) readQuotedString() []byte {
+func (ml *Lexer) readQuotedString() []byte {
 	ml.advance() // skip opening '"'
 	start := ml.Position
 	for !ml.atEnd() && ml.current() != '"' {
@@ -277,8 +222,8 @@ func stripNamespace(raw []byte) []byte {
 
 // parseAttrs reads attribute key="value" pairs until '>' or '/'.
 // The position is left ON the terminating '>' or '/'.
-func (ml *MetaLexer) parseAttrs() Attrs {
-	var a Attrs
+func (ml *Lexer) parseAttrs() attrs {
+	var a attrs
 	for !ml.atEnd() {
 		ml.skipWhiteSpace()
 		if ml.atEnd() {
@@ -342,16 +287,16 @@ func (ml *MetaLexer) parseAttrs() Attrs {
 // knownTag returns true when the local name is a recognised XSD structural tag.
 func knownTag(local string) bool {
 	switch TagType(local) {
-	case TAG_SCHEMA, TAG_ELEMENT, TAG_COMPLEX_TYPE, TAG_SIMPLE_TYPE,
-		TAG_SEQUENCE, TAG_RESTRICTION, TAG_ENUMERATION, TAG_SIMPLE_CONTENT,
-		TAG_COMPLEX_CONTENT, TAG_EXTENSION, TAG_ATTRIBUTE, TAG_CHOICE, TAG_ALL:
+	case tagSchema, tagElement, tagComplexType, tagSimpleType,
+		tagSequence, tagRestriction, tagEnumeration, tagSimpleContent,
+		tagComplexContent, tagExtension, tagAttribute, tagChoice, tagAll:
 		return true
 	}
 	return false
 }
 
 // pushChild appends node as a child of the current node and descends into it.
-func (ast *AST) pushChild(node *Node) {
+func (ast *AST) pushChild(node *node) {
 	if node == nil {
 		return
 	}
@@ -367,7 +312,7 @@ func (ast *AST) pushChild(node *Node) {
 }
 
 // pushSibling adds node as a sibling under the same parent without descending. Used for self-closing tags.
-func (ast *AST) pushSibling(node *Node) {
+func (ast *AST) pushSibling(node *node) {
 	if node == nil || ast.Current == nil {
 		return
 	}
@@ -392,7 +337,7 @@ func (ast *AST) popToParent() {
 }
 
 // Lex scans the full stream and builds the AST.
-func (ml *MetaLexer) Lex(ast *AST) error {
+func (ml *Lexer) Lex(ast *AST) error {
 	ml.Tokens = ml.Tokens[:0]
 
 	for !ml.atEnd() {
@@ -482,10 +427,10 @@ func (ml *MetaLexer) Lex(ast *AST) error {
 			ml.advance()
 		}
 
-		node := &Node{Tag: tag, Attrs: attrs}
+		node := &node{Tag: tag, Attrs: attrs}
 
-		ml.Tokens = append(ml.Tokens, Token{
-			Type:   TOKEN_UNDEFINED_EOF,
+		ml.Tokens = append(ml.Tokens, token{
+			Type:   tokenUndefinedEof,
 			Lexeme: []byte(local),
 			Tag:    tag,
 		})
@@ -531,9 +476,9 @@ func goIdent(name string) string {
 }
 
 // resolveGoType converts an XSD type attribute value to a Go type string.
-// Primitive types come from XsdToGo; unknown types become struct references.
+// Primitive types come from xsdToGo; unknown types become struct references.
 func resolveGoType(xsdType string) string {
-	if gt, ok := XsdToGo[xsdType]; ok {
+	if gt, ok := xsdToGo[xsdType]; ok {
 		return gt
 	}
 	local := xsdType
@@ -560,7 +505,7 @@ func jsonKey(name string) string {
 // isRequired reports whether an XSD element or attribute is required.
 // Elements are required when minOccurs is absent (defaults to 1) or explicitly "1".
 // Attributes are required when use="required".
-func isRequired(attrs Attrs, isAttr bool) bool {
+func isRequired(attrs attrs, isAttr bool) bool {
 	if isAttr {
 		return attrs.Use == "required"
 	}
@@ -608,14 +553,14 @@ func buildTag(f structField) string {
 // collectFields walks direct children of a node and returns fields for the
 // generated struct. Transparent compositor nodes (sequence / choice / all)
 // are recursed through transparently.
-func collectFields(node *Node) []structField {
+func collectFields(node *node) []structField {
 	var fields []structField
 	for child := node.First; child != nil; child = child.Next {
 		switch child.Tag {
-		case TAG_SEQUENCE, TAG_CHOICE, TAG_ALL:
+		case tagSequence, tagChoice, tagAll:
 			fields = append(fields, collectFields(child)...)
 
-		case TAG_ELEMENT:
+		case tagElement:
 			name := child.Attrs.Name
 			if name == "" {
 				continue
@@ -626,7 +571,7 @@ func collectFields(node *Node) []structField {
 			} else {
 				// inline anonymous complexType child?
 				for inner := child.First; inner != nil; inner = inner.Next {
-					if inner.Tag == TAG_COMPLEX_TYPE {
+					if inner.Tag == tagComplexType {
 						goType = goIdent(name) + "Type"
 						break
 					}
@@ -650,7 +595,7 @@ func collectFields(node *Node) []structField {
 				Validate: validate,
 			})
 
-		case TAG_ATTRIBUTE:
+		case tagAttribute:
 			name := child.Attrs.Name
 			if name == "" {
 				continue
@@ -678,12 +623,12 @@ func collectFields(node *Node) []structField {
 
 // collectEnumValues returns the xs:enumeration value strings under a
 // simpleType > restriction node.
-func collectEnumValues(node *Node) []string {
+func collectEnumValues(node *node) []string {
 	var vals []string
 	for child := node.First; child != nil; child = child.Next {
-		if child.Tag == TAG_RESTRICTION {
+		if child.Tag == tagRestriction {
 			for e := child.First; e != nil; e = e.Next {
-				if e.Tag == TAG_ENUMERATION && e.Attrs.Value != "" {
+				if e.Tag == tagEnumeration && e.Attrs.Value != "" {
 					vals = append(vals, e.Attrs.Value)
 				}
 			}
@@ -695,13 +640,13 @@ func collectEnumValues(node *Node) []string {
 // collectSimpleContentFields returns the fields for a complexType whose body
 // is a simpleContent > extension node. The extension base becomes a chardata
 // Value field; any xs:attribute children become attribute fields.
-func collectSimpleContentFields(node *Node) (fields []structField, ok bool) {
+func collectSimpleContentFields(node *node) (fields []structField, ok bool) {
 	for child := node.First; child != nil; child = child.Next {
-		if child.Tag != TAG_SIMPLE_CONTENT {
+		if child.Tag != tagSimpleContent {
 			continue
 		}
 		for ext := child.First; ext != nil; ext = ext.Next {
-			if ext.Tag != TAG_EXTENSION {
+			if ext.Tag != tagExtension {
 				continue
 			}
 			goType := "string"
@@ -719,7 +664,7 @@ func collectSimpleContentFields(node *Node) (fields []structField, ok bool) {
 			})
 			// attributes on the extension
 			for attr := ext.First; attr != nil; attr = ext.Next {
-				if attr.Tag != TAG_ATTRIBUTE || attr.Attrs.Name == "" {
+				if attr.Tag != tagAttribute || attr.Attrs.Name == "" {
 					continue
 				}
 				attrType := "string"
@@ -746,9 +691,9 @@ func collectSimpleContentFields(node *Node) (fields []structField, ok bool) {
 }
 
 // hasSimpleContent reports whether a complexType node uses simpleContent.
-func hasSimpleContent(node *Node) bool {
+func hasSimpleContent(node *node) bool {
 	for child := node.First; child != nil; child = child.Next {
-		if child.Tag == TAG_SIMPLE_CONTENT {
+		if child.Tag == tagSimpleContent {
 			return true
 		}
 	}
@@ -757,7 +702,7 @@ func hasSimpleContent(node *Node) bool {
 
 // buildStructs walks the AST depth-first and emits Go type declarations.
 // seen prevents duplicate declarations across sibling nodes.
-func buildStructs(node *Node, buf *strings.Builder, seen map[string]bool) {
+func buildStructs(node *node, buf *strings.Builder, seen map[string]bool) {
 	if node == nil {
 		return
 	}
@@ -765,9 +710,9 @@ func buildStructs(node *Node, buf *strings.Builder, seen map[string]bool) {
 	switch node.Tag {
 
 	// complexType struct (regular or simpleContent flavour)
-	case TAG_COMPLEX_TYPE:
+	case tagComplexType:
 		name := node.Attrs.Name
-		if name == "" && node.Parent != nil && node.Parent.Tag == TAG_ELEMENT {
+		if name == "" && node.Parent != nil && node.Parent.Tag == tagElement {
 			name = node.Parent.Attrs.Name
 		}
 		if name != "" {
@@ -787,7 +732,7 @@ func buildStructs(node *Node, buf *strings.Builder, seen map[string]bool) {
 		}
 
 	// simpleType string typedef + typed const block for enumerations
-	case TAG_SIMPLE_TYPE:
+	case tagSimpleType:
 		name := node.Attrs.Name
 		if name == "" {
 			break
@@ -801,17 +746,17 @@ func buildStructs(node *Node, buf *strings.Builder, seen map[string]bool) {
 		vals := collectEnumValues(node)
 		if len(vals) == 0 {
 			// plain restriction with no enumeration — emit a type alias only
-			fmt.Fprintf(buf, "type %s string\n\n", ident)
+			_, _ = fmt.Fprintf(buf, "type %s string\n\n", ident)
 			break
 		}
 		// string-backed type + const block
-		fmt.Fprintf(buf, "type %s string\n\n", ident)
-		fmt.Fprintf(buf, "const (\n")
+		_, _ = fmt.Fprintf(buf, "type %s string\n\n", ident)
+		_, _ = fmt.Fprintf(buf, "const (\n")
 		for _, v := range vals {
 			constName := ident + goIdent(v)
-			fmt.Fprintf(buf, "\t%-32s %s = %q\n", constName, ident, v)
+			_, _ = fmt.Fprintf(buf, "\t%-32s %s = %q\n", constName, ident, v)
 		}
-		fmt.Fprintf(buf, ")\n\n")
+		_, _ = fmt.Fprintf(buf, ")\n\n")
 
 	default:
 		for child := node.First; child != nil; child = child.Next {
@@ -831,11 +776,11 @@ func writeStruct(buf *strings.Builder, name string, fields []structField) {
 	buf.WriteString(" struct {\n")
 
 	xmlElem := name
-	fmt.Fprintf(buf, "\tXMLName xml.Name `xml:\"%s\" json:\"%s\"`\n", xmlElem, xmlElem)
+	_, _ = fmt.Fprintf(buf, "\tXMLName xml.Name `xml:\"%s\" json:\"%s\"`\n", xmlElem, xmlElem)
 
 	for _, f := range fields {
 		tag := buildTag(f)
-		fmt.Fprintf(buf, "\t%-24s %-20s %s\n", f.GoName, f.GoType, tag)
+		_, _ = fmt.Fprintf(buf, "\t%-24s %-20s %s\n", f.GoName, f.GoType, tag)
 	}
 	buf.WriteString("}\n\n")
 }
@@ -855,7 +800,7 @@ func xsdToGoFileName(xsdFile string) string {
 // Package is set to "gen" to match the conventional generated-code sub-package.
 func WriteGoStruct(ast *AST, folderPath string, xsdFile string) error {
 	if ast == nil || ast.Root == nil {
-		return &MetaError{FileName: xsdFile, Content: "AST is nil or empty"}
+		return &metaError{FileName: xsdFile, Content: "AST is nil or empty"}
 	}
 
 	var buf strings.Builder
@@ -871,7 +816,7 @@ func WriteGoStruct(ast *AST, folderPath string, xsdFile string) error {
 
 	outPath := filepath.Join(folderPath, xsdToGoFileName(xsdFile))
 	if err := os.WriteFile(outPath, []byte(buf.String()), 0644); err != nil {
-		return &MetaError{
+		return &metaError{
 			FileName: outPath,
 			Content:  fmt.Sprintf("failed to write output file: %v", err),
 		}

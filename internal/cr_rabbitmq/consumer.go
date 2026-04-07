@@ -8,20 +8,20 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-type InternalRabbitMQ struct {
+type internalRabbitMQ struct {
 	Conn  *amqp.Connection
 	Chans map[string]*amqp.Channel
 }
 
-// ProcessFunc is a function type that processes a message body.
+// processFunc is a function type that processes a message body.
 // Return nil on success, or an error to trigger DLQ routing.
-type ProcessFunc func(body []byte) error
+type processFunc func(body []byte) error
 
 // ConsumerConfig holds the configuration for message consumption.
 type ConsumerConfig struct {
 	DLQCh   *amqp.Channel
 	DLQName string
-	Process ProcessFunc
+	Process processFunc
 }
 
 // ExchangeInfo holds exchange declaration parameters.
@@ -75,8 +75,8 @@ func SetupQueue(ch *amqp.Channel, ex ExchangeInfo, q QueueInfo, binding BindingI
 	return msgs, nil
 }
 
-// SendToDLQ publishes a message to the dead letter queue with error context.
-func SendToDLQ(dlqCh *amqp.Channel, dlqName string, body []byte, reason string) error {
+// sendToDLQ publishes a message to the dead letter queue with error context.
+func sendToDLQ(dlqCh *amqp.Channel, dlqName string, body []byte, reason string) error {
 	if dlqName == "" {
 		dlqName = "dlq"
 	}
@@ -118,12 +118,18 @@ func Consume(cfg *ConsumerConfig, msgs <-chan amqp.Delivery, ctx context.Context
 			if err != nil {
 				log.Printf("Process failed: %v", err)
 				// Send to DLQ before nack
-				if dlqErr := SendToDLQ(cfg.DLQCh, cfg.DLQName, msg.Body, err.Error()); dlqErr != nil {
+				if dlqErr := sendToDLQ(cfg.DLQCh, cfg.DLQName, msg.Body, err.Error()); dlqErr != nil {
 					log.Printf("Failed to send to DLQ: %v", dlqErr)
 				}
-				msg.Nack(false, false)
+				err := msg.Nack(false, false)
+				if err != nil {
+					return
+				}
 			} else {
-				msg.Ack(false)
+				err := msg.Ack(false)
+				if err != nil {
+					return
+				}
 			}
 		}
 	}
