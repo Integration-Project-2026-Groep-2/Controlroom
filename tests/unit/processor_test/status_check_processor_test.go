@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	elasticsearch "github.com/elastic/go-elasticsearch/v9"
+	"github.com/elastic/go-elasticsearch/v9"
 	"github.com/stretchr/testify/assert"
 
 	"integration-project-ehb/controlroom/internal/statuscheck"

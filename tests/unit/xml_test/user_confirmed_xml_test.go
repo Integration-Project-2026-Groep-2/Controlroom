@@ -13,8 +13,8 @@ import (
 
 func makeValidUser() gen.UserConfirmed {
 	return gen.UserConfirmed{
-		Id:          gen.UUIDType("550e8400-e29b-41d4-a716-446655440000"),
-		Email:       gen.EmailType("jane.doe@example.com"),
+		Id:          "550e8400-e29b-41d4-a716-446655440000",
+		Email:       "jane.doe@example.com",
 		FirstName:   "Jane",
 		LastName:    "Doe",
 		Role:        gen.UserRoleTypeADMIN,
@@ -83,7 +83,7 @@ func TestUserConfirmed_OptionalFieldsAbsent(t *testing.T) {
 func TestUserConfirmed_OptionalFieldsPresent(t *testing.T) {
 	u := makeValidUser()
 	u.Phone = "+32477000000"
-	u.CompanyId = gen.UUIDType("a3b8c9d0-1234-5678-90ab-cdef12345678")
+	u.CompanyId = "a3b8c9d0-1234-5678-90ab-cdef12345678"
 	u.BadgeCode = "BADGE-42"
 
 	data, err := xml.Marshal(u)

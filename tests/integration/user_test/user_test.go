@@ -9,9 +9,10 @@ import (
 	"testing"
 	"time"
 
+	"integration-project-ehb/controlroom/pkg/gen"
+
 	"github.com/go-playground/validator/v10"
 	amqp "github.com/rabbitmq/amqp091-go"
-	"integration-project-ehb/controlroom/pkg/gen"
 )
 
 func TestProducerUser(t *testing.T) {
@@ -28,13 +29,23 @@ func TestProducerUser(t *testing.T) {
 		log.Fatalf("Failed to connect to RabbitMQ: %v", err)
 	}
 
-	defer conn.Close()
+	defer func(conn *amqp.Connection) {
+		err := conn.Close()
+		if err != nil {
+
+		}
+	}(conn)
 
 	ch, err := conn.Channel()
 	if err != nil {
 		log.Fatalf("Failed to open channel: %v", err)
 	}
-	defer ch.Close()
+	defer func(ch *amqp.Channel) {
+		err := ch.Close()
+		if err != nil {
+
+		}
+	}(ch)
 
 	err = ch.ExchangeDeclare("user.topic", "topic", false, false, false, false, nil)
 	if err != nil {

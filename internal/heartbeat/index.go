@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"time"
 
 	"integration-project-ehb/controlroom/pkg/gen"
@@ -40,7 +41,12 @@ func indexHeartbeat(es *elasticsearch.Client, ctx context.Context, hb *gen.Heart
 		return err
 	}
 
-	defer res.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+
+		}
+	}(res.Body)
 
 	if res.IsError() {
 		return fmt.Errorf("elasticsearch error: %s", res.String())

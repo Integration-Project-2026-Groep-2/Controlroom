@@ -12,7 +12,7 @@ import (
 	"github.com/elastic/go-elasticsearch/v9"
 )
 
-// NOTE(nasr): returning a function independenant of es client to simplify mocking
+// NewHeartbeatProcessor NOTE(nasr): returning a function independenant of es client to simplify mocking
 func NewHeartbeatProcessor(es *elasticsearch.Client) func([]byte) error {
 	return func(body []byte) error {
 		var hb gen.Heartbeat

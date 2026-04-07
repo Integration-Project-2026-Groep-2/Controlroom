@@ -1,21 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified">
 
-  <xs:complexType name="StatusCheck">
-    <xs:sequence>
-      <xs:element name="serviceId"  type="xs:string"/>
-      <xs:element name="timestamp"  type="xs:dateTime"/>
-      <xs:element name="uptime"     type="xs:nonNegativeInteger"/>
-    </xs:sequence>
-  </xs:complexType>
+    <xs:complexType name="StatusCheck">
+        <xs:sequence>
+            <xs:element name="serviceId" type="xs:string"/>
+            <xs:element name="timestamp" type="xs:dateTime"/>
+            <xs:element name="uptime" type="xs:nonNegativeInteger"/>
+        </xs:sequence>
+    </xs:complexType>
 
-<!-- values in percentage, so keep them between 0.0 and 1.0 -->
-<!-- won't do uneccesary type creations etc -->
-  <xs:complexType name="SystemLoad">
-    <xs:sequence>
-      <xs:element name="cpu"    type="xs:decimal"/>
-      <xs:element name="memory" type="xs:decimal"/>
-      <xs:element name="disk"   type="xs:decimal"/>
-    </xs:sequence>
-  </xs:complexType>
+    <!-- values in percentage, so keep them between 0.0 and 1.0 -->
+    <!-- won't do uneccesary type creations etc -->
+    <xs:complexType name="SystemLoad">
+        <xs:sequence>
+            <xs:element name="cpu" type="xs:decimal"/>
+            <xs:element name="memory" type="xs:decimal"/>
+            <xs:element name="disk" type="xs:decimal"/>
+        </xs:sequence>
+    </xs:complexType>
 </xs:schema>

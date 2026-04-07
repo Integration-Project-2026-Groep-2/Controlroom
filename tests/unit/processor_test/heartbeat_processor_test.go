@@ -5,10 +5,11 @@ import (
 	"testing"
 	"time"
 
-	elasticsearch "github.com/elastic/go-elasticsearch/v9"
-	"github.com/stretchr/testify/assert"
 	"integration-project-ehb/controlroom/internal/heartbeat"
 	"integration-project-ehb/controlroom/pkg/gen"
+
+	"github.com/elastic/go-elasticsearch/v9"
+	"github.com/stretchr/testify/assert"
 )
 
 // TestProcessHeartbeat_InvalidXML: malformed XML should fail during unmarshal
