@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"integration-project-ehb/controlroom/internal/statuscheck"
-	"integration-project-ehb/controlroom/internal/userobject"
+	"integration-project-ehb/controlroom/internal/user"
 	"integration-project-ehb/controlroom/pkg/gen"
 )
 
@@ -32,7 +32,7 @@ func TestProcessStatusCheck_InvalidXML(t *testing.T) {
 func TestProcessStatusCheck_ValidXML_ESUnavailable(t *testing.T) {
 	processor := statuscheck.NewStatusCheckProcessor(unreachableES(t))
 
-	sc := gen.StatusCheckType{
+	sc := gen.StatusCheck{
 		ServiceId: "crm-service",
 		Timestamp: time.Now().UTC(),
 		Uptime:    3600,
@@ -57,7 +57,7 @@ func TestProcessStatusCheck_PartialXML(t *testing.T) {
 
 	// valid XML structure but missing required fields — unmarshal succeeds,
 	// but we still expect an error from the index step (ES unreachable)
-	body := []byte(`<StatusCheckType><serviceId>x</serviceId></StatusCheckType>`)
+	body := []byte(`<StatusCheck><serviceId>x</serviceId></StatusCheck>`)
 	err := processor(body)
 	assert.Error(t, err)
 	// the error must come from indexing, not unmarshalling
@@ -65,7 +65,7 @@ func TestProcessStatusCheck_PartialXML(t *testing.T) {
 }
 
 func TestProcessUser_InvalidXML(t *testing.T) {
-	processor := userobject.NewUserProcessor(unreachableES(t))
+	processor := user.NewUserProcessor(unreachableES(t))
 
 	err := processor([]byte("garbage"))
 	assert.Error(t, err)
@@ -73,7 +73,7 @@ func TestProcessUser_InvalidXML(t *testing.T) {
 }
 
 func TestProcessUser_ValidXML_ESUnavailable(t *testing.T) {
-	processor := userobject.NewUserProcessor(unreachableES(t))
+	processor := user.NewUserProcessor(unreachableES(t))
 
 	u := gen.UserConfirmed{
 		Id:          gen.UUIDType("550e8400-e29b-41d4-a716-446655440000"),
@@ -94,14 +94,14 @@ func TestProcessUser_ValidXML_ESUnavailable(t *testing.T) {
 }
 
 func TestProcessUser_EmptyBody(t *testing.T) {
-	processor := userobject.NewUserProcessor(unreachableES(t))
+	processor := user.NewUserProcessor(unreachableES(t))
 
 	err := processor([]byte{})
 	assert.Error(t, err)
 }
 
 func TestProcessUser_WrongXMLShape(t *testing.T) {
-	processor := userobject.NewUserProcessor(unreachableES(t))
+	processor := user.NewUserProcessor(unreachableES(t))
 
 	// heartbeat XML fed to user processor: unmarshal won't error (Go XML is
 	// permissive), but ES is unreachable so index will fail
