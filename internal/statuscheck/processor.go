@@ -14,7 +14,7 @@ import (
 
 func NewStatusCheckProcessor(es *elasticsearch.Client) func([]byte) error {
 	return func(body []byte) error {
-		var sct gen.StatusCheckType
+		var sct gen.StatusCheck
 		if err := xml.Unmarshal(body, &sct); err != nil {
 			return fmt.Errorf("unmarshal: %w", err)
 		}

@@ -11,10 +11,11 @@ import (
 	"github.com/elastic/go-elasticsearch/v9"
 	amqp "github.com/rabbitmq/amqp091-go"
 
+	"integration-project-ehb/controlroom/internal/company"
 	"integration-project-ehb/controlroom/internal/cr_rabbitmq"
 	"integration-project-ehb/controlroom/internal/heartbeat"
 	"integration-project-ehb/controlroom/internal/statuscheck"
-	"integration-project-ehb/controlroom/internal/userobject"
+	"integration-project-ehb/controlroom/internal/user"
 )
 
 func main() {
@@ -147,7 +148,7 @@ func main() {
 	userCfg := &cr_rabbitmq.ConsumerConfig{
 		DLQCh:   dlqCh,
 		DLQName: "user_dlq",
-		Process: userobject.NewUserProcessor(esClient),
+		Process: user.NewUserProcessor(esClient),
 	}
 	if err := cr_rabbitmq.SetupDLQ(userCfg.DLQCh, userCfg.DLQName); err != nil {
 		log.Fatalf("user dlq setup: %v", err)
@@ -209,6 +210,56 @@ func main() {
 
 	go cr_rabbitmq.Consume(scCfg, scMsgs, ctx)
 	log.Println("StatusCheck consumer started")
+
+	// Company consumer
+	companyCh, err := conn.Channel()
+	if err != nil {
+		log.Fatalf("company channel: %v", err)
+	}
+	defer func(companyCh *amqp.Channel) {
+		err := companyCh.Close()
+		if err != nil {
+
+		}
+	}(companyCh)
+
+	companyExchange := cr_rabbitmq.ExchangeInfo{
+		Name:    "contact.topic",
+		Kind:    "topic",
+		Durable: true,
+	}
+
+	companyQueue := cr_rabbitmq.QueueInfo{
+		Name:    "crm.company.confirmed",
+		Durable: true,
+	}
+
+	companyBinding := cr_rabbitmq.BindingInfo{
+		Key: "crm.company.confirmed",
+	}
+
+	companyMsgs, err := cr_rabbitmq.SetupQueue(companyCh, companyExchange, companyQueue, companyBinding)
+	if err != nil {
+		log.Fatalf("company setup: %v", err)
+	}
+
+	companyCfg := &cr_rabbitmq.ConsumerConfig{
+		DLQCh:   dlqCh,
+		DLQName: "company_dlq",
+		Process: company.NewCompanyProcessor(esClient),
+	}
+	if err := cr_rabbitmq.SetupDLQ(companyCfg.DLQCh, companyCfg.DLQName); err != nil {
+		log.Fatalf("company dlq setup: %v", err)
+	}
+
+	// NOTE(nasr): verify prefetch count with team
+	err = companyCh.Qos(10, 0, false)
+	if err != nil {
+		return
+	}
+
+	go cr_rabbitmq.Consume(companyCfg, companyMsgs, ctx)
+	log.Println("Company consumer started")
 
 	// TODO(nasr): add logging stuff in the future
 
