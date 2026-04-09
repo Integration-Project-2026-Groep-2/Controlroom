@@ -1,4 +1,4 @@
-package userobject
+package user
 
 import (
 	"bytes"
@@ -16,6 +16,7 @@ import (
 
 // indexUser marshals a UserConfirmed to JSON and indexes it in Elasticsearch.
 func indexUser(es *elasticsearch.Client, ctx context.Context, uo *gen.UserConfirmed) error {
+
 	doc := map[string]any{
 		"id":      uo.Id,
 		"role":    uo.Role,
@@ -38,10 +39,12 @@ func indexUser(es *elasticsearch.Client, ctx context.Context, uo *gen.UserConfir
 	if err != nil {
 		return fmt.Errorf("index: %w", err)
 	}
+
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
 		if err != nil {
-
+			// TODO(nasr): what happens here then? this is a fix suggested by the static analyzers
+			// but when the closing does fail? how do you handle it?
 		}
 	}(res.Body)
 

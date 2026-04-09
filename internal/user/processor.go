@@ -1,4 +1,4 @@
-package userobject
+package user
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 	"github.com/elastic/go-elasticsearch/v9"
 )
 
-// NewUserProcessor ProcessUserObject unmarshals, validates, and indexes a user message.
+// NewUserProcessor unmarshals, validates, and indexes a user message.
 // Returns error to trigger DLQ routing via cr_rabbitmq consumer.
 func NewUserProcessor(es *elasticsearch.Client) func([]byte) error {
 	return func(body []byte) error {
@@ -28,7 +28,7 @@ func NewUserProcessor(es *elasticsearch.Client) func([]byte) error {
 			return fmt.Errorf("index: %w", err)
 		}
 
-		log.Printf("Indexed user object: %s", uc.Id)
+		log.Printf("indexed user object: %s", uc.Id)
 		return nil
 	}
 }

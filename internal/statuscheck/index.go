@@ -13,7 +13,7 @@ import (
 	"github.com/elastic/go-elasticsearch/v9/esapi"
 )
 
-func indexStatusCheck(es *elasticsearch.Client, ctx context.Context, sct *gen.StatusCheckType) error {
+func indexStatusCheck(es *elasticsearch.Client, ctx context.Context, sct *gen.StatusCheck) error {
 
 	doc := map[string]any{
 		"service_id": sct.ServiceId,
