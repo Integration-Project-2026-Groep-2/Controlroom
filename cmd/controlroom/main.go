@@ -18,9 +18,14 @@ import (
 
 func main() {
 	// Elasticsearch client
-	esClient, err := elasticsearch.NewDefaultClient()
+	cfg := elasticsearch.Config{
+		Addresses: []string{os.Getenv("ELASTICSEARCH_URL")},
+		Username:  os.Getenv("CONTROLROOM_ES_USER"),
+		Password:  os.Getenv("CONTROLROOM_ES_PASS"),
+	}
+	esClient, err := elasticsearch.NewClient(cfg)
 	if err != nil {
-		log.Fatalf("elasticsearch client: %v", err)
+		log.Fatalf("elasticsearch client config: %v", err)
 	}
 	res, err := esClient.Info()
 	if err != nil {
