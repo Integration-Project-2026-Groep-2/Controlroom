@@ -32,7 +32,7 @@ func main() {
 	defer res.Body.Close()
 
 	// Upgrade to ES-backed logger now that connection is confirmed
-	log = logger.NewWithElastic(os.Stdout, "controlroom", esClient, "controlroom-logs")
+	log.SetElastic(esClient, "controlroom-logs")
 	defer log.Flush()
 	log.Info("connected to elasticsearch")
 

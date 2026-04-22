@@ -3,7 +3,6 @@ package logger
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"io"
 	"os"
 	"sync"
@@ -65,29 +64,15 @@ func (s Severity) journalPriority() journal.Priority {
 
 // --- Field ---
 
-type fieldKind uint8
-
-const (
-	kindString fieldKind = iota
-	kindInt
-)
-
 // Field is a typed key-value pair for structured logging.
 type Field struct {
-	key    string
-	strVal string
-	intVal int64
-	kind   fieldKind
+	key string
+	val string
 }
 
 // String returns a Field with a string value.
 func String(key, val string) Field {
-	return Field{key: key, strVal: val, kind: kindString}
-}
-
-// Int returns a Field with an integer value.
-func Int(key string, val int) Field {
-	return Field{key: key, intVal: int64(val), kind: kindInt}
+	return Field{key: key, val: val}
 }
 
 // --- Logger ---
@@ -112,9 +97,10 @@ func New(w io.Writer, service string) *Logger {
 	return &Logger{w: w, service: service}
 }
 
-// NewWithElastic returns a Logger that writes to w and indexes logs into Elasticsearch.
-func NewWithElastic(w io.Writer, service string, es *elasticsearch.Client, index string) *Logger {
-	return &Logger{w: w, service: service, es: es, esIndex: index}
+// SetElastic configures Elasticsearch indexing on an existing Logger.
+func (l *Logger) SetElastic(es *elasticsearch.Client, index string) {
+	l.es = es
+	l.esIndex = index
 }
 
 func (l *Logger) Debug(msg string, fields ...Field) {
@@ -175,14 +161,9 @@ func (l *Logger) log(sev Severity, msg string, err error, fields []Field) {
 		buf.WriteString(`,"`)
 		writeEscaped(buf, f.key)
 		buf.WriteString(`":`)
-		switch f.kind {
-		case kindString:
-			buf.WriteByte('"')
-			writeEscaped(buf, f.strVal)
-			buf.WriteByte('"')
-		case kindInt:
-			writeInt(buf, f.intVal)
-		}
+		buf.WriteByte('"')
+		writeEscaped(buf, f.val)
+		buf.WriteByte('"')
 	}
 
 	buf.WriteString("}\n")
@@ -206,22 +187,21 @@ func (l *Logger) log(sev Severity, msg string, err error, fields []Field) {
 			payload := make([]byte, n)
 			copy(payload, buf.Bytes())
 			l.wg.Add(1)
-			go l.indexToElastic(payload, time.Now())
+			go l.indexToElastic(payload)
 		}
 	}
 
 	pool.Put(buf)
 }
 
-func (l *Logger) indexToElastic(payload []byte, t time.Time) {
+func (l *Logger) indexToElastic(payload []byte) {
 	defer l.wg.Done()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	req := esapi.IndexRequest{
-		Index:      l.esIndex,
-		DocumentID: fmt.Sprintf("%s-%d", l.service, t.UnixNano()),
-		Body:       bytes.NewReader(payload),
-		Refresh:    "false",
+		Index:   l.esIndex,
+		Body:    bytes.NewReader(payload),
+		Refresh: "false",
 	}
 	res, err := req.Do(ctx, l.es)
 	if err != nil {
@@ -262,24 +242,4 @@ func writeEscaped(buf *bytes.Buffer, s string) {
 			buf.WriteByte(c)
 		}
 	}
-}
-
-// writeInt writes an int64 into buf without fmt or strconv allocations.
-func writeInt(buf *bytes.Buffer, v int64) {
-	if v == 0 {
-		buf.WriteByte('0')
-		return
-	}
-	if v < 0 {
-		buf.WriteByte('-')
-		v = -v
-	}
-	var tmp [20]byte
-	pos := len(tmp)
-	for v > 0 {
-		pos--
-		tmp[pos] = byte('0' + v%10)
-		v /= 10
-	}
-	buf.Write(tmp[pos:])
 }
