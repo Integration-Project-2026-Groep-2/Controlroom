@@ -4,7 +4,6 @@ package gen
 
 import (
 	json "encoding/json"
-	xml "encoding/xml"
 	easyjson "github.com/mailru/easyjson"
 	jlexer "github.com/mailru/easyjson/jlexer"
 	jwriter "github.com/mailru/easyjson/jwriter"
@@ -32,8 +31,6 @@ func easyjsonD00443dcDecodeIntegrationProjectEhbControlroomPkgGen(in *jlexer.Lex
 		key := in.UnsafeFieldName(false)
 		in.WantColon()
 		switch key {
-		case "HeartbeatDoc":
-			easyjsonD00443dcDecodeEncodingXml(in, &out.XMLName)
 		case "service_id":
 			if in.IsNull() {
 				in.Skip()
@@ -71,13 +68,8 @@ func easyjsonD00443dcEncodeIntegrationProjectEhbControlroomPkgGen(out *jwriter.W
 	first := true
 	_ = first
 	{
-		const prefix string = ",\"HeartbeatDoc\":"
-		out.RawString(prefix[1:])
-		easyjsonD00443dcEncodeEncodingXml(out, in.XMLName)
-	}
-	{
 		const prefix string = ",\"service_id\":"
-		out.RawString(prefix)
+		out.RawString(prefix[1:])
 		out.String(string(in.ServiceId))
 	}
 	{
@@ -115,56 +107,4 @@ func (v *HeartbeatDoc) UnmarshalJSON(data []byte) error {
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *HeartbeatDoc) UnmarshalEasyJSON(l *jlexer.Lexer) {
 	easyjsonD00443dcDecodeIntegrationProjectEhbControlroomPkgGen(l, v)
-}
-func easyjsonD00443dcDecodeEncodingXml(in *jlexer.Lexer, out *xml.Name) {
-	isTopLevel := in.IsStart()
-	if in.IsNull() {
-		if isTopLevel {
-			in.Consumed()
-		}
-		in.Skip()
-		return
-	}
-	in.Delim('{')
-	for !in.IsDelim('}') {
-		key := in.UnsafeFieldName(false)
-		in.WantColon()
-		switch key {
-		case "Space":
-			if in.IsNull() {
-				in.Skip()
-			} else {
-				out.Space = string(in.String())
-			}
-		case "Local":
-			if in.IsNull() {
-				in.Skip()
-			} else {
-				out.Local = string(in.String())
-			}
-		default:
-			in.SkipRecursive()
-		}
-		in.WantComma()
-	}
-	in.Delim('}')
-	if isTopLevel {
-		in.Consumed()
-	}
-}
-func easyjsonD00443dcEncodeEncodingXml(out *jwriter.Writer, in xml.Name) {
-	out.RawByte('{')
-	first := true
-	_ = first
-	{
-		const prefix string = ",\"Space\":"
-		out.RawString(prefix[1:])
-		out.String(string(in.Space))
-	}
-	{
-		const prefix string = ",\"Local\":"
-		out.RawString(prefix)
-		out.String(string(in.Local))
-	}
-	out.RawByte('}')
 }

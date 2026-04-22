@@ -12,7 +12,6 @@ var _ = xml.Name{}
 var _ = time.Time{}
 
 type CompanyDoc struct {
-	XMLName     xml.Name            `xml:"CompanyDoc" json:"CompanyDoc"`
 	Id          UUIDType            `xml:"id" json:"id" validate:"required"`
 	ConfirmedAt ISO8601DateTimeType `xml:"confirmedAt" json:"confirmed_at" validate:"required"`
 	Indexed     time.Time           `xml:"indexed" json:"indexed" validate:"required"`

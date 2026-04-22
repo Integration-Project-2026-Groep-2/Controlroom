@@ -775,9 +775,6 @@ func writeStruct(buf *strings.Builder, name string, fields []structField) {
 	buf.WriteString(name)
 	buf.WriteString(" struct {\n")
 
-	xmlElem := name
-	_, _ = fmt.Fprintf(buf, "\tXMLName xml.Name `xml:\"%s\" json:\"%s\"`\n", xmlElem, xmlElem)
-
 	for _, f := range fields {
 		tag := buildTag(f)
 		_, _ = fmt.Fprintf(buf, "\t%-24s %-20s %s\n", f.GoName, f.GoType, tag)

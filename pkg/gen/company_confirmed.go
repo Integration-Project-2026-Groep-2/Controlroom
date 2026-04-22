@@ -14,7 +14,6 @@ var _ = time.Time{}
 type BelgianVatNumberType string
 
 type CompanyConfirmed struct {
-	XMLName     xml.Name             `xml:"CompanyConfirmed" json:"CompanyConfirmed"`
 	Id          UUIDType             `xml:"id" json:"id" validate:"required"`
 	VatNumber   BelgianVatNumberType `xml:"vatNumber" json:"vat_number" validate:"required"`
 	Name        string               `xml:"name" json:"name" validate:"required"`
