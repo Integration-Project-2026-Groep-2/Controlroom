@@ -144,16 +144,30 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 	}
 	defer hbCh.Close()
 
-	hbMsgs, err := cr_rabbitmq.SetupQueue(hbCh,
-		cr_rabbitmq.ExchangeInfo{Name: "heartbeat.direct", Kind: "direct", Durable: true},
-		cr_rabbitmq.QueueInfo{Name: "heartbeat_queue", Durable: true},
-		cr_rabbitmq.BindingInfo{Key: "routing.heartbeat"},
-	)
+	hbExchange := cr_rabbitmq.ExchangeInfo{
+		Name:    "heartbeat.direct",
+		Kind:    "direct",
+		Durable: true,
+	}
+	hbQueue := cr_rabbitmq.QueueInfo{
+		Name:    "heartbeat.queue",
+		Durable: true,
+	}
+	hbBinding := cr_rabbitmq.BindingInfo{
+		Key: "routing.heartbeat",
+	}
+
+	hbMsgs, err := cr_rabbitmq.SetupQueue(hbCh, hbExchange, hbQueue, hbBinding)
 	if err != nil {
 		return fmt.Errorf("heartbeat setup: %w", err)
 	}
 
-	hbCfg := &cr_rabbitmq.ConsumerConfig{DLQCh: dlqCh, DLQName: "heartbeat_dlq", Process: heartbeat.NewHeartbeatProcessor(client)}
+	hbCfg := &cr_rabbitmq.ConsumerConfig{
+		DLQCh:   dlqCh,
+		DLQName: "heartbeat.dlq",
+		Process: heartbeat.NewHeartbeatProcessor(esClient),
+	}
+
 	if err := cr_rabbitmq.SetupDLQ(hbCfg.DLQCh, hbCfg.DLQName); err != nil {
 		return fmt.Errorf("heartbeat dlq setup: %w", err)
 	}
@@ -179,7 +193,11 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 		return fmt.Errorf("user setup: %w", err)
 	}
 
-	userCfg := &cr_rabbitmq.ConsumerConfig{DLQCh: dlqCh, DLQName: "user_dlq", Process: user.NewUserProcessor(client)}
+	userCfg := &cr_rabbitmq.ConsumerConfig{
+		DLQCh:   dlqCh,
+		DLQName: "user.dlq",
+		Process: user.NewUserProcessor(esClient),
+	}
 	if err := cr_rabbitmq.SetupDLQ(userCfg.DLQCh, userCfg.DLQName); err != nil {
 		return fmt.Errorf("user dlq setup: %w", err)
 	}
@@ -196,16 +214,30 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 	}
 	defer scCh.Close()
 
-	scMsgs, err := cr_rabbitmq.SetupQueue(scCh,
-		cr_rabbitmq.ExchangeInfo{Name: "statuscheck.direct", Kind: "direct", Durable: true},
-		cr_rabbitmq.QueueInfo{Name: "statuscheck_queue", Durable: true},
-		cr_rabbitmq.BindingInfo{Key: "routing.statuscheck"},
-	)
+	scExchange := cr_rabbitmq.ExchangeInfo{
+		Name:    "statuscheck.direct",
+		Kind:    "direct",
+		Durable: true,
+	}
+	scQueue := cr_rabbitmq.QueueInfo{
+		Name:    "statuscheck.queue",
+		Durable: true,
+	}
+	// NOTE(nasr): allows for crm.status.checked, kassa.status.checked, etc.
+	scBinding := cr_rabbitmq.BindingInfo{
+		Key: "routing.statuscheck",
+	}
+
+	scMsgs, err := cr_rabbitmq.SetupQueue(scCh, scExchange, scQueue, scBinding)
 	if err != nil {
 		return fmt.Errorf("statuscheck setup: %w", err)
 	}
 
-	scCfg := &cr_rabbitmq.ConsumerConfig{DLQCh: dlqCh, DLQName: "statuscheck_dlq", Process: statuscheck.NewStatusCheckProcessor(client)}
+	scCfg := &cr_rabbitmq.ConsumerConfig{
+		DLQCh:   dlqCh,
+		DLQName: "statuscheck.dlq",
+		Process: statuscheck.NewStatusCheckProcessor(esClient),
+	}
 	if err := cr_rabbitmq.SetupDLQ(scCfg.DLQCh, scCfg.DLQName); err != nil {
 		return fmt.Errorf("statuscheck dlq setup: %w", err)
 	}
@@ -233,8 +265,11 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 		return fmt.Errorf("company setup: %w", err)
 	}
 
-	companyCfg := &cr_rabbitmq.ConsumerConfig{DLQCh: dlqCh, DLQName: "company_dlq", Process: company.NewCompanyProcessor(client)}
-
+	companyCfg := &cr_rabbitmq.ConsumerConfig{
+		DLQCh:   dlqCh,
+		DLQName: "company.dlq",
+		Process: company.NewCompanyProcessor(esClient),
+	}
 	if err := cr_rabbitmq.SetupDLQ(companyCfg.DLQCh, companyCfg.DLQName); err != nil {
 		return fmt.Errorf("company dlq setup: %w", err)
 	}
