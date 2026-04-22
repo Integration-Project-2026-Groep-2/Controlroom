@@ -13,39 +13,42 @@ import (
 	elasticsearch "github.com/elastic/go-elasticsearch/v9"
 )
 
-// List of services we expect to see
-var monitoredServices = []string{"DUMMY_CRM_SERVICE", "DUMMY_FRONTEND_SERVICE"}
+// Configuratie uit .env
+var monitoredServices = strings.Split(os.Getenv("MONITORED_SERVICES"), ",")
+var teamsWebhookURL = os.Getenv("TEAMS_WEBHOOK_URL")
 
-// State tracker: true = ONLINE, false = OFFLINE
+// State trackers
 var serviceState = make(map[string]bool)
+var esOnline = true // We gaan ervan uit dat ES in het begin online is
 
 // The FIFO Queue for alerts (Buffer of 50 messages)
 var alertQueue = make(chan string, 50)
 
-// YOUR WEBHOOK URL GOES HERE
-var teamsWebhookURL = os.Getenv("TEAMS_WEBHOOK_URL")
-
 func main() {
-	// Initialize all services as ONLINE
+	if teamsWebhookURL == "" {
+		log.Fatal("🚨 CRITICAL: TEAMS_WEBHOOK_URL is niet ingesteld in de environment!")
+	}
+
 	for _, svc := range monitoredServices {
 		serviceState[svc] = true
 	}
 
-	// 1. Start the Background Alert Worker (This handles the FIFO queue)
 	go processAlertQueue()
 
+	esURL := os.Getenv("ELASTICSEARCH_URL")
 	cfg := elasticsearch.Config{
-		Addresses: []string{"http://localhost:9200"},
-		Username:  "elastic",
-		Password:  os.Getenv("ELASTIC_PASSWORD"),
+		Addresses: []string{esURL},
+		Username:  os.Getenv("WATCHDOG_ES_USER"),
+		Password:  os.Getenv("WATCHDOG_ES_PASS"),
 	}
 	es, err := elasticsearch.NewClient(cfg)
 	if err != nil {
-		log.Fatalf("ES Client error: %v", err)
+		log.Fatalf("ES Client config error: %v", err)
 	}
 
-	fmt.Println("🐕 Watchdog started! Checking heartbeats every 10 seconds...")
-	ticker := time.NewTicker(10 * time.Second)
+	fmt.Println("🐕 Watchdog started! Checking heartbeats every 60 seconds...")
+	// Ticker aangepast naar 60 seconden!
+	ticker := time.NewTicker(60 * time.Second)
 
 	for range ticker.C {
 		checkHeartbeats(es)
@@ -53,12 +56,10 @@ func main() {
 }
 
 // processAlertQueue runs endlessly in the background.
-// It pulls one message from the queue, sends it, and waits 5 seconds.
 func processAlertQueue() {
 	for message := range alertQueue {
 		sendTeamsAlert(message)
-		// Crucial: Sleep to prevent Microsoft from rate-limiting us
-		time.Sleep(5 * time.Second)
+		time.Sleep(6 * time.Second)
 	}
 }
 
@@ -73,12 +74,42 @@ func checkHeartbeats(es *elasticsearch.Client) {
 		es.Search.WithIndex("heartbeats"),
 		es.Search.WithBody(strings.NewReader(query)),
 	)
-	if err != nil || res.IsError() {
-		log.Printf("Error querying ES: %v", err)
-		return
+
+	// SCENARIO 1: ELASTICSEARCH IS ONBEREIKBAAR (Netwerk Error / Server Plat)
+	if err != nil {
+		if esOnline {
+			esOnline = false
+			log.Printf("🚨 Netwerkfout: Elasticsearch onbereikbaar: %v", err)
+			alertQueue <- "🚨 **CRITICAL:** Elasticsearch is onbereikbaar! Watchdog kan momenteel geen services controleren."
+		}
+		return // Sla service checks over
 	}
+
+	// SCENARIO 2: ELASTICSEARCH KOMT NET TERUG ONLINE NA EEN UITVAL
+	if !esOnline {
+		esOnline = true
+		log.Println("✅ Elasticsearch is terug online! Services worden bij de volgende check (over 60s) weer gecontroleerd.")
+		alertQueue <- "✅ **RESOLVED:** Elasticsearch is terug bereikbaar! Watchdog wacht één cyclus om heartbeats de kans te geven binnen te komen."
+		if res != nil {
+			res.Body.Close()
+		}
+		return // Belangrijk: We slaan de check NU over. Bij de volgende 'tick' (over 60 seconden) checkt hij pas weer!
+	}
+
+	// SCENARIO 3: NETWERK IS OKÉ, MAAR HTTP ERROR (bijv. 401 Unauthorized / 403 Forbidden)
+	if res.IsError() {
+		if res.StatusCode == 401 || res.StatusCode == 403 {
+			log.Printf("🔒 Authenticatie fout (%d): Geen toegang. Wachten tot account in Kibana is aangemaakt.", res.StatusCode)
+		} else {
+			log.Printf("⚠️ Elasticsearch foutmelding: %s", res.String())
+		}
+		res.Body.Close()
+		return // Sla service checks over, stuur GEEN Teams alert!
+	}
+
 	defer res.Body.Close()
 
+	// SCENARIO 4: ALLES IS NORMAAL, CHECK DE SERVICES
 	var result map[string]interface{}
 	json.NewDecoder(res.Body).Decode(&result)
 
@@ -103,13 +134,10 @@ func checkHeartbeats(es *elasticsearch.Client) {
 		if isCurrentlyOnline && !wasOnline {
 			serviceState[svc] = true
 			log.Printf("✅ %s is BACK ONLINE!", svc)
-			// Send to Queue instead of directly to Teams!
 			alertQueue <- fmt.Sprintf("✅ **RESOLVED:** Service **%s** is back online!", svc)
-
 		} else if !isCurrentlyOnline && wasOnline {
 			serviceState[svc] = false
 			log.Printf("🚨 %s is OFFLINE!", svc)
-			// Send to Queue instead of directly to Teams!
 			alertQueue <- fmt.Sprintf("🚨 **CRITICAL:** Service **%s** is down! (Heartbeats in last 60s: %v)", svc, count)
 		}
 	}
