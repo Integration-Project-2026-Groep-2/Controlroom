@@ -2,7 +2,9 @@ package cr_rabbitmq
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"os"
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -67,7 +69,9 @@ func SetupQueue(ch *amqp.Channel, ex ExchangeInfo, q QueueInfo, binding BindingI
 		return nil, err
 	}
 
-	msgs, err := ch.Consume(queue.Name, "", false, false, false, false, nil)
+	consumerTag := fmt.Sprintf("controlroom-%d", os.Getpid())
+
+	msgs, err := ch.Consume(queue.Name, consumerTag, false, false, false, false, nil)
 	if err != nil {
 		return nil, err
 	}
