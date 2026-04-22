@@ -3,27 +3,26 @@ package user
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
+	"integration-project-ehb/controlroom/pkg/gen"
 	"io"
 	"time"
 
-	"integration-project-ehb/controlroom/pkg/gen"
-
 	"github.com/elastic/go-elasticsearch/v9"
 	"github.com/elastic/go-elasticsearch/v9/esapi"
+	"github.com/mailru/easyjson"
 )
 
 // indexUser marshals a UserConfirmed to JSON and indexes it in Elasticsearch.
 func indexUser(es *elasticsearch.Client, ctx context.Context, uo *gen.UserConfirmed) error {
 
-	doc := map[string]any{
-		"id":      uo.Id,
-		"role":    uo.Role,
-		"indexed": time.Now(),
+	doc := gen.UserDoc{
+		Id:      uo.Id,
+		Role:    uo.Role,
+		Indexed: time.Now(),
 	}
 
-	jsonData, err := json.Marshal(doc)
+	jsonData, err := easyjson.Marshal(doc)
 	if err != nil {
 		return fmt.Errorf("marshal: %w", err)
 	}

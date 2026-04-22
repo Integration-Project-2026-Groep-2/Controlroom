@@ -3,7 +3,6 @@ package heartbeat
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"time"
@@ -16,13 +15,13 @@ import (
 
 func indexHeartbeat(es *elasticsearch.Client, ctx context.Context, hb *gen.Heartbeat) error {
 
-	doc := map[string]any{
-		"serviceId": hb.ServiceId,
-		"timestamp": hb.Timestamp,
-		"indexed":   time.Now(),
+	doc := gen.HeartbeatDoc{
+		ServiceId: hb.ServiceId,
+		Timestamp: hb.Timestamp,
+		Indexed:   time.Now(),
 	}
 
-	jsonData, err := json.Marshal(doc)
+	jsonData, err := doc.MarshalJSON()
 
 	if err != nil {
 		return err

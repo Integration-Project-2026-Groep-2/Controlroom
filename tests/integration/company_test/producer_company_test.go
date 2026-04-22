@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/joho/godotenv"
 	amqp "github.com/rabbitmq/amqp091-go"
 
 	// NOTE(nasr): deprecating this. we already load the env variables using os.Getenv
@@ -21,11 +22,12 @@ import (
 func TestProducerCompany(t *testing.T) {
 
 	// NOTE(nasr): deprecating this. we already load the env variables using os.Getenv
+	// NOTE(steven): This was done to make sure this test could be used outside the container. undeprecating this.
 	// Use env file to load variables in tests
-	// err := gotdotenv.Load("../../../../.env")
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
+	err := godotenv.Load("../../../../.env")
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	// For testing, we will assume the host will be local host, and the standard rabbitMQ port :)
 	host := "127.0.0.1:5672"
@@ -40,6 +42,8 @@ func TestProducerCompany(t *testing.T) {
 	//connectionString := fmt.Sprintf("amqp://root:admin@127.0.0.1:5672")
 	conn, err := amqp.Dial(connectionString)
 	if err != nil {
+		log.Fatalf("%s", connectionString)
+		log.Fatalf("❌ Failed to connect to RabbitMQ: %v", err)
 		log.Fatalf("❌ Failed to connect to RabbitMQ: %v", err)
 	}
 	defer conn.Close()

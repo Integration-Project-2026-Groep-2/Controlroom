@@ -3,7 +3,6 @@ package company
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -12,22 +11,18 @@ import (
 
 	"github.com/elastic/go-elasticsearch/v9"
 	"github.com/elastic/go-elasticsearch/v9/esapi"
+	"github.com/mailru/easyjson"
 )
 
 // indexCompany indexes consumed companies to elastic
 func indexCompany(es *elasticsearch.Client, ctx context.Context, comp *gen.CompanyConfirmed) error {
-	doc := map[string]any{
-		"Id": comp.Id,
-		/* NOTE(nasr): dont store these? gdpr?
-		* "Email":     comp.VatNumber,
-		* "FirstName": comp.Name,
-		* "LastName":  comp.Email,
-		* "Phone":     comp.IsActive, */
-		"Role":    comp.ConfirmedAt,
-		"indexed": time.Now(),
+	doc := gen.CompanyDoc{
+		Id:          comp.Id,
+		ConfirmedAt: comp.ConfirmedAt,
+		Indexed:     time.Now(),
 	}
 
-	jsonData, err := json.Marshal(doc)
+	jsonData, err := easyjson.Marshal(doc)
 	if err != nil {
 		return err
 	}
