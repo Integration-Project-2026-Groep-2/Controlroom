@@ -2,11 +2,14 @@ package main
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"io"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/elastic/go-elasticsearch/v9"
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -16,9 +19,15 @@ import (
 	"integration-project-ehb/controlroom/internal/heartbeat"
 	"integration-project-ehb/controlroom/internal/statuscheck"
 	"integration-project-ehb/controlroom/internal/user"
+	"integration-project-ehb/controlroom/pkg/logger"
 )
 
 func main() {
+	// Logger writes to stdout immediately; ES indexing wordt aangezet zodra
+	// de ES-client klaar is (zie SetElastic hieronder).
+	lg := logger.New(os.Stdout, "controlroom")
+	defer lg.Flush()
+
 	// Elasticsearch client
 	cfg := elasticsearch.Config{
 		Addresses: []string{os.Getenv("ELASTICSEARCH_URL")},
@@ -27,11 +36,11 @@ func main() {
 	}
 	esClient, err := elasticsearch.NewClient(cfg)
 	if err != nil {
-		log.Fatalf("elasticsearch client config: %v", err)
+		lg.Fatal("elasticsearch client config", err)
 	}
 	res, err := esClient.Info()
 	if err != nil {
-		log.Fatalf("elasticsearch connect: %v", err)
+		lg.Fatal("elasticsearch connect", err)
 	}
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
@@ -39,48 +48,87 @@ func main() {
 
 		}
 	}(res.Body)
-	log.Println("Connected to Elasticsearch")
+	lg.Info("Connected to Elasticsearch")
 
-	// RabbitMQ connection
+	// Vanaf hier gaan alle logs ook naar ES index "controlroom-logs".
+	lg.SetElastic(esClient, "controlroom-logs")
+
+	// Context + signal handler for graceful shutdown
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-sigChan
+		lg.Info("Shutdown signal received, draining queues...")
+		cancel()
+	}()
+
+	// RabbitMQ redial loop. Een sessie leeft zolang de connectie gezond is;
+	// bij verlies of setup-fout wachten we met exponential backoff (1s → 60s max)
+	// en proberen we opnieuw. De backoff reset zodra een sessie langer dan 10s
+	// heeft gedraaid (teken van een succesvolle reconnect).
+	const (
+		initialBackoff = 1 * time.Second
+		maxBackoff     = 60 * time.Second
+		healthyAfter   = 10 * time.Second
+	)
+	backoff := initialBackoff
+
+	for {
+		start := time.Now()
+		err := runRabbitSession(ctx, esClient, lg)
+		if errors.Is(err, context.Canceled) {
+			return
+		}
+		if time.Since(start) > healthyAfter {
+			backoff = initialBackoff
+		}
+
+		lg.Error("rabbit session ended, redialing", err, logger.String("interval", backoff.String()))
+
+		select {
+		case <-time.After(backoff):
+		case <-ctx.Done():
+			return
+		}
+
+		backoff *= 2
+		if backoff > maxBackoff {
+			backoff = maxBackoff
+		}
+	}
+}
+
+// runRabbitSession dials RabbitMQ, declares all four consumers, and blocks
+// until the connection drops or ctx is cancelled. Returns an error describing
+// why the session ended; the caller decides whether to retry.
+func runRabbitSession(ctx context.Context, esClient *elasticsearch.Client, lg *logger.Logger) error {
 	conn, err := amqp.Dial(os.Getenv("RABBITMQ_URL"))
 	if err != nil {
-		log.Fatalf("rabbitmq dial: %v", err)
+		return fmt.Errorf("dial: %w", err)
 	}
-	defer func(conn *amqp.Connection) {
-		err := conn.Close()
-		if err != nil {
+	defer conn.Close()
+	lg.Info("Connected to RabbitMQ")
 
-		}
-	}(conn)
-	log.Println("Connected to RabbitMQ")
+	// Buffered size 1 per amqp091-go convention — otherwise the library's
+	// internal sender blocks if we haven't selected yet when the close fires.
+	closeCh := conn.NotifyClose(make(chan *amqp.Error, 1))
 
 	// DLQ channel (shared)
 	dlqCh, err := conn.Channel()
 	if err != nil {
-		log.Fatalf("dlq channel: %v", err)
+		return fmt.Errorf("dlq channel: %w", err)
 	}
-	defer func(dlqCh *amqp.Channel) {
-		err := dlqCh.Close()
-		if err != nil {
-
-		}
-	}(dlqCh)
-
-	// Context for graceful shutdown
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	defer dlqCh.Close()
 
 	// Heartbeat consumer
 	hbCh, err := conn.Channel()
 	if err != nil {
-		log.Fatalf("heartbeat channel: %v", err)
+		return fmt.Errorf("heartbeat channel: %w", err)
 	}
-	defer func(hbCh *amqp.Channel) {
-		err := hbCh.Close()
-		if err != nil {
-
-		}
-	}(hbCh)
+	defer hbCh.Close()
 
 	hbExchange := cr_rabbitmq.ExchangeInfo{
 		Name:    "heartbeat.direct",
@@ -96,6 +144,9 @@ func main() {
 	}
 
 	hbMsgs, err := cr_rabbitmq.SetupQueue(hbCh, hbExchange, hbQueue, hbBinding)
+	if err != nil {
+		return fmt.Errorf("heartbeat setup: %w", err)
+	}
 
 	hbCfg := &cr_rabbitmq.ConsumerConfig{
 		DLQCh:   dlqCh,
@@ -104,33 +155,23 @@ func main() {
 	}
 
 	if err := cr_rabbitmq.SetupDLQ(hbCfg.DLQCh, hbCfg.DLQName); err != nil {
-		log.Fatalf("heartbeat dlq setup: %v", err)
-	}
-
-	if err != nil {
-		log.Fatalf("heartbeat setup: %v", err)
+		return fmt.Errorf("heartbeat dlq setup: %w", err)
 	}
 
 	// NOTE(nasr): prefetch count 18 for reasonable throughput without hoarding memory
-	err = hbCh.Qos(18, 0, false)
-	if err != nil {
-		return
+	if err := hbCh.Qos(18, 0, false); err != nil {
+		return fmt.Errorf("heartbeat qos: %w", err)
 	}
 
 	go cr_rabbitmq.Consume(hbCfg, hbMsgs, ctx)
-	log.Println("Heartbeat consumer started")
+	lg.Info("Heartbeat consumer started")
 
 	// User consumer
 	userCh, err := conn.Channel()
 	if err != nil {
-		log.Fatalf("user channel: %v", err)
+		return fmt.Errorf("user channel: %w", err)
 	}
-	defer func(userCh *amqp.Channel) {
-		err := userCh.Close()
-		if err != nil {
-
-		}
-	}(userCh)
+	defer userCh.Close()
 
 	userExchange := cr_rabbitmq.ExchangeInfo{
 		Name:    "contact.topic",
@@ -147,7 +188,7 @@ func main() {
 
 	userMsgs, err := cr_rabbitmq.SetupQueue(userCh, userExchange, userQueue, userBinding)
 	if err != nil {
-		log.Fatalf("user setup: %v", err)
+		return fmt.Errorf("user setup: %w", err)
 	}
 
 	userCfg := &cr_rabbitmq.ConsumerConfig{
@@ -156,13 +197,12 @@ func main() {
 		Process: user.NewUserProcessor(esClient),
 	}
 	if err := cr_rabbitmq.SetupDLQ(userCfg.DLQCh, userCfg.DLQName); err != nil {
-		log.Fatalf("user dlq setup: %v", err)
+		return fmt.Errorf("user dlq setup: %w", err)
 	}
 
 	// NOTE(nasr): prefetch count 10 for higher throughput, autoack disabled per consumer
-	err = userCh.Qos(10, 0, false)
-	if err != nil {
-		return
+	if err := userCh.Qos(10, 0, false); err != nil {
+		return fmt.Errorf("user qos: %w", err)
 	}
 
 	go cr_rabbitmq.Consume(userCfg, userMsgs, ctx)
@@ -171,14 +211,9 @@ func main() {
 	// StatusCheck consumer
 	scCh, err := conn.Channel()
 	if err != nil {
-		log.Fatalf("statuscheck channel: %v", err)
+		return fmt.Errorf("statuscheck channel: %w", err)
 	}
-	defer func(scCh *amqp.Channel) {
-		err := scCh.Close()
-		if err != nil {
-
-		}
-	}(scCh)
+	defer scCh.Close()
 
 	scExchange := cr_rabbitmq.ExchangeInfo{
 		Name:    "statuscheck.direct",
@@ -196,7 +231,7 @@ func main() {
 
 	scMsgs, err := cr_rabbitmq.SetupQueue(scCh, scExchange, scQueue, scBinding)
 	if err != nil {
-		log.Fatalf("statuscheck setup: %v", err)
+		return fmt.Errorf("statuscheck setup: %w", err)
 	}
 
 	scCfg := &cr_rabbitmq.ConsumerConfig{
@@ -205,12 +240,11 @@ func main() {
 		Process: statuscheck.NewStatusCheckProcessor(esClient),
 	}
 	if err := cr_rabbitmq.SetupDLQ(scCfg.DLQCh, scCfg.DLQName); err != nil {
-		log.Fatalf("statuscheck dlq setup: %v", err)
+		return fmt.Errorf("statuscheck dlq setup: %w", err)
 	}
 
-	err = scCh.Qos(5, 0, false)
-	if err != nil {
-		return
+	if err := scCh.Qos(5, 0, false); err != nil {
+		return fmt.Errorf("statuscheck qos: %w", err)
 	}
 
 	go cr_rabbitmq.Consume(scCfg, scMsgs, ctx)
@@ -219,14 +253,9 @@ func main() {
 	// Company consumer
 	companyCh, err := conn.Channel()
 	if err != nil {
-		log.Fatalf("company channel: %v", err)
+		return fmt.Errorf("company channel: %w", err)
 	}
-	defer func(companyCh *amqp.Channel) {
-		err := companyCh.Close()
-		if err != nil {
-
-		}
-	}(companyCh)
+	defer companyCh.Close()
 
 	companyExchange := cr_rabbitmq.ExchangeInfo{
 		Name:    "contact.topic",
@@ -245,7 +274,7 @@ func main() {
 
 	companyMsgs, err := cr_rabbitmq.SetupQueue(companyCh, companyExchange, companyQueue, companyBinding)
 	if err != nil {
-		log.Fatalf("company setup: %v", err)
+		return fmt.Errorf("company setup: %w", err)
 	}
 
 	companyCfg := &cr_rabbitmq.ConsumerConfig{
@@ -254,29 +283,26 @@ func main() {
 		Process: company.NewCompanyProcessor(esClient),
 	}
 	if err := cr_rabbitmq.SetupDLQ(companyCfg.DLQCh, companyCfg.DLQName); err != nil {
-		log.Fatalf("company dlq setup: %v", err)
+		return fmt.Errorf("company dlq setup: %w", err)
 	}
 
 	// NOTE(nasr): verify prefetch count with team
-	err = companyCh.Qos(10, 0, false)
-	if err != nil {
-		return
+	if err := companyCh.Qos(10, 0, false); err != nil {
+		return fmt.Errorf("company qos: %w", err)
 	}
 
 	go cr_rabbitmq.Consume(companyCfg, companyMsgs, ctx)
 	log.Println("Company consumer started")
 
-	// TODO(nasr): add logging stuff in the future
-
-	// ---------------------- shutdown stuff ----------------------
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-
-	<-sigChan
-	log.Println("Shutdown signal received, draining queues...")
-	cancel()
-
-	// Give consumers time to ack pending messages
-	// TODO(nasr): implement proper drain with timeout
-	// time.Sleep(2 * time.Second)
+	// Wacht tot de connectie dichtgaat of shutdown wordt geïnitieerd.
+	// De Consume-goroutines exiten vanzelf zodra hun msgs channel sluit.
+	select {
+	case reason := <-closeCh:
+		if reason == nil {
+			return fmt.Errorf("connection closed")
+		}
+		return fmt.Errorf("connection lost: %w", reason)
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
