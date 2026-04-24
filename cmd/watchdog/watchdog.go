@@ -26,7 +26,7 @@ var alertQueue = make(chan string, 50)
 
 func main() {
 	if teamsWebhookURL == "" {
-		log.Fatal("🚨 CRITICAL: TEAMS_WEBHOOK_URL is niet ingesteld in de environment!")
+		log.Fatal("CRITICAL: TEAMS_WEBHOOK_URL is niet ingesteld in de environment!")
 	}
 
 	for _, svc := range monitoredServices {
@@ -79,8 +79,8 @@ func checkHeartbeats(es *elasticsearch.Client) {
 	if err != nil {
 		if esOnline {
 			esOnline = false
-			log.Printf("🚨 Netwerkfout: Elasticsearch onbereikbaar: %v", err)
-			alertQueue <- "🚨 **CRITICAL:** Elasticsearch is onbereikbaar! Watchdog kan momenteel geen services controleren."
+			log.Printf("Netwerkfout: Elasticsearch onbereikbaar: %v", err)
+			alertQueue <- "**CRITICAL:** Elasticsearch is onbereikbaar! Watchdog kan momenteel geen services controleren."
 		}
 		return // Sla service checks over
 	}
@@ -88,8 +88,8 @@ func checkHeartbeats(es *elasticsearch.Client) {
 	// SCENARIO 2: ELASTICSEARCH KOMT NET TERUG ONLINE NA EEN UITVAL
 	if !esOnline {
 		esOnline = true
-		log.Println("✅ Elasticsearch is terug online! Services worden bij de volgende check (over 60s) weer gecontroleerd.")
-		alertQueue <- "✅ **RESOLVED:** Elasticsearch is terug bereikbaar! Watchdog wacht één cyclus om heartbeats de kans te geven binnen te komen."
+		log.Println("Elasticsearch is terug online! Services worden bij de volgende check (over 60s) weer gecontroleerd.")
+		alertQueue <- "**RESOLVED:** Elasticsearch is terug bereikbaar! Watchdog wacht één cyclus om heartbeats de kans te geven binnen te komen."
 		if res != nil {
 			res.Body.Close()
 		}
@@ -99,9 +99,9 @@ func checkHeartbeats(es *elasticsearch.Client) {
 	// SCENARIO 3: NETWERK IS OKÉ, MAAR HTTP ERROR (bijv. 401 Unauthorized / 403 Forbidden)
 	if res.IsError() {
 		if res.StatusCode == 401 || res.StatusCode == 403 {
-			log.Printf("🔒 Authenticatie fout (%d): Geen toegang. Wachten tot account in Kibana is aangemaakt.", res.StatusCode)
+			log.Printf("Authenticatie fout (%d): Geen toegang. Wachten tot account in Kibana is aangemaakt.", res.StatusCode)
 		} else {
-			log.Printf("⚠️ Elasticsearch foutmelding: %s", res.String())
+			log.Printf("Elasticsearch foutmelding: %s", res.String())
 		}
 		res.Body.Close()
 		return // Sla service checks over, stuur GEEN Teams alert!
@@ -110,15 +110,15 @@ func checkHeartbeats(es *elasticsearch.Client) {
 	defer res.Body.Close()
 
 	// SCENARIO 4: ALLES IS NORMAAL, CHECK DE SERVICES
-	var result map[string]interface{}
+	var result map[string]any
 	json.NewDecoder(res.Body).Decode(&result)
 
 	counts := make(map[string]float64)
-	if aggregations, ok := result["aggregations"].(map[string]interface{}); ok {
-		if services, ok := aggregations["services"].(map[string]interface{}); ok {
-			if buckets, ok := services["buckets"].([]interface{}); ok {
+	if aggregations, ok := result["aggregations"].(map[string]any); ok {
+		if services, ok := aggregations["services"].(map[string]any); ok {
+			if buckets, ok := services["buckets"].([]any); ok {
 				for _, b := range buckets {
-					bucket := b.(map[string]interface{})
+					bucket := b.(map[string]any)
 					key := bucket["key"].(string)
 					counts[key] = bucket["doc_count"].(float64)
 				}
@@ -133,27 +133,27 @@ func checkHeartbeats(es *elasticsearch.Client) {
 
 		if isCurrentlyOnline && !wasOnline {
 			serviceState[svc] = true
-			log.Printf("✅ %s is BACK ONLINE!", svc)
-			alertQueue <- fmt.Sprintf("✅ **RESOLVED:** Service **%s** is back online!", svc)
+			log.Printf("%s is BACK ONLINE!", svc)
+			alertQueue <- fmt.Sprintf("**RESOLVED:** Service **%s** is back online!", svc)
 		} else if !isCurrentlyOnline && wasOnline {
 			serviceState[svc] = false
-			log.Printf("🚨 %s is OFFLINE!", svc)
-			alertQueue <- fmt.Sprintf("🚨 **CRITICAL:** Service **%s** is down! (Heartbeats in last 60s: %v)", svc, count)
+			log.Printf("%s is OFFLINE!", svc)
+			alertQueue <- fmt.Sprintf("**CRITICAL:** Service **%s** is down! (Heartbeats in last 60s: %v)", svc, count)
 		}
 	}
 }
 
 func sendTeamsAlert(message string) {
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"type": "message",
-		"attachments": []map[string]interface{}{
+		"attachments": []map[string]any{
 			{
 				"contentType": "application/vnd.microsoft.card.adaptive",
-				"content": map[string]interface{}{
+				"content": map[string]any{
 					"$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
 					"type":    "AdaptiveCard",
 					"version": "1.2",
-					"body": []map[string]interface{}{
+					"body": []map[string]any{
 						{
 							"type": "TextBlock",
 							"text": message,
