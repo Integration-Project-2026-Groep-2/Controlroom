@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/xml"
 	"fmt"
-	"log"
 	"time"
 
 	"integration-project-ehb/controlroom/pkg/gen"
@@ -28,7 +27,6 @@ func NewUserProcessor(es *elasticsearch.Client) func([]byte) error {
 			return fmt.Errorf("index: %w", err)
 		}
 
-		log.Printf("indexed user object: %s", uc.Id)
 		return nil
 	}
 }

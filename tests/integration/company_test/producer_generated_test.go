@@ -71,10 +71,10 @@ func TestPublishCompanyConfirmed(t *testing.T) {
 
 		// Publish message
 		err = ch.Publish(
-			"contact.topic",           // exchange
-			"crm.company.confirmed",   // routing key
-			false,                     // mandatory
-			false,                     // immediate
+			"contact.topic",         // exchange
+			"crm.company.confirmed", // routing key
+			false,                   // mandatory
+			false,                   // immediate
 			amqp.Publishing{
 				ContentType: "application/xml",
 				Body:        xmlData,

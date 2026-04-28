@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -23,24 +22,22 @@ import (
 )
 
 func main() {
-	// Logger writes to stdout immediately; ES indexing wordt aangezet zodra
-	// de ES-client klaar is (zie SetElastic hieronder).
-	lg := logger.New(os.Stdout, "controlroom")
-	defer lg.Flush()
-
 	// Elasticsearch client
 	cfg := elasticsearch.Config{
 		Addresses: []string{os.Getenv("ELASTICSEARCH_URL")},
 		Username:  os.Getenv("CONTROLROOM_ES_USER"),
 		Password:  os.Getenv("CONTROLROOM_ES_PASS"),
 	}
+
 	esClient, err := elasticsearch.NewClient(cfg)
 	if err != nil {
-		lg.Fatal("elasticsearch client config", err)
+		logger.Log("elasticsearch client config", err)
 	}
+
 	res, err := esClient.Info()
+
 	if err != nil {
-		lg.Fatal("elasticsearch connect", err)
+		logger.Log("elasticsearch connect", err)
 	}
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
@@ -48,10 +45,11 @@ func main() {
 
 		}
 	}(res.Body)
-	lg.Info("Connected to Elasticsearch")
+
+	logger.Log("Connected to Elasticsearch")
 
 	// Vanaf hier gaan alle logs ook naar ES index "controlroom-logs".
-	lg.SetElastic(esClient, "controlroom-logs")
+	logger.Log(esClient, "controlroom-logs")
 
 	// Context + signal handler for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
@@ -59,9 +57,10 @@ func main() {
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
 	go func() {
 		<-sigChan
-		lg.Info("Shutdown signal received, draining queues...")
+		internal_logger.Info("Shutdown signal received, draining queues...")
 		cancel()
 	}()
 
@@ -74,11 +73,12 @@ func main() {
 		maxBackoff     = 60 * time.Second
 		healthyAfter   = 10 * time.Second
 	)
+
 	backoff := initialBackoff
 
 	for {
 		start := time.Now()
-		err := runRabbitSession(ctx, esClient, lg)
+		err := startSession(ctx, esClient, internal_logger)
 		if errors.Is(err, context.Canceled) {
 			return
 		}
@@ -86,7 +86,7 @@ func main() {
 			backoff = initialBackoff
 		}
 
-		lg.Error("rabbit session ended, redialing", err, logger.String("interval", backoff.String()))
+		internal_logger.Error("rabbit session ended, redialing", err, logger.String("interval", backoff.String()))
 
 		select {
 		case <-time.After(backoff):
@@ -101,16 +101,16 @@ func main() {
 	}
 }
 
-// runRabbitSession dials RabbitMQ, declares all four consumers, and blocks
+// startSession dials RabbitMQ, declares all four consumers, and blocks
 // until the connection drops or ctx is cancelled. Returns an error describing
 // why the session ended; the caller decides whether to retry.
-func runRabbitSession(ctx context.Context, esClient *elasticsearch.Client, lg *logger.Logger) error {
+func startSession(ctx context.Context, esClient *elasticsearch.Client, internal_logger *logger.Logger) error {
 	conn, err := amqp.Dial(os.Getenv("RABBITMQ_URL"))
 	if err != nil {
 		return fmt.Errorf("dial: %w", err)
 	}
 	defer conn.Close()
-	lg.Info("Connected to RabbitMQ")
+	internal_logger.Info("Connected to RabbitMQ")
 
 	// Buffered size 1 per amqp091-go convention — otherwise the library's
 	// internal sender blocks if we haven't selected yet when the close fires.
@@ -164,7 +164,7 @@ func runRabbitSession(ctx context.Context, esClient *elasticsearch.Client, lg *l
 	}
 
 	go cr_rabbitmq.Consume(hbCfg, hbMsgs, ctx)
-	lg.Info("Heartbeat consumer started")
+	internal_logger.Info("Heartbeat consumer started")
 
 	// User consumer
 	userCh, err := conn.Channel()
@@ -178,10 +178,12 @@ func runRabbitSession(ctx context.Context, esClient *elasticsearch.Client, lg *l
 		Kind:    "topic",
 		Durable: true,
 	}
+
 	userQueue := cr_rabbitmq.QueueInfo{
 		Name:    "crm.user.confirmed",
 		Durable: true,
 	}
+
 	userBinding := cr_rabbitmq.BindingInfo{
 		Key: "crm.user.confirmed",
 	}
@@ -206,7 +208,7 @@ func runRabbitSession(ctx context.Context, esClient *elasticsearch.Client, lg *l
 	}
 
 	go cr_rabbitmq.Consume(userCfg, userMsgs, ctx)
-	log.Println("User consumer started")
+	internal_loggger.Info("User consumer started")
 
 	// StatusCheck consumer
 	scCh, err := conn.Channel()
@@ -248,7 +250,7 @@ func runRabbitSession(ctx context.Context, esClient *elasticsearch.Client, lg *l
 	}
 
 	go cr_rabbitmq.Consume(scCfg, scMsgs, ctx)
-	log.Println("StatusCheck consumer started")
+	internal_logger.Info("StatusCheck consumer started")
 
 	// Company consumer
 	companyCh, err := conn.Channel()
@@ -292,7 +294,7 @@ func runRabbitSession(ctx context.Context, esClient *elasticsearch.Client, lg *l
 	}
 
 	go cr_rabbitmq.Consume(companyCfg, companyMsgs, ctx)
-	log.Println("Company consumer started")
+	internal_logger.Info("Company consumer started")
 
 	// Wacht tot de connectie dichtgaat of shutdown wordt geïnitieerd.
 	// De Consume-goroutines exiten vanzelf zodra hun msgs channel sluit.

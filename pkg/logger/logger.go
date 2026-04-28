@@ -13,231 +13,136 @@ import (
 	"github.com/elastic/go-elasticsearch/v9/esapi"
 )
 
-type Severity int8
+type Severity string
+type Service string
 
 const (
-	DEBUG Severity = 1
-	INFO  Severity = 2
-	WARN  Severity = 3
-	ERROR Severity = 4
-	FATAL Severity = 5
-	PANIC Severity = 6
+	DEBUG Severity = "DEBUG"
+	INFO  Severity = "INFO"
+	WARN  Severity = "WARN"
+	ERROR Severity = "ERROR"
+	FATAL Severity = "FATAL"
+	PANIC Severity = "PANIC"
 )
 
-func (s Severity) String() string {
-	switch s {
-	case DEBUG:
-		return "DEBUG"
-	case INFO:
-		return "INFO"
-	case WARN:
-		return "WARN"
-	case ERROR:
-		return "ERROR"
-	case FATAL:
-		return "FATAL"
-	case PANIC:
-		return "PANIC"
-	default:
-		return "UNKNOWN"
+// TODO(nasr): replace with environment variables
+const (
+	CONTROLROOM Service = "CONTROLROOM"
+	CRM         Service = "CRM"
+	KASSA       Service = "KASSA"
+	FACTURATIE  Service = "FACTURATIE"
+	MAILING     Service = "MAILING"
+	FRONTEND    Service = "FRONTEND"
+	PLANNING    Service = "PLANNING"
+)
+
+var (
+	esClient *elasticsearch.Client
+	esIndex  string
+	out      io.Writer
+	queue    chan []byte
+)
+
+var pool = sync.Pool{New: func() any { return new(bytes.Buffer) }}
+
+var journalPriorities = map[Severity]journal.Priority{
+	DEBUG: journal.PriDebug,
+	INFO:  journal.PriInfo,
+	WARN:  journal.PriWarning,
+	ERROR: journal.PriErr,
+	FATAL: journal.PriCrit,
+	PANIC: journal.PriCrit,
+}
+
+func Init(addr, idx string, writer io.Writer, workers int) error {
+	c, err := elasticsearch.NewClient(elasticsearch.Config{Addresses: []string{addr}})
+	if err != nil {
+		return err
 	}
-}
-
-func (s Severity) journalPriority() journal.Priority {
-	switch s {
-	case DEBUG:
-		return journal.PriDebug
-	case INFO:
-		return journal.PriInfo
-	case WARN:
-		return journal.PriWarning
-	case ERROR:
-		return journal.PriErr
-	case FATAL, PANIC:
-		return journal.PriCrit
-	default:
-		return journal.PriInfo
+	esClient, esIndex, out, queue = c, idx, writer, make(chan []byte, 512)
+	for range workers {
+		go indexToElastic()
 	}
+	return nil
 }
 
-// Field is a typed key-value pair for structured logging.
-type Field struct {
-	key string
-	val string
-}
+func Shutdown() { close(queue) }
 
-// String returns a Field with a string value.
-func String(key, val string) Field {
-	return Field{key: key, val: val}
-}
-
-var pool = sync.Pool{
-	New: func() any { return new(bytes.Buffer) },
-}
-
-// Logger writes JSON log lines to an io.Writer without intermediate heap
-// allocations. For ERROR and above it also writes to journald. If es is
-// set, logs are sent asynchronously to Elasticsearch.
-type Logger struct {
-	w       io.Writer
-	service string
-	es      *elasticsearch.Client
-	esIndex string
-	wg      sync.WaitGroup // tracks in-flight Elasticsearch goroutines
-}
-
-// New returns a Logger that writes to w.
-func New(w io.Writer, service string) *Logger {
-	return &Logger{w: w, service: service}
-}
-
-// SetElastic configures Elasticsearch indexing on an existing Logger.
-func (l *Logger) SetElastic(es *elasticsearch.Client, index string) {
-	l.es = es
-	l.esIndex = index
-}
-
-func (l *Logger) Debug(msg string, fields ...Field) {
-	l.log(DEBUG, msg, nil, fields)
-}
-
-func (l *Logger) Info(msg string, fields ...Field) {
-	l.log(INFO, msg, nil, fields)
-}
-
-func (l *Logger) Warn(msg string, fields ...Field) {
-	l.log(WARN, msg, nil, fields)
-}
-
-func (l *Logger) Error(msg string, err error, fields ...Field) {
-	l.log(ERROR, msg, err, fields)
-}
-
-/**
-* NOTE(nasr): because we are exiting the program we wait for all messages to be sent before exiting
-* that's what the l.wg.Wait() does in the Fatal and Panic methods
-**/
-
-func (l *Logger) Fatal(msg string, err error, fields ...Field) {
-	l.log(FATAL, msg, err, fields)
-	l.wg.Wait()
-	os.Exit(1)
-}
-
-func (l *Logger) Panic(msg string, err error, fields ...Field) {
-	l.log(PANIC, msg, err, fields)
-	l.wg.Wait()
-	panic(msg)
-}
-
-// Flush waits for all in-flight Elasticsearch writes to complete.
-func (l *Logger) Flush() {
-	l.wg.Wait()
-}
-
-func (l *Logger) log(sev Severity, msg string, err error, fields []Field) {
+func Log(severity Severity, svc Service, msg string) {
 	buf := pool.Get().(*bytes.Buffer)
 	buf.Reset()
 
-	buf.WriteString(`{"level":"`)
-	buf.WriteString(sev.String())
-	buf.WriteString(`","@timestamp":"`)
 	var tmp [35]byte
+	buf.WriteString(`{"level":"`)
+	buf.WriteString(string(severity))
+	buf.WriteString(`","@timestamp":"`)
 	buf.Write(time.Now().UTC().AppendFormat(tmp[:0], time.RFC3339Nano))
 	buf.WriteString(`","service":"`)
-	writeEscaped(buf, l.service)
+	writeEscaped(buf, string(svc))
 	buf.WriteString(`","msg":"`)
 	writeEscaped(buf, msg)
-	buf.WriteByte('"')
+	buf.WriteString("\"}\n")
 
-	if err != nil {
-		buf.WriteString(`,"error":"`)
-		writeEscaped(buf, err.Error())
-		buf.WriteByte('"')
+	out.Write(buf.Bytes())
+
+	switch severity {
+	case ERROR, FATAL, PANIC:
+		journal.Send(msg, journalPriorities[severity], map[string]string{
+			"SERVICE":  string(svc),
+			"SEVERITY": string(severity),
+		})
 	}
 
-	for _, f := range fields {
-		buf.WriteString(`,"`)
-		writeEscaped(buf, f.key)
-		buf.WriteString(`":`)
-		buf.WriteByte('"')
-		writeEscaped(buf, f.val)
-		buf.WriteByte('"')
-	}
-
-	buf.WriteString("}\n")
-	l.w.Write(buf.Bytes()) //nolint:errcheck
-
-	// also send to journald for ERROR and above
-	if sev >= ERROR {
-		vars := map[string]string{
-			"SERVICE":  l.service,
-			"SEVERITY": sev.String(),
-		}
-		if err != nil {
-			vars["ERROR"] = err.Error()
-		}
-		journal.Send(msg, sev.journalPriority(), vars) //nolint:errcheck
-	}
-
-	// send to Elasticsearch asynchronously if client is set
-	if l.es != nil {
-		if n := buf.Len() - 1; n > 0 { // exclude trailing \n; ES expects raw JSON
+	if esClient != nil {
+		if n := buf.Len() - 1; n > 0 {
 			payload := make([]byte, n)
 			copy(payload, buf.Bytes())
-			l.wg.Add(1)
-			go l.indexToElastic(payload)
+			// dont block when the queu is full or down
+			select {
+			case queue <- payload:
+			default:
+			}
 		}
 	}
 
 	pool.Put(buf)
+
+	// an external service shouldn't be able to crash controlroom on command
+	if svc == CONTROLROOM && (severity == FATAL || severity == PANIC) {
+		os.Exit(1)
+	}
 }
 
-// indexToElastic indexes the build log to elastic with refresh disabled
-func (l *Logger) indexToElastic(payload []byte) {
-	defer l.wg.Done()
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	req := esapi.IndexRequest{
-		Index:   l.esIndex,
-		Body:    bytes.NewReader(payload),
-		Refresh: "false",
+func indexToElastic() {
+	for payload := range queue {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		res, err := (esapi.IndexRequest{
+			Index:   esIndex,
+			Body:    bytes.NewReader(payload),
+			Refresh: "false",
+		}).Do(ctx, esClient)
+		cancel()
+		if err == nil {
+			res.Body.Close()
+		}
 	}
-	res, err := req.Do(ctx, l.es)
-	if err != nil {
-		return
-	}
-	res.Body.Close() //nolint:errcheck
 }
 
-// writeEscaped into buf with JSON string escaping per RFC 8259.
-// All control characters (0x00–0x1F) and the two structural characters
-// " and \ are escaped. No heap allocations.
 func writeEscaped(buf *bytes.Buffer, s string) {
 	const hex = "0123456789abcdef"
 	for i := 0; i < len(s); i++ {
 		c := s[i]
 		switch {
-		case c == '"':
-			buf.WriteString(`\"`)
-		case c == '\\':
-			buf.WriteString(`\\`)
-		case c == '\n':
-			buf.WriteString(`\n`)
-		case c == '\r':
-			buf.WriteString(`\r`)
-		case c == '\t':
-			buf.WriteString(`\t`)
+			case c == '"':  buf.WriteString(`\"`)
+			case c == '\\': buf.WriteString(`\\`)
+			case c == '\n': buf.WriteString(`\n`)
+			case c == '\r': buf.WriteString(`\r`)
+			case c == '\t': buf.WriteString(`\t`)
 		case c < 0x20:
-			// Remaining control characters: emit \u00XX
-			buf.WriteByte('\\')
-			buf.WriteByte('u')
-			buf.WriteByte('0')
-			buf.WriteByte('0')
+			buf.WriteString(`\u00`)
 			buf.WriteByte(hex[c>>4])
 			buf.WriteByte(hex[c&0xF])
-		default:
-			buf.WriteByte(c)
+			default: buf.WriteByte(c)
 		}
 	}
 }
