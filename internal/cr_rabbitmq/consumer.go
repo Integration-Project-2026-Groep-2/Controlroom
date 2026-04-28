@@ -8,6 +8,8 @@ import (
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
+
+	"integration-project-ehb/controlroom/pkg/logger"
 )
 
 type internalRabbitMQ struct {
@@ -79,11 +81,23 @@ func SetupQueue(ch *amqp.Channel, ex ExchangeInfo, q QueueInfo, binding BindingI
 	return msgs, nil
 }
 
-// sendToDLQ publishes a message to the dead letter queue with error context.
-func sendToDLQ(dlqCh *amqp.Channel, dlqName string, body []byte, reason string) error {
+// SendToDLQ publishes a message to the dead letter queue with error context.
+func SendToDLQ(dlqCh *amqp.Channel, dlqName string, body []byte, reason string, exchange string) error {
+
 	if dlqName == "" {
-		dlqName = "dlq"
+		message := logger.LogMessage{
+
+			Message:   "internal/cr_rabbitmq/consumer.go",
+			Error:     "Didn't declare a message!!",
+			Service:   "control-room",
+			Severity:  logger.DEBUG, // tracing error for internal debugging
+			Type:      "Wrong paramter passed",
+			Timestamp: time.Now(),
+		}
+
+		logger.Log(message)
 	}
+
 	return dlqCh.PublishWithContext(
 		context.Background(),
 		"",      // exchange
@@ -94,8 +108,10 @@ func sendToDLQ(dlqCh *amqp.Channel, dlqName string, body []byte, reason string) 
 			ContentType: "application/octet-stream",
 			Body:        body,
 			Headers: amqp.Table{
-				"error_reason": reason,
-				"timestamp":    time.Now().Unix(),
+				"error_reason":              reason,
+				"timestamp":                 time.Now().Unix(),
+				"x-dead-letter-exchange":    exchange,
+				"x-dead-letter-routing-key": "heartbeat.failed",
 			},
 		},
 	)
@@ -122,7 +138,7 @@ func Consume(cfg *ConsumerConfig, msgs <-chan amqp.Delivery, ctx context.Context
 			if err != nil {
 				log.Printf("Process failed: %v", err)
 				// Send to DLQ before nack
-				if dlqErr := sendToDLQ(cfg.DLQCh, cfg.DLQName, msg.Body, err.Error()); dlqErr != nil {
+				if dlqErr := SendToDLQ(cfg.DLQCh, cfg.DLQName, msg.Body, err.Error(), ""); dlqErr != nil {
 					log.Printf("Failed to send to DLQ: %v", dlqErr)
 				}
 				err := msg.Nack(false, false)
