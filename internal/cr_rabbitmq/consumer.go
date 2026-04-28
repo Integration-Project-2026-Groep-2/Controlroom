@@ -85,17 +85,7 @@ func SetupQueue(ch *amqp.Channel, ex ExchangeInfo, q QueueInfo, binding BindingI
 func SendToDLQ(dlqCh *amqp.Channel, dlqName string, body []byte, reason string, exchange string) error {
 
 	if dlqName == "" {
-		message := logger.LogMessage{
-
-			Message:   "internal/cr_rabbitmq/consumer.go",
-			Error:     "Didn't declare a message!!",
-			Service:   "control-room",
-			Severity:  logger.DEBUG, // tracing error for internal debugging
-			Type:      "Wrong paramter passed",
-			Timestamp: time.Now(),
-		}
-
-		logger.Log(message)
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, "Wrong deadletter parameter passed"))
 	}
 
 	return dlqCh.PublishWithContext(

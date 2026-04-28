@@ -165,7 +165,7 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 	hbCfg := &cr_rabbitmq.ConsumerConfig{
 		DLQCh:   dlqCh,
 		DLQName: "heartbeat.dlq",
-		Process: heartbeat.NewHeartbeatProcessor(esClient),
+		Process: heartbeat.NewHeartbeatProcessor(client),
 	}
 
 	if err := cr_rabbitmq.SetupDLQ(hbCfg.DLQCh, hbCfg.DLQName); err != nil {
@@ -196,7 +196,7 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 	userCfg := &cr_rabbitmq.ConsumerConfig{
 		DLQCh:   dlqCh,
 		DLQName: "user.dlq",
-		Process: user.NewUserProcessor(esClient),
+		Process: user.NewUserProcessor(client),
 	}
 	if err := cr_rabbitmq.SetupDLQ(userCfg.DLQCh, userCfg.DLQName); err != nil {
 		return fmt.Errorf("user dlq setup: %w", err)
@@ -236,7 +236,7 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 	scCfg := &cr_rabbitmq.ConsumerConfig{
 		DLQCh:   dlqCh,
 		DLQName: "statuscheck.dlq",
-		Process: statuscheck.NewStatusCheckProcessor(esClient),
+		Process: statuscheck.NewStatusCheckProcessor(client),
 	}
 	if err := cr_rabbitmq.SetupDLQ(scCfg.DLQCh, scCfg.DLQName); err != nil {
 		return fmt.Errorf("statuscheck dlq setup: %w", err)
@@ -268,7 +268,7 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 	companyCfg := &cr_rabbitmq.ConsumerConfig{
 		DLQCh:   dlqCh,
 		DLQName: "company.dlq",
-		Process: company.NewCompanyProcessor(esClient),
+		Process: company.NewCompanyProcessor(client),
 	}
 	if err := cr_rabbitmq.SetupDLQ(companyCfg.DLQCh, companyCfg.DLQName); err != nil {
 		return fmt.Errorf("company dlq setup: %w", err)

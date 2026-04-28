@@ -2,10 +2,8 @@ package cr_rabbitmq
 
 import (
 	"fmt"
-	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
-
 	"integration-project-ehb/controlroom/pkg/logger"
 )
 
@@ -54,16 +52,7 @@ type qos struct {
 func SetupDLQ(dlqCh *amqp.Channel, dlqName string) error {
 
 	if dlqName == "" {
-		message := logger.LogMessage{
-			Message:   "internal/cr_rabbitmq/setup.go",
-			Error:     "Didn't declare a message!!",
-			Service:   "control-room",
-			Severity:  logger.DEBUG, // tracing error for internal debugging
-			Type:      "Wrong paramter passed",
-			Timestamp: time.Now(),
-		}
-
-		logger.Log(message)
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, "Wrong deadletter parameter passed"))
 	}
 
 	_, err := dlqCh.QueueDeclare(dlqName, true, false, false, false, nil)
