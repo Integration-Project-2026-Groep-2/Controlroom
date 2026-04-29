@@ -5,7 +5,7 @@
     <!-- won't do uneccesary type creations etc -->
     <!-- NOTE(nasr): not sure if these are needed honestly -->
 
-    <xs:complexType name="StatusCheck">
+    <xs:complexType name="StatusCheckDoc">
         <xs:sequence>
             <xs:element name="serviceId" type="xs:string"/>
             <xs:element name="timestamp" type="xs:dateTime"/>

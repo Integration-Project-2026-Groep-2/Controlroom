@@ -17,7 +17,7 @@ var (
 	_ easyjson.Marshaler
 )
 
-func easyjsonB3c76d9dDecodeIntegrationProjectEhbControlroomPkgGen(in *jlexer.Lexer, out *CompanyDoc) {
+func easyjson998cfc76DecodeIntegrationProjectEhbControlroomPkgGen(in *jlexer.Lexer, out *LogDoc) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -31,23 +31,31 @@ func easyjsonB3c76d9dDecodeIntegrationProjectEhbControlroomPkgGen(in *jlexer.Lex
 		key := in.UnsafeFieldName(false)
 		in.WantColon()
 		switch key {
-		case "id":
+		case "level":
 			if in.IsNull() {
 				in.Skip()
 			} else {
-				out.Id = UUIDType(in.String())
+				out.Level = SeverityType(in.String())
 			}
-		case "confirmed_at":
+		case "timestamp":
 			if in.IsNull() {
 				in.Skip()
 			} else {
-				out.ConfirmedAt = ISO8601DateTimeType(in.String())
+				if data := in.Raw(); in.Ok() {
+					in.AddError((out.Timestamp).UnmarshalJSON(data))
+				}
 			}
-		case "name":
+		case "service":
 			if in.IsNull() {
 				in.Skip()
 			} else {
-				out.Name = string(in.String())
+				out.Service = string(in.String())
+			}
+		case "data":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Data = string(in.String())
 			}
 		case "indexed":
 			if in.IsNull() {
@@ -67,24 +75,29 @@ func easyjsonB3c76d9dDecodeIntegrationProjectEhbControlroomPkgGen(in *jlexer.Lex
 		in.Consumed()
 	}
 }
-func easyjsonB3c76d9dEncodeIntegrationProjectEhbControlroomPkgGen(out *jwriter.Writer, in CompanyDoc) {
+func easyjson998cfc76EncodeIntegrationProjectEhbControlroomPkgGen(out *jwriter.Writer, in LogDoc) {
 	out.RawByte('{')
 	first := true
 	_ = first
 	{
-		const prefix string = ",\"id\":"
+		const prefix string = ",\"level\":"
 		out.RawString(prefix[1:])
-		out.String(string(in.Id))
+		out.String(string(in.Level))
 	}
 	{
-		const prefix string = ",\"confirmed_at\":"
+		const prefix string = ",\"timestamp\":"
 		out.RawString(prefix)
-		out.String(string(in.ConfirmedAt))
+		out.Raw((in.Timestamp).MarshalJSON())
 	}
 	{
-		const prefix string = ",\"name\":"
+		const prefix string = ",\"service\":"
 		out.RawString(prefix)
-		out.String(string(in.Name))
+		out.String(string(in.Service))
+	}
+	{
+		const prefix string = ",\"data\":"
+		out.RawString(prefix)
+		out.String(string(in.Data))
 	}
 	{
 		const prefix string = ",\"indexed\":"
@@ -95,25 +108,25 @@ func easyjsonB3c76d9dEncodeIntegrationProjectEhbControlroomPkgGen(out *jwriter.W
 }
 
 // MarshalJSON supports json.Marshaler interface
-func (v CompanyDoc) MarshalJSON() ([]byte, error) {
+func (v LogDoc) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	easyjsonB3c76d9dEncodeIntegrationProjectEhbControlroomPkgGen(&w, v)
+	easyjson998cfc76EncodeIntegrationProjectEhbControlroomPkgGen(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
-func (v CompanyDoc) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjsonB3c76d9dEncodeIntegrationProjectEhbControlroomPkgGen(w, v)
+func (v LogDoc) MarshalEasyJSON(w *jwriter.Writer) {
+	easyjson998cfc76EncodeIntegrationProjectEhbControlroomPkgGen(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
-func (v *CompanyDoc) UnmarshalJSON(data []byte) error {
+func (v *LogDoc) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	easyjsonB3c76d9dDecodeIntegrationProjectEhbControlroomPkgGen(&r, v)
+	easyjson998cfc76DecodeIntegrationProjectEhbControlroomPkgGen(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
-func (v *CompanyDoc) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjsonB3c76d9dDecodeIntegrationProjectEhbControlroomPkgGen(l, v)
+func (v *LogDoc) UnmarshalEasyJSON(l *jlexer.Lexer) {
+	easyjson998cfc76DecodeIntegrationProjectEhbControlroomPkgGen(l, v)
 }

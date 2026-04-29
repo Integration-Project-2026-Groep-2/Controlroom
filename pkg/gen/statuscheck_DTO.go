@@ -11,7 +11,7 @@ import (
 var _ = xml.Name{}
 var _ = time.Time{}
 
-type StatusCheck struct {
+type StatusCheckDoc struct {
 	ServiceId string    `xml:"serviceId" json:"service_id" validate:"required"`
 	Timestamp time.Time `xml:"timestamp" json:"timestamp" validate:"required"`
 	Uptime    uint      `xml:"uptime" json:"uptime" validate:"required"`

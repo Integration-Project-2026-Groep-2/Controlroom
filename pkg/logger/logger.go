@@ -67,7 +67,7 @@ func Init(addr, idx string, writer io.Writer, workers int) error {
 	esClient, esIndex, out, queue = c, idx, writer, make(chan []byte, 512)
 
 	for range workers {
-		go indexQueue()
+		go IndexLogsQueue()
 	}
 	return nil
 }
@@ -125,21 +125,6 @@ func Log(msg Message) {
 	}
 }
 
-func indexQueue() {
-	for payload := range queue {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		res, err := (esapi.IndexRequest{
-			Index:   esIndex,
-			Body:    bytes.NewReader(payload),
-			Refresh: "false",
-		}).Do(ctx, esClient)
-		cancel()
-		if err == nil {
-			res.Body.Close()
-		}
-	}
-}
-
 func writeEscaped(buf *bytes.Buffer, s string) {
 	const hex = "0123456789abcdef"
 	for i := 0; i < len(s); i++ {
@@ -161,6 +146,26 @@ func writeEscaped(buf *bytes.Buffer, s string) {
 			buf.WriteByte(hex[c&0xF])
 		default:
 			buf.WriteByte(c)
+		}
+	}
+}
+
+func IndexLogsQueue() {
+
+	for payload := range queue {
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+
+		res, err := (esapi.IndexRequest{
+			Index:   esIndex,
+			Body:    bytes.NewReader(payload),
+			Refresh: "false",
+		}).Do(ctx, esClient)
+
+		cancel()
+
+		if err == nil {
+			res.Body.Close()
 		}
 	}
 }

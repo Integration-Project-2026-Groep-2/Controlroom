@@ -5,6 +5,7 @@
             <xs:sequence>
                 <xs:element name="id"          type="UUIDType"/>
                 <xs:element name="confirmedAt" type="ISO8601DateTimeType"/>
+                <xs:element name="name"        type="xs:string"/>
                 <xs:element name="indexed" type="xs:dateTime"/>
             </xs:sequence>
         </xs:complexType>
