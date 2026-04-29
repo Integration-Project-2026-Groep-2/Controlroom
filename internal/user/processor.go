@@ -21,23 +21,21 @@ import (
 // we return a processor that with the signature of func([]byte) because that fits properly in the
 // ConsumerConfig struct. we made that a struct so we could avoid using a global one
 // not sure if this is the correct approach. probably not
-func NewUserProcessor(es *elasticsearch.Client) func([]byte) error {
-	return func(body []byte) error {
-		var uc gen.UserConfirmed
-		if err := xml.Unmarshal(body, &uc); err != nil {
-			logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("Unmarshal error when trying to unmarshal user xml: %v", err.Error())))
-			return fmt.Errorf("unmarshal error when trying to unmarshal user xml: %v", err.Error())
-		}
-
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-
-		if err := indexUser(es, ctx, &uc); err != nil {
-			logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("Failed to index user object: %s", err.Error())))
-			return fmt.Errorf("Failed to index user object: %s", err.Error())
-		}
-
-		logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("Indexed user object: %s", uc.Id)))
-		return nil
+func ProcessUser(es *elasticsearch.Client, body []byte) error {
+	var uc gen.UserConfirmed
+	if err := xml.Unmarshal(body, &uc); err != nil {
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("Unmarshal error when trying to unmarshal user xml: %v", err.Error())))
+		return fmt.Errorf("unmarshal error when trying to unmarshal user xml: %v", err.Error())
 	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := indexUser(es, ctx, &uc); err != nil {
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("Failed to index user object: %s", err.Error())))
+		return fmt.Errorf("Failed to index user object: %s", err.Error())
+	}
+
+	logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("Indexed user object: %s", uc.Id)))
+	return nil
 }

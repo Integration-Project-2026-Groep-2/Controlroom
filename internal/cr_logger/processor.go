@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"integration-project-ehb/controlroom/pkg/logger"
+	"github.com/elastic/go-elasticsearch/v9"
 )
 
 type rawLogBody struct {
@@ -13,8 +14,10 @@ type rawLogBody struct {
 	Msg     string `json:"msg"`
 }
 
-func LogMessageProcesser(body []byte) error {
+func ProcessLog(_ *elasticsearch.Client, body []byte) error {
+
 	var raw rawLogBody
+
 	if err := json.Unmarshal(body, &raw); err != nil {
 		logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM,
 			fmt.Sprintf("unparseable log body: %s", body)))

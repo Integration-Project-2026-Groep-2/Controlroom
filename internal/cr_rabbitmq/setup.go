@@ -50,13 +50,14 @@ type qos struct {
 
 // SetupDLQ declares the dead letter queue. Call once at startup.
 func SetupDLQ(dlqCh *amqp.Channel, dlqName string) error {
-
-	if dlqName == "" {
-		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, "Wrong deadletter parameter passed"))
+	if dlqName != "" {
+		_, err := dlqCh.QueueDeclare(dlqName, true, false, false, false, nil)
+		if err != nil {
+			logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("failed to create dlq : %s", dlqName)))
+			return err
+		}
 	}
-
-	_, err := dlqCh.QueueDeclare(dlqName, true, false, false, false, nil)
-	return err
+	return nil
 }
 
 // setupConsumer TODO(nasr): implement this function in the entry point

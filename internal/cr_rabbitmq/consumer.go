@@ -3,10 +3,11 @@ package cr_rabbitmq
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
+	"strings"
 	"time"
 
+	"github.com/elastic/go-elasticsearch/v9"
 	amqp "github.com/rabbitmq/amqp091-go"
 
 	"integration-project-ehb/controlroom/pkg/logger"
@@ -17,15 +18,11 @@ type internalRabbitMQ struct {
 	Chans map[string]*amqp.Channel
 }
 
-// processFunc is a function type that processes a message body.
-// Return nil on success, or an error to trigger DLQ routing.
-type processFunc func(body []byte) error
-
 // ConsumerConfig holds the configuration for message consumption.
 type ConsumerConfig struct {
+	client  *elasticsearch.Client
 	DLQCh   *amqp.Channel
 	DLQName string
-	Process processFunc
 }
 
 // ExchangeInfo holds exchange declaration parameters.
@@ -56,8 +53,16 @@ type BindingInfo struct {
 	Args   amqp.Table
 }
 
-// SetupQueue declares an exchange, queue, and binding, then returns a delivery channel.
-func SetupQueue(ch *amqp.Channel, ex ExchangeInfo, q QueueInfo, binding BindingInfo) (<-chan amqp.Delivery, error) {
+// SetupConsumer declares an exchange, queue, and binding, then returns a delivery channel.
+func SetupConsumer(ch *amqp.Channel, ex ExchangeInfo, q QueueInfo, binding BindingInfo) (<-chan amqp.Delivery, error) {
+
+	if q.Args == nil {
+		q.Args = amqp.Table{}
+	}
+	// Add DLX configuration
+	q.Args["x-dead-letter-exchange"] = "controlroom.dlx"
+	q.Args["x-dead-letter-routing-key"] = q.Name + ".failed"
+
 	if err := ch.ExchangeDeclare(ex.Name, ex.Kind, ex.Durable, ex.AutoDelete, ex.Internal, ex.NoWait, ex.Args); err != nil {
 		return nil, err
 	}
@@ -88,20 +93,22 @@ func SendToDLQ(dlqCh *amqp.Channel, dlqName string, body []byte, reason string, 
 		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, "Wrong deadletter parameter passed"))
 	}
 
+	key := strings.Join([]string{exchange, ".failed"}, ".")
+
 	return dlqCh.PublishWithContext(
 		context.Background(),
-		"",      // exchange
-		dlqName, // routing key
-		false,   // mandatory
-		false,   // immediate
+		"controlroom.dlx", // exchange
+		key,               // routing key
+		false,             // mandatory
+		false,             // immediate
 		amqp.Publishing{
 			ContentType: "application/octet-stream",
 			Body:        body,
 			Headers: amqp.Table{
 				"error_reason":              reason,
 				"timestamp":                 time.Now().Unix(),
-				"x-dead-letter-exchange":    exchange,
-				"x-dead-letter-routing-key": "heartbeat.failed",
+				"x-dead-letter-exchange":    "controlroom.dlx",
+				"x-dead-letter-routing-key": key,
 			},
 		},
 	)
@@ -110,35 +117,39 @@ func SendToDLQ(dlqCh *amqp.Channel, dlqName string, body []byte, reason string, 
 // Consume reads from a delivery channel and processes each message.
 // On success, acks the message. On error, sends to DLQ and nacks.
 // Blocks until ctx is cancelled.
-func Consume(cfg *ConsumerConfig, msgs <-chan amqp.Delivery, ctx context.Context) {
-	if cfg.DLQName == "" {
-		cfg.DLQName = "dlq"
-	}
-
+func Consume(cfg *ConsumerConfig, msgs <-chan amqp.Delivery, ctx context.Context, handler func(*elasticsearch.Client, []byte) error) error {
 	for {
 		select {
 		case <-ctx.Done():
-			log.Println("Consumer shutting down...")
-			return
+			logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, "Consumer shutting down..."))
+			return nil
+
 		case msg, ok := <-msgs:
 			if !ok {
-				return
+				return nil
 			}
-			err := cfg.Process(msg.Body)
+
+			err := handler(cfg.client, msg.Body)
 			if err != nil {
-				log.Printf("Process failed: %v", err)
-				// Send to DLQ before nack
-				if dlqErr := SendToDLQ(cfg.DLQCh, cfg.DLQName, msg.Body, err.Error(), ""); dlqErr != nil {
-					log.Printf("Failed to send to DLQ: %v", dlqErr)
+				logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("Process failed: %v", err)))
+
+				if err := SendToDLQ(cfg.DLQCh, cfg.DLQName, msg.Body, err.Error(), ""); err != nil {
+					logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("Failed to send to DLQ: %v", err)))
+					return err
 				}
+
 				err := msg.Nack(false, false)
 				if err != nil {
-					return
+					logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("Error NACK: %v", err)))
+					return err
 				}
+
 			} else {
+
 				err := msg.Ack(false)
 				if err != nil {
-					return
+					logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("Error ACK: %v", err)))
+					return err
 				}
 			}
 		}
