@@ -1,6 +1,5 @@
 package xml_test
 
-
 /*
 import (
 	"encoding/xml"
