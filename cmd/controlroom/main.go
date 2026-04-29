@@ -326,7 +326,7 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 		},
 
 		cr_rabbitmq.BindingInfo{
-			Key:    "log",
+			Key:    "routing.log",
 			NoWait: false,
 			Args:   nil,
 		},
