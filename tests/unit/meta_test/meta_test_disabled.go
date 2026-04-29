@@ -12,9 +12,6 @@ import (
 	"integration-project-ehb/controlroom/pkg/meta"
 )
 
-// ---- helpers ----------------------------------------------------------------
-
-// writeXSD writes content to a temp dir and returns the dir + filename.
 func writeXSD(t *testing.T, name, content string) (dir string) {
 	t.Helper()
 	dir = t.TempDir()
@@ -31,8 +28,6 @@ func lexAndParse(t *testing.T, dir, name string) meta.AST {
 	return ast
 }
 
-// ---- IsXsd ------------------------------------------------------------------
-
 func TestIsXsd_True(t *testing.T) {
 	assert.True(t, meta.IsXsd("heartbeat.xsd"))
 	assert.True(t, meta.IsXsd("user_confirmed.xsd"))
@@ -44,8 +39,6 @@ func TestIsXsd_False(t *testing.T) {
 	assert.False(t, meta.IsXsd("heartbeat"))
 	assert.False(t, meta.IsXsd(""))
 }
-
-// ---- LoadFile ---------------------------------------------------------------
 
 func TestLoadFile_MissingFile(t *testing.T) {
 	var lexer meta.Lexer
@@ -59,8 +52,6 @@ func TestLoadFile_ValidFile(t *testing.T) {
 	err := lexer.LoadFile(dir, "simple.xsd")
 	assert.NoError(t, err)
 }
-
-// ---- Lex / AST --------------------------------------------------------------
 
 func TestLex_EmptySchema(t *testing.T) {
 	dir := writeXSD(t, "empty.xsd", `<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"/>`)
@@ -150,8 +141,6 @@ func TestLex_MultipleComplexTypes(t *testing.T) {
 	assert.Equal(t, "TypeB", ast.Root.First.Next.Attrs.Name)
 }
 
-// ---- WriteGoStruct (code generation output) ---------------------------------
-
 func TestWriteGoStruct_NilAST(t *testing.T) {
 	err := meta.WriteGoStruct(nil, t.TempDir(), "empty.xsd")
 	assert.Error(t, err)
@@ -240,7 +229,6 @@ func TestWriteGoStruct_HyphenatedFilenameBecomesUnderscore(t *testing.T) {
 	outDir := t.TempDir()
 	require.NoError(t, meta.WriteGoStruct(new(lexAndParse(t, dir, "my-type.xsd")), outDir, "my-type.xsd"))
 
-	// hyphens must become underscores in the output filename
 	_, err := os.Stat(filepath.Join(outDir, "my_type.go"))
 	assert.NoError(t, err, "expected my_type.go (hyphen → underscore)")
 }

@@ -37,10 +37,8 @@ func TestStatusCheck_XMLTagNames(t *testing.T) {
 		Timestamp: time.Now().UTC(),
 		Uptime:    120,
 	}
-
 	data, err := xml.Marshal(sc)
 	assert.NoError(t, err)
-
 	xmlStr := string(data)
 	assert.True(t, strings.Contains(xmlStr, "<StatusCheck>"), "expected root tag <StatusCheck>")
 	assert.True(t, strings.Contains(xmlStr, "<serviceId>"), "expected tag <serviceId>")
@@ -55,10 +53,8 @@ func TestStatusCheck_UptimeZero(t *testing.T) {
 		Timestamp: time.Now().UTC(),
 		Uptime:    0,
 	}
-
 	data, err := xml.Marshal(sc)
 	assert.NoError(t, err)
-
 	var result gen.StatusCheck
 	err = xml.Unmarshal(data, &result)
 	assert.NoError(t, err)
@@ -66,16 +62,12 @@ func TestStatusCheck_UptimeZero(t *testing.T) {
 }
 
 func TestStatusCheck_EmptyServiceId(t *testing.T) {
-	// empty serviceId should still marshal/unmarshal without error,
-	// validation is a separate concern
 	sc := gen.StatusCheck{
 		Timestamp: time.Now().UTC(),
 		Uptime:    999,
 	}
-
 	data, err := xml.Marshal(sc)
 	assert.NoError(t, err)
-
 	var result gen.StatusCheck
 	err = xml.Unmarshal(data, &result)
 	assert.NoError(t, err)

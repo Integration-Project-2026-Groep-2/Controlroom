@@ -1,6 +1,5 @@
 package xml_test
 
-/*
 import (
 	"encoding/xml"
 	"strings"
@@ -64,18 +63,12 @@ func TestUserConfirmed_XMLTagNames(t *testing.T) {
 }
 
 func TestUserConfirmed_OptionalFieldsAbsent(t *testing.T) {
-	// phone, companyId, badgeCode are minOccurs=0 — they should not appear in
-	// the XML when empty, and unmarshalling without them should leave them zero
 	u := makeValidUser()
-	// do not set Phone, CompanyId, BadgeCode
-
 	data, err := xml.Marshal(u)
 	assert.NoError(t, err)
-
 	var result gen.UserConfirmed
 	err = xml.Unmarshal(data, &result)
 	assert.NoError(t, err)
-
 	assert.Equal(t, "", result.Phone)
 	assert.Equal(t, gen.UUIDType(""), result.CompanyId)
 	assert.Equal(t, "", result.BadgeCode)
@@ -86,14 +79,11 @@ func TestUserConfirmed_OptionalFieldsPresent(t *testing.T) {
 	u.Phone = "+32477000000"
 	u.CompanyId = "a3b8c9d0-1234-5678-90ab-cdef12345678"
 	u.BadgeCode = "BADGE-42"
-
 	data, err := xml.Marshal(u)
 	assert.NoError(t, err)
-
 	var result gen.UserConfirmed
 	err = xml.Unmarshal(data, &result)
 	assert.NoError(t, err)
-
 	assert.Equal(t, "+32477000000", result.Phone)
 	assert.Equal(t, gen.UUIDType("a3b8c9d0-1234-5678-90ab-cdef12345678"), result.CompanyId)
 	assert.Equal(t, "BADGE-42", result.BadgeCode)
@@ -113,10 +103,8 @@ func TestUserConfirmed_AllRolesRoundTrip(t *testing.T) {
 	for _, role := range roles {
 		u := makeValidUser()
 		u.Role = role
-
 		data, err := xml.Marshal(u)
 		assert.NoError(t, err, "marshal failed for role %s", role)
-
 		var result gen.UserConfirmed
 		err = xml.Unmarshal(data, &result)
 		assert.NoError(t, err, "unmarshal failed for role %s", role)
@@ -127,10 +115,8 @@ func TestUserConfirmed_AllRolesRoundTrip(t *testing.T) {
 func TestUserConfirmed_GdprConsentFalse(t *testing.T) {
 	u := makeValidUser()
 	u.GdprConsent = false
-
 	data, err := xml.Marshal(u)
 	assert.NoError(t, err)
-
 	var result gen.UserConfirmed
 	err = xml.Unmarshal(data, &result)
 	assert.NoError(t, err)
@@ -140,10 +126,8 @@ func TestUserConfirmed_GdprConsentFalse(t *testing.T) {
 func TestUserConfirmed_IsActiveFalse(t *testing.T) {
 	u := makeValidUser()
 	u.IsActive = false
-
 	data, err := xml.Marshal(u)
 	assert.NoError(t, err)
-
 	var result gen.UserConfirmed
 	err = xml.Unmarshal(data, &result)
 	assert.NoError(t, err)
@@ -158,15 +142,9 @@ func TestUserConfirmed_InvalidXML(t *testing.T) {
 
 // test a wrong root tag
 func TestUserConfirmed_WrongRootTag(t *testing.T) {
-
 	xmlStr := `<SomethingElse><id>abc</id></SomethingElse>`
-
 	var u gen.UserConfirmed
-
 	err := xml.Unmarshal([]byte(xmlStr), &u)
 	assert.Error(t, err)
-
 	assert.Equal(t, gen.UUIDType(""), u.Id)
 }
-
-*/
