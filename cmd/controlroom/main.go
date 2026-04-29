@@ -151,7 +151,7 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 		Durable: true,
 	}
 	hbQueue := cr_rabbitmq.QueueInfo{
-		Name:    "heartbeat.queue",
+		Name:    "controlroom.heartbeat.queue",
 		Durable: true,
 	}
 	hbBinding := cr_rabbitmq.BindingInfo{
@@ -235,7 +235,7 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 		Durable: true,
 	}
 	scQueue := cr_rabbitmq.QueueInfo{
-		Name:    "statuscheck.queue",
+		Name:    "controlroom.statuscheck.queue",
 		Durable: true,
 	}
 	// NOTE(nasr): allows for crm.status.checked, kassa.status.checked, etc.
@@ -317,7 +317,7 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 		},
 
 		cr_rabbitmq.QueueInfo{
-			Name:       "logs.queue",
+			Name:       "controlroom.logs.queue",
 			Durable:    true,
 			AutoDelete: false,
 			Exclusive:  false,
@@ -332,6 +332,7 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 		},
 	)
 	if err != nil {
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("SetupLogsConsumer failed: %v", err)))
 		return fmt.Errorf("SetupLogsConsumer: %w", err)
 	}
 
