@@ -150,7 +150,7 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 		Durable: true,
 	}
 	hbQueue := cr_rabbitmq.QueueInfo{
-		Name:    "heartbeat.queue",
+		Name:    "heartbeat_queue",
 		Durable: true,
 	}
 	hbBinding := cr_rabbitmq.BindingInfo{
