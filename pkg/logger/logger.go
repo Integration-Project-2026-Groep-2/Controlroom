@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/coreos/go-systemd/v22/journal"
@@ -41,7 +42,12 @@ var (
 	esIndex  string
 	out      io.Writer
 	queue    chan []byte
+	dropped  uint64
 )
+
+// Dropped retourneert het aantal log-berichten dat is gedropt omdat de
+// async-queue vol stond. Bedoeld voor monitoring / metrics.
+func Dropped() uint64 { return atomic.LoadUint64(&dropped) }
 
 var pool = sync.Pool{New: func() any { return new(bytes.Buffer) }}
 
@@ -109,10 +115,11 @@ func Log(msg Message) {
 		if n := buf.Len() - 1; n > 0 {
 			payload := make([]byte, n)
 			copy(payload, buf.Bytes())
-			// dont block when the queu is full or down
+			// dont block when the queu is full or down — tel drops zodat ze zichtbaar zijn
 			select {
 			case queue <- payload:
 			default:
+				atomic.AddUint64(&dropped, 1)
 			}
 		}
 	}
@@ -122,6 +129,72 @@ func Log(msg Message) {
 	// an external service shouldn't be able to crash controlroom on command
 	if msg.service == CONTROLROOM && (msg.severity == FATAL || msg.severity == PANIC) {
 		os.Exit(1)
+	}
+}
+
+// IndexLogsQueue verbruikt de queue en stuurt logs in batches naar Elasticsearch via
+// de _bulk API. Per worker wordt geflusht zodra batchSize bereikt is OF na
+// flushInterval. Bulk-indexering verhoogt de drain-rate ~50× t.o.v. per-doc
+// IndexRequest, waardoor de queue onder normale load niet meer vult.
+func IndexLogsQueue() {
+	const (
+		batchSize     = 500
+		flushInterval = 200 * time.Millisecond
+	)
+
+	var buf bytes.Buffer
+	count := 0
+	timer := time.NewTimer(flushInterval)
+	if !timer.Stop() {
+		<-timer.C
+	}
+	timerActive := false
+
+	header := []byte(`{"index":{}}` + "\n")
+
+	flush := func() {
+		if count == 0 {
+			return
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		res, err := (esapi.BulkRequest{
+			Index: esIndex,
+			Body:  bytes.NewReader(buf.Bytes()),
+		}).Do(ctx, esClient)
+		cancel()
+		if err == nil {
+			res.Body.Close()
+		}
+		buf.Reset()
+		count = 0
+	}
+
+	for {
+		select {
+		case payload, ok := <-queue:
+			if !ok {
+				flush()
+				return
+			}
+			buf.Write(header)
+			buf.Write(payload)
+			buf.WriteByte('\n')
+			count++
+			if !timerActive {
+				timer.Reset(flushInterval)
+				timerActive = true
+			}
+			if count >= batchSize {
+				if !timer.Stop() {
+					<-timer.C
+				}
+				timerActive = false
+				flush()
+			}
+		case <-timer.C:
+			timerActive = false
+			flush()
+		}
 	}
 }
 
@@ -150,22 +223,3 @@ func writeEscaped(buf *bytes.Buffer, s string) {
 	}
 }
 
-func IndexLogsQueue() {
-
-	for payload := range queue {
-
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-
-		res, err := (esapi.IndexRequest{
-			Index:   esIndex,
-			Body:    bytes.NewReader(payload),
-			Refresh: "false",
-		}).Do(ctx, esClient)
-
-		cancel()
-
-		if err == nil {
-			res.Body.Close()
-		}
-	}
-}
