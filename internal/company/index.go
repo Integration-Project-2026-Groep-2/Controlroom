@@ -18,6 +18,7 @@ import (
 func indexCompany(es *elasticsearch.Client, ctx context.Context, comp *gen.CompanyConfirmed) error {
 	doc := gen.CompanyDoc{
 		Id:          comp.Id,
+		Name:        comp.Name,
 		ConfirmedAt: comp.ConfirmedAt,
 		Indexed:     time.Now(),
 	}
