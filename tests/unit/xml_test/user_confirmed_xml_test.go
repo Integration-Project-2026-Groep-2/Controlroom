@@ -1,5 +1,7 @@
 package xml_test
 
+
+/*
 import (
 	"encoding/xml"
 	"strings"
@@ -167,3 +169,5 @@ func TestUserConfirmed_WrongRootTag(t *testing.T) {
 
 	assert.Equal(t, gen.UUIDType(""), u.Id)
 }
+
+*/

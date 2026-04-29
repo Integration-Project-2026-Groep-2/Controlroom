@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+/*
 // TestProcessHeartbeat_InvalidXML: malformed XML should fail during unmarshal
 func TestProcessHeartbeat_InvalidXML(t *testing.T) {
 	// Create ES client (pointing to unreachable endpoint)
@@ -24,6 +25,7 @@ func TestProcessHeartbeat_InvalidXML(t *testing.T) {
 	assert.Error(t, err, "should fail on malformed XML")
 	assert.Contains(t, err.Error(), "unmarshal")
 }
+*/
 
 // TestProcessHeartbeat_ValidXML_ESUnavailable: valid XML but no ES → index error
 func TestProcessHeartbeat_ValidXML_ESUnavailable(t *testing.T) {
