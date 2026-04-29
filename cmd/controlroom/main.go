@@ -13,6 +13,7 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 
 	"integration-project-ehb/controlroom/internal/company"
+	"integration-project-ehb/controlroom/internal/cr_logger"
 	"integration-project-ehb/controlroom/internal/cr_rabbitmq"
 	"integration-project-ehb/controlroom/internal/heartbeat"
 	"integration-project-ehb/controlroom/internal/statuscheck"
@@ -150,7 +151,7 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 		Durable: true,
 	}
 	hbQueue := cr_rabbitmq.QueueInfo{
-		Name:    "heartbeat_queue",
+		Name:    "heartbeat.queue",
 		Durable: true,
 	}
 	hbBinding := cr_rabbitmq.BindingInfo{
@@ -185,10 +186,23 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 	defer userCh.Close()
 
 	userMsgs, err := cr_rabbitmq.SetupQueue(userCh,
-		cr_rabbitmq.ExchangeInfo{Name: "contact.topic", Kind: "topic", Durable: true},
-		cr_rabbitmq.QueueInfo{Name: "crm.user.confirmed", Durable: true},
-		cr_rabbitmq.BindingInfo{Key: "crm.user.confirmed"},
+
+		cr_rabbitmq.ExchangeInfo{
+			Name:    "contact.topic",
+			Kind:    "topic",
+			Durable: true,
+		},
+
+		cr_rabbitmq.QueueInfo{
+			Name:    "crm.user.confirmed",
+			Durable: true,
+		},
+
+		cr_rabbitmq.BindingInfo{
+			Key: "crm.user.confirmed",
+		},
 	)
+
 	if err != nil {
 		return fmt.Errorf("user setup: %w", err)
 	}
@@ -212,6 +226,7 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 	if err != nil {
 		return fmt.Errorf("statuscheck channel: %w", err)
 	}
+
 	defer scCh.Close()
 
 	scExchange := cr_rabbitmq.ExchangeInfo{
@@ -270,6 +285,7 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 		DLQName: "company.dlq",
 		Process: company.NewCompanyProcessor(client),
 	}
+
 	if err := cr_rabbitmq.SetupDLQ(companyCfg.DLQCh, companyCfg.DLQName); err != nil {
 		return fmt.Errorf("company dlq setup: %w", err)
 	}
@@ -280,6 +296,52 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 
 	go cr_rabbitmq.Consume(companyCfg, companyMsgs, ctx)
 	logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, "company consumer started"))
+
+	logCh, err := conn.Channel()
+	if err != nil {
+		return fmt.Errorf("log channel: %w", err)
+	}
+
+	defer companyCh.Close()
+
+	msgs, err := cr_rabbitmq.SetupQueue(
+		logCh,
+		cr_rabbitmq.ExchangeInfo{
+			Name:       "logs.direct",
+			Kind:       "direct",
+			Durable:    true,
+			AutoDelete: false,
+			Internal:   false,
+			NoWait:     false,
+			Args:       nil,
+		},
+
+		cr_rabbitmq.QueueInfo{
+			Name:       "logs.queue",
+			Durable:    true,
+			AutoDelete: false,
+			Exclusive:  false,
+			NoWait:     false,
+			Args:       nil,
+		},
+
+		cr_rabbitmq.BindingInfo{
+			Key:    "log",
+			NoWait: false,
+			Args:   nil,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("SetupLogsConsumer: %w", err)
+	}
+
+	cfg := &cr_rabbitmq.ConsumerConfig{
+		DLQCh:   dlqCh,
+		DLQName: "dlq",
+		Process: cr_logger.LogMessageProcesser,
+	}
+
+	go cr_rabbitmq.Consume(cfg, msgs, ctx)
 
 	select {
 	case reason := <-closeCh:
