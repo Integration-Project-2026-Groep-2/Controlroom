@@ -64,13 +64,8 @@ func NewMessage(sev Severity, svc Service, data string) Message {
 	return Message{severity: sev, service: svc, data: data}
 }
 
-func Init(addr, idx string, writer io.Writer, workers int) error {
-	c, err := elasticsearch.NewClient(elasticsearch.Config{Addresses: []string{addr}})
-	if err != nil {
-		return err
-	}
-
-	esClient, esIndex, out, queue = c, idx, writer, make(chan []byte, 512)
+func Init(client *elasticsearch.Client, idx string, writer io.Writer, workers int) error {
+	esClient, esIndex, out, queue = client, idx, writer, make(chan []byte, 512)
 
 	for range workers {
 		go IndexLogsQueue()

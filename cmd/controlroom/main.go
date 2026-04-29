@@ -23,30 +23,27 @@ import (
 
 func main() {
 
-	cfg := elasticsearch.Config{
+	client, err := elasticsearch.NewClient(elasticsearch.Config{
 		Addresses: []string{os.Getenv("ELASTICSEARCH_URL")},
 		Username:  os.Getenv("CONTROLROOM_ES_USER"),
 		Password:  os.Getenv("CONTROLROOM_ES_PASS"),
-	}
-
-	if err := logger.Init(os.Getenv("ELASTICSEARCH_URL"), "controlroom-logs", os.Stdout, 4); err != nil {
-		fmt.Fprintf(os.Stderr, "logger init: %v\n", err)
+	})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "elasticsearch client: %v\n", err)
 		os.Exit(1)
 	}
 
+	if err := logger.Init(client, "controlroom-logs", os.Stdout, 4); err != nil {
+		fmt.Fprintf(os.Stderr, "logger init: %v\n", err)
+		os.Exit(1)
+	}
 	defer logger.Shutdown()
 
-	client, err := elasticsearch.NewClient(cfg)
-
-	if err != nil {
-		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("elasticsearch client config: %v", err)))
-	}
-
-	res, err := client.Info()
-	if err != nil {
+	if res, err := client.Info(); err != nil {
 		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("elasticsearch connect: %v", err)))
+	} else {
+		res.Body.Close()
 	}
-	res.Body.Close()
 
 	logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, "connected to elasticsearch"))
 
