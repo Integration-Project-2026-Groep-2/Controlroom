@@ -1,3 +1,5 @@
+// TODO(nasr): los dit nekeer op want is statuscheck wel een goed idee?
+// wordt dat niet opgelost door kubereneters?
 package statuscheck
 
 import (

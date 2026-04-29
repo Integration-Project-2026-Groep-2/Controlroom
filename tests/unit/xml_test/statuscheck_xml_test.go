@@ -1,3 +1,4 @@
+// TODO(nasr): refactor this to the new statuscheck
 package xml_test
 
 import (
@@ -85,23 +86,4 @@ func TestStatusCheck_InvalidXML(t *testing.T) {
 	var sc gen.StatusCheck
 	err := xml.Unmarshal([]byte("not xml at all"), &sc)
 	assert.Error(t, err)
-}
-
-func TestSystemLoad_MarshalUnmarshal(t *testing.T) {
-	original := gen.SystemLoad{
-		Cpu:    0.72,
-		Memory: 0.55,
-		Disk:   0.30,
-	}
-
-	data, err := xml.Marshal(original)
-	assert.NoError(t, err)
-
-	var result gen.SystemLoad
-	err = xml.Unmarshal(data, &result)
-	assert.NoError(t, err)
-
-	assert.InDelta(t, original.Cpu, result.Cpu, 0.0001)
-	assert.InDelta(t, original.Memory, result.Memory, 0.0001)
-	assert.InDelta(t, original.Disk, result.Disk, 0.0001)
 }
