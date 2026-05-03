@@ -35,17 +35,21 @@ func CheckHeartbeats(client *elasticsearch.Client) {
 	}`
 
 	// TODO(nasr): error handling
-	res, _ := client.Search(
+	res, err := client.Search(
 		client.Search.WithIndex("heartbeats"),
 		client.Search.WithBody(strings.NewReader(query)),
 	)
+	if err != nil {
+			logger.Log(logger.NewMessage(logger.WARN, logger.WATCHDOG, fmt.Sprintf("Failed to query elastic (%s): ", err)))
+
+	}
 
 	//  Netwerk is oké, maar http error (bijv. 401 unauthorized / 403 forbidden)
 	if res.IsError() {
 		if res.StatusCode == 401 || res.StatusCode == 403 {
-			logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, fmt.Sprintf("Authenticatie fout (%d): Geen toegang. Wachten tot account in Kibana is aangemaakt.", res.StatusCode)))
+			logger.Log(logger.NewMessage(logger.WARN, logger.WATCHDOG, fmt.Sprintf("Authenticatie fout (%d): Geen toegang. Wachten tot account in Kibana is aangemaakt.", res.StatusCode)))
 		} else {
-			logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("%s is ONLINE!", res.String())))
+			logger.Log(logger.NewMessage(logger.ERROR, logger.WATCHDOG, fmt.Sprintf("%s is ONLINE!", res.String())))
 		}
 
 		res.Body.Close()
@@ -82,13 +86,13 @@ func CheckHeartbeats(client *elasticsearch.Client) {
 		if isCurrentlyOnline && !wasOnline {
 
 			WDServiceState[svc] = true
-			logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("%s is ONLINE!", svc)))
+			logger.Log(logger.NewMessage(logger.INFO, logger.WATCHDOG, fmt.Sprintf("%s is ONLINE!", svc)))
 			WDQueue <- fmt.Sprintf("**RESOLVED:** Service **%s** is back online!", svc)
 
 		} else if !isCurrentlyOnline && wasOnline {
 
 			WDServiceState[svc] = false
-			logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, fmt.Sprintf("%s is OFFLINE!", svc)))
+			logger.Log(logger.NewMessage(logger.WARN, logger.WATCHDOG, fmt.Sprintf("%s is OFFLINE!", svc)))
 			WDQueue <- fmt.Sprintf("**CRITICAL:** Service **%s** is down! (Heartbeats in last 60s: %v)", svc, count)
 
 		}
@@ -122,7 +126,7 @@ func sendTeamsAlert(message string) {
 	resp, err := http.Post(WDWebhook, "application/json", bytes.NewBuffer(jsonValue))
 
 	if err != nil {
-		logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, err.Error()))
+		logger.Log(logger.NewMessage(logger.WARN, logger.WATCHDOG, err.Error()))
 		return
 	}
 
@@ -131,6 +135,6 @@ func sendTeamsAlert(message string) {
 	if resp.StatusCode >= 400 {
 		buf := new(bytes.Buffer)
 		buf.ReadFrom(resp.Body)
-		logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, fmt.Sprintf("teams webhook rejected the payload. status: %d, response: %s", resp.StatusCode, buf.String())))
+		logger.Log(logger.NewMessage(logger.WARN, logger.WATCHDOG, fmt.Sprintf("teams webhook rejected the payload. status: %d, response: %s", resp.StatusCode, buf.String())))
 	}
 }

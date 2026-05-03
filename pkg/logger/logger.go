@@ -36,6 +36,7 @@ const (
 	MAILING     Service = "MAILING"
 	FRONTEND    Service = "FRONTEND"
 	PLANNING    Service = "PLANNING"
+	WATCHDOG    Service = "WATCHDOG"
 )
 
 var (
