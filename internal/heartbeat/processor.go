@@ -29,6 +29,6 @@ func ProcessHeartbeat(es *elasticsearch.Client, body []byte) error {
 		return fmt.Errorf("Failed to index heartbeat: %s", err.Error())
 	}
 
-	logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("Indexed Heartbeat: %s", hb.ServiceId)))
+	logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("Finished processing Heartbeat: %s", hb.ServiceId)))
 	return nil
 }
