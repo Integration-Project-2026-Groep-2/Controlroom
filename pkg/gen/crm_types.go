@@ -11,8 +11,51 @@ import (
 var _ = xml.Name{}
 var _ = time.Time{}
 
-type ISO8601DateTimeType string
-
 type UUIDType string
 
+type ISO8601DateTimeType string
+
+type CountryCodeType string
+
 type EmailType string
+
+type BelgianVatNumberType string
+
+type UserRoleType string
+
+const (
+	UserRoleTypeVISITOR              UserRoleType = "VISITOR"
+	UserRoleTypeCOMPANYCONTACT       UserRoleType = "COMPANY_CONTACT"
+	UserRoleTypeSPEAKER              UserRoleType = "SPEAKER"
+	UserRoleTypeEVENTMANAGER         UserRoleType = "EVENT_MANAGER"
+	UserRoleTypeCASHIER              UserRoleType = "CASHIER"
+	UserRoleTypeBARSTAFF             UserRoleType = "BAR_STAFF"
+	UserRoleTypeADMIN                UserRoleType = "ADMIN"
+)
+
+type RegistrationRoleType string
+
+const (
+	RegistrationRoleTypeVISITOR      RegistrationRoleType = "VISITOR"
+	RegistrationRoleTypeCOMPANYCONTACT RegistrationRoleType = "COMPANY_CONTACT"
+)
+
+type FacturatieUserRoleType string
+
+const (
+	FacturatieUserRoleTypeVISITOR    FacturatieUserRoleType = "VISITOR"
+	FacturatieUserRoleTypeCOMPANYCONTACT FacturatieUserRoleType = "COMPANY_CONTACT"
+	FacturatieUserRoleTypeSPEAKER    FacturatieUserRoleType = "SPEAKER"
+	FacturatieUserRoleTypeEVENTMANAGER FacturatieUserRoleType = "EVENT_MANAGER"
+	FacturatieUserRoleTypeCASHIER    FacturatieUserRoleType = "CASHIER"
+	FacturatieUserRoleTypeBARSTAFF   FacturatieUserRoleType = "BAR_STAFF"
+	FacturatieUserRoleTypeADMIN      FacturatieUserRoleType = "ADMIN"
+)
+
+type PlanningUserRoleType string
+
+const (
+	PlanningUserRoleTypeSPEAKER      PlanningUserRoleType = "SPEAKER"
+	PlanningUserRoleTypeVISITOR      PlanningUserRoleType = "VISITOR"
+)
+

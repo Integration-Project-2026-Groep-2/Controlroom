@@ -3,14 +3,16 @@ package logger
 import (
 	"bytes"
 	"context"
+	"fmt"
+	"integration-project-ehb/controlroom/pkg/gen"
 	"io"
 	"os"
-	"sync"
 	"time"
 
 	"github.com/coreos/go-systemd/v22/journal"
 	"github.com/elastic/go-elasticsearch/v9"
 	"github.com/elastic/go-elasticsearch/v9/esapi"
+	"github.com/mailru/easyjson"
 )
 
 type Severity string
@@ -37,13 +39,11 @@ const (
 )
 
 var (
-	esClient *elasticsearch.Client
-	esIndex  string
-	out      io.Writer
-	queue    chan []byte
+	Client *elasticsearch.Client
+	Index  string
+	out    io.Writer
+	queue  chan gen.LogDoc
 )
-
-var pool = sync.Pool{New: func() any { return new(bytes.Buffer) }}
 
 var journalPriorities = map[Severity]journal.Priority{
 	DEBUG: journal.PriDebug,
@@ -58,17 +58,20 @@ func NewMessage(sev Severity, svc Service, data string) Message {
 	return Message{severity: sev, service: svc, data: data}
 }
 
-func Init(addr, idx string, writer io.Writer, workers int) error {
-	c, err := elasticsearch.NewClient(elasticsearch.Config{Addresses: []string{addr}})
+func Init(config *elasticsearch.Config, idx string, writer io.Writer, workers int) error {
+
+	c, err := elasticsearch.NewClient(*config)
+
 	if err != nil {
 		return err
 	}
 
-	esClient, esIndex, out, queue = c, idx, writer, make(chan []byte, 512)
+	Client, Index, out, queue = c, idx, writer, make(chan gen.LogDoc, 512)
 
 	for range workers {
 		go IndexLogsQueue()
 	}
+
 	return nil
 }
 
@@ -81,21 +84,14 @@ type Message struct {
 }
 
 func Log(msg Message) {
-	buf := pool.Get().(*bytes.Buffer)
-	buf.Reset()
 
-	var tmp [35]byte
-	buf.WriteString(`{"level":"`)
-	buf.WriteString(string(msg.severity))
-	buf.WriteString(`","@timestamp":"`)
-	buf.Write(time.Now().UTC().AppendFormat(tmp[:0], time.RFC3339Nano))
-	buf.WriteString(`","service":"`)
-	writeEscaped(buf, string(msg.service))
-	buf.WriteString(`","msg":"`)
-	writeEscaped(buf, string(msg.data))
-	buf.WriteString("\"}\n")
-
-	out.Write(buf.Bytes())
+	data := gen.LogDoc{
+		Level:     gen.SeverityType(msg.severity),
+		Timestamp: time.Now().UTC(),
+		Service:   string(msg.service),
+		Data:      string(msg.data),
+		Indexed:   time.Now().UTC(),
+	}
 
 	switch msg.severity {
 	case ERROR, FATAL, PANIC:
@@ -105,19 +101,12 @@ func Log(msg Message) {
 		})
 	}
 
-	if esClient != nil {
-		if n := buf.Len() - 1; n > 0 {
-			payload := make([]byte, n)
-			copy(payload, buf.Bytes())
-			// dont block when the queu is full or down
-			select {
-			case queue <- payload:
-			default:
-			}
+	if Client != nil {
+		select {
+		case queue <- data:
+		default:
 		}
 	}
-
-	pool.Put(buf)
 
 	// an external service shouldn't be able to crash controlroom on command
 	if msg.service == CONTROLROOM && (msg.severity == FATAL || msg.severity == PANIC) {
@@ -151,21 +140,34 @@ func writeEscaped(buf *bytes.Buffer, s string) {
 }
 
 func IndexLogsQueue() {
-
 	for payload := range queue {
+		data, err := easyjson.Marshal(payload)
+		if err != nil {
+			fmt.Printf("marshal error: %v\n", err)
+			continue
+		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 
-		res, err := (esapi.IndexRequest{
-			Index:   esIndex,
-			Body:    bytes.NewReader(payload),
+		req := esapi.IndexRequest{
+			Index:   Index,
+			Body:    bytes.NewReader(data),
 			Refresh: "false",
-		}).Do(ctx, esClient)
+		}
 
+		res, err := req.Do(ctx, Client)
 		cancel()
 
-		if err == nil {
-			res.Body.Close()
+		if err != nil {
+			fmt.Printf("index logs error: %v\n", err)
+			continue
+		}
+
+		res.Body.Close()
+
+		if res.IsError() {
+			fmt.Printf("index logs error response: %v\n", res.Status())
+			continue
 		}
 	}
 }

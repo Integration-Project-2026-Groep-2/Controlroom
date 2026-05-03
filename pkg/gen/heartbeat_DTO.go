@@ -12,7 +12,8 @@ var _ = xml.Name{}
 var _ = time.Time{}
 
 type HeartbeatDoc struct {
-	ServiceId string    `xml:"serviceId" json:"service_id" validate:"required"`
-	Timestamp time.Time `xml:"timestamp" json:"timestamp" validate:"required"`
-	Indexed   time.Time `xml:"indexed" json:"indexed" validate:"required"`
+	ServiceId                string               `xml:"serviceId" json:"service_id" validate:"required"`
+	Timestamp                time.Time            `xml:"timestamp" json:"timestamp" validate:"required"`
+	Indexed                  time.Time            `xml:"indexed" json:"indexed" validate:"required"`
 }
+

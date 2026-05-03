@@ -11,28 +11,17 @@ import (
 var _ = xml.Name{}
 var _ = time.Time{}
 
-type UserRoleType string
-
-const (
-	UserRoleTypeVISITOR        UserRoleType = "VISITOR"
-	UserRoleTypeCOMPANYCONTACT UserRoleType = "COMPANY_CONTACT"
-	UserRoleTypeSPEAKER        UserRoleType = "SPEAKER"
-	UserRoleTypeEVENTMANAGER   UserRoleType = "EVENT_MANAGER"
-	UserRoleTypeCASHIER        UserRoleType = "CASHIER"
-	UserRoleTypeBARSTAFF       UserRoleType = "BAR_STAFF"
-	UserRoleTypeADMIN          UserRoleType = "ADMIN"
-)
-
 type UserConfirmed struct {
-	Id          UUIDType            `xml:"id" json:"id" validate:"required"`
-	Email       EmailType           `xml:"email" json:"email" validate:"required"`
-	FirstName   string              `xml:"firstName" json:"first_name" validate:"required"`
-	LastName    string              `xml:"lastName" json:"last_name" validate:"required"`
-	Phone       string              `xml:"phone" json:"phone"`
-	Role        UserRoleType        `xml:"role" json:"role" validate:"required"`
-	CompanyId   UUIDType            `xml:"companyId" json:"company_id"`
-	BadgeCode   string              `xml:"badgeCode" json:"badge_code"`
-	IsActive    bool                `xml:"isActive" json:"is_active" validate:"required"`
-	GdprConsent bool                `xml:"gdprConsent" json:"gdpr_consent" validate:"required"`
-	ConfirmedAt ISO8601DateTimeType `xml:"confirmedAt" json:"confirmed_at" validate:"required"`
+	Id                       UUIDType             `xml:"id" json:"id" validate:"required"`
+	Email                    EmailType            `xml:"email" json:"email" validate:"required"`
+	FirstName                string               `xml:"firstName" json:"first_name" validate:"required"`
+	LastName                 string               `xml:"lastName" json:"last_name" validate:"required"`
+	Phone                    string               `xml:"phone" json:"phone"`
+	Role                     UserRoleType         `xml:"role" json:"role" validate:"required"`
+	CompanyId                UUIDType             `xml:"companyId" json:"company_id"`
+	BadgeCode                string               `xml:"badgeCode" json:"badge_code"`
+	IsActive                 bool                 `xml:"isActive" json:"is_active" validate:"required"`
+	GdprConsent              bool                 `xml:"gdprConsent" json:"gdpr_consent" validate:"required"`
+	ConfirmedAt              ISO8601DateTimeType  `xml:"confirmedAt" json:"confirmed_at" validate:"required"`
 }
+

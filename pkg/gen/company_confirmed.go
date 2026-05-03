@@ -11,13 +11,18 @@ import (
 var _ = xml.Name{}
 var _ = time.Time{}
 
-type BelgianVatNumberType string
-
 type CompanyConfirmed struct {
-	Id          UUIDType             `xml:"id" json:"id" validate:"required"`
-	VatNumber   BelgianVatNumberType `xml:"vatNumber" json:"vat_number" validate:"required"`
-	Name        string               `xml:"name" json:"name" validate:"required"`
-	Email       EmailType            `xml:"email" json:"email" validate:"required"`
-	IsActive    bool                 `xml:"isActive" json:"is_active" validate:"required"`
-	ConfirmedAt ISO8601DateTimeType  `xml:"confirmedAt" json:"confirmed_at" validate:"required"`
+	Id                       UUIDType             `xml:"id" json:"id" validate:"required"`
+	VatNumber                BelgianVatNumberType `xml:"vatNumber" json:"vat_number" validate:"required"`
+	Name                     string               `xml:"name" json:"name" validate:"required"`
+	Email                    EmailType            `xml:"email" json:"email" validate:"required"`
+	Phone                    string               `xml:"phone" json:"phone"`
+	Street                   string               `xml:"street" json:"street" validate:"required"`
+	HouseNumber              string               `xml:"houseNumber" json:"house_number" validate:"required"`
+	PostalCode               string               `xml:"postalCode" json:"postal_code" validate:"required"`
+	City                     string               `xml:"city" json:"city" validate:"required"`
+	Country                  CountryCodeType      `xml:"country" json:"country" validate:"required"`
+	IsActive                 bool                 `xml:"isActive" json:"is_active" validate:"required"`
+	ConfirmedAt              ISO8601DateTimeType  `xml:"confirmedAt" json:"confirmed_at" validate:"required"`
 }
+

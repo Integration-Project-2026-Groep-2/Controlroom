@@ -12,7 +12,8 @@ var _ = xml.Name{}
 var _ = time.Time{}
 
 type UserDoc struct {
-	Id      UUIDType     `xml:"id" json:"id" validate:"required"`
-	Role    UserRoleType `xml:"Role" json:"role" validate:"required"`
-	Indexed time.Time    `xml:"indexed" json:"indexed" validate:"required"`
+	Id                       UUIDType             `xml:"id" json:"id" validate:"required"`
+	Role                     UserRoleType         `xml:"Role" json:"role" validate:"required"`
+	Indexed                  time.Time            `xml:"indexed" json:"indexed" validate:"required"`
 }
+
