@@ -12,9 +12,9 @@ import (
 	"github.com/elastic/go-elasticsearch/v9"
 	amqp "github.com/rabbitmq/amqp091-go"
 
-
 	"integration-project-ehb/controlroom/internal/cr_rabbitmq"
 
+	"integration-project-ehb/controlroom/cmd/config"
 	"integration-project-ehb/controlroom/internal/company"
 	"integration-project-ehb/controlroom/internal/cr_logger"
 	"integration-project-ehb/controlroom/internal/heartbeat"
@@ -24,105 +24,66 @@ import (
 	"integration-project-ehb/controlroom/pkg/watchdog"
 )
 
-type cr_consumer_t int8
+func setup(ch *amqp.Channel) error {
+	logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, "declaring exchanges"))
+	for _, def := range config.ConsumerDefinitions {
+		if def.Passive {
+			continue
+		}
 
-const (
-	HEARTBEAT   cr_consumer_t = iota
-	LOGGER
-	STATUSCHECK
-	USER
-	COMPANY
-)
-
-type ConsumerDef struct {
-
-	Type      cr_consumer_t
-	Exchange  cr_rabbitmq.ExchangeInfo
-	Queue     cr_rabbitmq.QueueInfo
-	Binding   cr_rabbitmq.BindingInfo
-	DLQName   string
-	Qos       int
-}
-
-var consumerDefinitions = []ConsumerDef{
-	{
-		Type:      HEARTBEAT,
-		Exchange:  cr_rabbitmq.ExchangeInfo{Name: "heartbeat.direct", Kind: "direct", Durable: true},
-		Queue:     cr_rabbitmq.QueueInfo{Name: "controlroom.heartbeat.queue", Durable: true},
-		Binding:   cr_rabbitmq.BindingInfo{Key: "routing.heartbeat"},
-		DLQName:   "controlroom.heartbeat.queue.dlq",
-		Qos:       18,
-	},
-	{
-		Type:      STATUSCHECK,
-		Exchange:  cr_rabbitmq.ExchangeInfo{Name: "statuscheck.direct", Kind: "direct", Durable: true},
-		Queue:     cr_rabbitmq.QueueInfo{Name: "controlroom.statuscheck.queue", Durable: true},
-		Binding:   cr_rabbitmq.BindingInfo{Key: "routing.statuscheck"},
-		DLQName:   "controlroom.statuscheck.queue.dlq",
-		Qos:       5,
-	},
-	{
-		Type:      STATUSCHECK,
-		Exchange:  cr_rabbitmq.ExchangeInfo{Name: "contact.topic", Kind: "topic", Durable: true},
-		Queue:     cr_rabbitmq.QueueInfo{Name: "crm.user.confirmed", Durable: true},
-		Binding:   cr_rabbitmq.BindingInfo{Key: "crm.user.confirmed"},
-		DLQName:   "crm.user.confirmed.dlq",
-		Qos:       10,
-	},
-	{
-		Type:      COMPANY,
-		Exchange:  cr_rabbitmq.ExchangeInfo{Name: "contact.topic", Kind: "topic", Durable: true},
-		Queue:     cr_rabbitmq.QueueInfo{Name: "crm.company.confirmed", Durable: true},
-		Binding:   cr_rabbitmq.BindingInfo{Key: "crm.company.confirmed"},
-		DLQName:   "crm.company.confirmed.dlq",
-		Qos:       10,
-	},
-	{
-		Type:      LOGGER,
-		Exchange:  cr_rabbitmq.ExchangeInfo{Name: "logs.direct", Kind: "direct", Durable: true},
-		Queue:     cr_rabbitmq.QueueInfo{Name: "controlroom.logs.queue", Durable: true},
-		Binding:   cr_rabbitmq.BindingInfo{Key: "routing.log"},
-		DLQName:   "controlroom.logs.queue.dlq",
-		Qos:       5,
-	},
-}
-
-func setupCRRQ(ch *amqp.Channel) error {
-	for _, def := range consumerDefinitions {
 		if err := ch.ExchangeDeclare(def.Exchange.Name, def.Exchange.Kind, def.Exchange.Durable, false, false, false, nil); err != nil {
 			return fmt.Errorf("exchange %s: %w", def.Exchange.Name, err)
 		}
+		logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, fmt.Sprintf("declared exchange %s (%s)", def.Exchange.Name, def.Exchange.Kind)))
 	}
 
 	if err := ch.ExchangeDeclare("controlroom.dlx", "direct", true, false, false, false, nil); err != nil {
 		return fmt.Errorf("dlx: %w", err)
 	}
 
-	for _, def := range consumerDefinitions {
+	logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, "declared DLX exchange"))
+
+	for _, def := range config.ConsumerDefinitions {
+		if def.Passive {
+			continue
+		}
+
 		if _, err := ch.QueueDeclare(def.Queue.Name, def.Queue.Durable, false, false, false, nil); err != nil {
 			return fmt.Errorf("queue %s: %w", def.Queue.Name, err)
 		}
+		logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, fmt.Sprintf("declared queue %s", def.Queue.Name)))
 
-		if _, err := ch.QueueDeclare(def.DLQName, true, false, false, false, nil); err != nil {
-			return fmt.Errorf("dlq %s: %w", def.DLQName, err)
+		err := cr_rabbitmq.SetupDLQ(ch, def.DLQName)
+		if err != nil {
+
+			logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, fmt.Sprintf("error declaring DLQ %v", err)))
+		} else {
+
+			logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, fmt.Sprintf("declared DLQ %s", def.DLQName)))
+
 		}
 
 		if err := ch.QueueBind(def.Queue.Name, def.Binding.Key, def.Exchange.Name, false, nil); err != nil {
 			return fmt.Errorf("bind %s: %w", def.Queue.Name, err)
 		}
+		logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, fmt.Sprintf("bound %s -> %s (key: %s)", def.Queue.Name, def.Exchange.Name, def.Binding.Key)))
 
 		dlqRoutingKey := def.Queue.Name + ".failed"
 		if err := ch.QueueBind(def.DLQName, dlqRoutingKey, "controlroom.dlx", false, nil); err != nil {
 			return fmt.Errorf("bind dlq %s: %w", def.DLQName, err)
 		}
+		logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, fmt.Sprintf("bound DLQ %s -> controlroom.dlx (key: %s)", def.DLQName, dlqRoutingKey)))
 	}
 
+	logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, "RabbitMQ topology setup complete"))
 	return nil
 }
 
 func startSession(ctx context.Context, client *elasticsearch.Client) error {
+	logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, "dialing RabbitMQ"))
 	conn, err := amqp.Dial(os.Getenv("RABBITMQ_URL"))
 	if err != nil {
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("failed to dial RabbitMQ: %v", err)))
 		return fmt.Errorf("dial: %w", err)
 	}
 	defer conn.Close()
@@ -131,10 +92,13 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 	closeCh := conn.NotifyClose(make(chan *amqp.Error, 1))
 
 	setupCh, err := conn.Channel()
+
 	if err != nil {
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("failed to open setup channel: %v", err)))
 		return fmt.Errorf("setup channel: %w", err)
 	}
-	if err := setupCRRQ(setupCh); err != nil {
+	if err := setup(setupCh); err != nil {
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("topology setup failed: %v", err)))
 		setupCh.Close()
 		return err
 	}
@@ -142,57 +106,64 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 
 	dlqCh, err := conn.Channel()
 	if err != nil {
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("failed to open DLQ channel: %v", err)))
 		return fmt.Errorf("dlq channel: %w", err)
 	}
 	defer dlqCh.Close()
 
-	for _, def := range consumerDefinitions {
+	for _, def := range config.ConsumerDefinitions {
 		ch, err := conn.Channel()
 		if err != nil {
+			logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("failed to open channel for %s: %v", def.Queue.Name, err)))
 			return fmt.Errorf("channel for %s: %w", def.Queue.Name, err)
 		}
 		defer ch.Close()
 
-		msgs, err := cr_rabbitmq.SetupConsumer(ch, def.Exchange, def.Queue, def.Binding)
+		msgs, err := ch.Consume(def.Queue.Name, fmt.Sprintf("controlroom-%d", os.Getpid()), false, false, false, false, nil)
 
 		if err != nil {
+			logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("failed to setup consumer for %s: %v", def.Queue.Name, err)))
 			return fmt.Errorf("setup %s: %w", def.Queue.Name, err)
 		}
 
 		if err := ch.Qos(def.Qos, 0, false); err != nil {
+			logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("failed to set QoS for %s: %v", def.Queue.Name, err)))
 			return fmt.Errorf("qos %s: %w", def.Queue.Name, err)
 		}
 
 		cfg := &cr_rabbitmq.ConsumerConfig{
+			Client:  client,
 			DLQCh:   dlqCh,
 			DLQName: def.DLQName,
 		}
 
 		switch def.Type {
-
-		case HEARTBEAT:
+		case config.HEARTBEAT:
 			go cr_rabbitmq.Consume(cfg, msgs, ctx, heartbeat.ProcessHeartbeat)
-		case  LOGGER:
+		case config.LOGGER:
 			go cr_rabbitmq.Consume(cfg, msgs, ctx, cr_logger.ProcessLog)
-		case  STATUSCHECK:
+		case config.STATUSCHECK:
 			go cr_rabbitmq.Consume(cfg, msgs, ctx, statuscheck.ProcessStatusCheck)
-		case  USER:
+		case config.USER:
 			go cr_rabbitmq.Consume(cfg, msgs, ctx, user.ProcessUser)
-		case  COMPANY:
+		case config.COMPANY:
 			go cr_rabbitmq.Consume(cfg, msgs, ctx, company.ProcessCompany)
-
 		}
-
-		logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("%s consumer started", def.Queue.Name)))
+		logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("%s consumer started (qos: %d)", def.Queue.Name, def.Qos)))
 	}
+
+	logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, "all consumers running, waiting for messages"))
 
 	select {
 	case reason := <-closeCh:
 		if reason == nil {
+			logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, "RabbitMQ connection closed unexpectedly"))
 			return fmt.Errorf("connection closed")
 		}
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("RabbitMQ connection lost: %v", reason)))
 		return fmt.Errorf("connection lost: %w", reason)
 	case <-ctx.Done():
+		logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, "context cancelled, closing RabbitMQ session"))
 		return ctx.Err()
 	}
 }
@@ -204,22 +175,23 @@ func main() {
 		Password:  os.Getenv("CONTROLROOM_ES_PASS"),
 	}
 
-	if err := logger.Init(os.Getenv("ELASTICSEARCH_URL"), "controlroom-logs", os.Stdout, 4); err != nil {
+	if err := logger.Init(&cfg, "controlroom-logs", os.Stdout, 4); err != nil {
 		fmt.Fprintf(os.Stderr, "logger init: %v\n", err)
-		os.Exit(1)
+		os.Exit(4)
 	}
 	defer logger.Shutdown()
 
 	client, err := elasticsearch.NewClient(cfg)
 	if err != nil {
 		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("elasticsearch client config: %v", err)))
-		os.Exit(1)
+		os.Exit(5)
 	}
 
 	res, err := client.Info()
 	if err != nil {
+		fmt.Printf("error here: %v", err)
 		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("elasticsearch connect: %v", err)))
-		os.Exit(1)
+		os.Exit(6)
 	}
 	res.Body.Close()
 
