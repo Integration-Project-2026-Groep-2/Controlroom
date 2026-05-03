@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"integration-project-ehb/controlroom/pkg/gen"
+	"integration-project-ehb/controlroom/pkg/logger"
 	"io"
 	"time"
 
@@ -15,6 +16,8 @@ import (
 
 // indexUser marshals a UserConfirmed to JSON and indexes it in Elasticsearch.
 func indexUser(es *elasticsearch.Client, ctx context.Context, uo *gen.UserConfirmed) error {
+
+	logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, "indexing user"))
 
 	doc := gen.UserDoc{
 		Id:      uo.Id,
@@ -42,12 +45,12 @@ func indexUser(es *elasticsearch.Client, ctx context.Context, uo *gen.UserConfir
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
 		if err != nil {
-			// TODO(nasr): what happens here then? this is a fix suggested by the static analyzers
-			// but when the closing does fail? how do you handle it?
+			logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("failed to close reader when indexing user: %v", err)))
 		}
 	}(res.Body)
 
 	if res.IsError() {
+		logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("response contains an error when indexing user: %v", res.String())))
 		return fmt.Errorf("elasticsearch: %s", res.String())
 	}
 

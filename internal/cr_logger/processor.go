@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"integration-project-ehb/controlroom/pkg/logger"
 	"github.com/elastic/go-elasticsearch/v9"
+	"integration-project-ehb/controlroom/pkg/logger"
 )
 
 type rawLogBody struct {
@@ -14,6 +14,10 @@ type rawLogBody struct {
 	Msg     string `json:"msg"`
 }
 
+// NOTE(nasr): unused elastic search client, because this isnt needed for the logging system.
+// it uses a differnet logger reference in "integration-project-ehb/controlroom/pkg/logger"
+// we added the parameter so we can keep the same function signature and use a function
+// pointer in the main entry point
 func ProcessLog(_ *elasticsearch.Client, body []byte) error {
 
 	var raw rawLogBody
