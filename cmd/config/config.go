@@ -1,0 +1,67 @@
+package config
+
+import (
+	"integration-project-ehb/controlroom/internal/cr_rabbitmq"
+)
+
+type cr_consumer_t int8
+
+const (
+	HEARTBEAT cr_consumer_t = iota
+	LOGGER
+	STATUSCHECK
+	USER
+	COMPANY
+)
+
+type ConsumerDef struct {
+	Type     cr_consumer_t
+	Exchange cr_rabbitmq.ExchangeInfo
+	Queue    cr_rabbitmq.QueueInfo
+	Binding  cr_rabbitmq.BindingInfo
+	DLQName  string
+	Qos      int
+	Passive  bool
+}
+
+var ConsumerDefinitions = []ConsumerDef{
+	{
+		Type:     HEARTBEAT,
+		Exchange: cr_rabbitmq.ExchangeInfo{Name: "heartbeat.direct", Kind: "direct", Durable: true},
+		Queue:    cr_rabbitmq.QueueInfo{Name: "controlroom.heartbeat.queue", Durable: true},
+		Binding:  cr_rabbitmq.BindingInfo{Key: "routing.heartbeat"},
+		DLQName:  "controlroom.heartbeat.queue.dlq",
+		Qos:      18,
+		Passive:  false,
+	},
+	{
+		Type:     STATUSCHECK,
+		Exchange: cr_rabbitmq.ExchangeInfo{Name: "statuscheck.direct", Kind: "direct", Durable: true},
+		Queue:    cr_rabbitmq.QueueInfo{Name: "controlroom.statuscheck.queue", Durable: true},
+		Binding:  cr_rabbitmq.BindingInfo{Key: "routing.statuscheck"},
+		DLQName:  "controlroom.statuscheck.queue.dlq",
+		Qos:      5,
+		Passive:  false,
+	},
+	{
+		Type:     LOGGER,
+		Exchange: cr_rabbitmq.ExchangeInfo{Name: "logs.direct", Kind: "direct", Durable: true},
+		Queue:    cr_rabbitmq.QueueInfo{Name: "controlroom.logs.queue", Durable: true},
+		Binding:  cr_rabbitmq.BindingInfo{Key: "routing.log"},
+		DLQName:  "controlroom.logs.queue.dlq",
+		Qos:      5,
+		Passive:  false,
+	},
+	{
+		Type:    USER,
+		Queue:   cr_rabbitmq.QueueInfo{Name: "crm.user.confirmed", Durable: true},
+		Qos:     10,
+		Passive: true,
+	},
+	{
+		Type:    COMPANY,
+		Queue:   cr_rabbitmq.QueueInfo{Name: "crm.company.confirmed", Durable: true},
+		Qos:     10,
+		Passive: true,
+	},
+}
