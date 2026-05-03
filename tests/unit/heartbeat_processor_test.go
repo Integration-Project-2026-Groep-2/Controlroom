@@ -1,4 +1,4 @@
-package processor_test
+package unit_tests
 
 import (
 	"encoding/xml"

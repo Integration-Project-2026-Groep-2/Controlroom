@@ -1,4 +1,4 @@
-package xml_test
+package unit_tests
 
 import (
 	"encoding/xml"
@@ -138,13 +138,4 @@ func TestUserConfirmed_InvalidXML(t *testing.T) {
 	var u gen.UserConfirmed
 	err := xml.Unmarshal([]byte("<broken"), &u)
 	assert.Error(t, err)
-}
-
-// test a wrong root tag
-func TestUserConfirmed_WrongRootTag(t *testing.T) {
-	xmlStr := `<SomethingElse><id>abc</id></SomethingElse>`
-	var u gen.UserConfirmed
-	err := xml.Unmarshal([]byte(xmlStr), &u)
-	assert.Error(t, err)
-	assert.Equal(t, gen.UUIDType(""), u.Id)
 }

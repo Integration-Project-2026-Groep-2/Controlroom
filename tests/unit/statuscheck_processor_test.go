@@ -1,25 +1,16 @@
-package processor_test
+package unit_tests
 
 import (
 	"encoding/xml"
 	"testing"
 	"time"
 
-	"github.com/elastic/go-elasticsearch/v9"
 	"github.com/stretchr/testify/assert"
 
 	"integration-project-ehb/controlroom/internal/statuscheck"
 	"integration-project-ehb/controlroom/internal/user"
 	"integration-project-ehb/controlroom/pkg/gen"
 )
-
-func unreachableES(t *testing.T) *elasticsearch.Client {
-	t.Helper()
-	es, _ := elasticsearch.NewClient(elasticsearch.Config{
-		Addresses: []string{"http://localhost:9999"},
-	})
-	return es
-}
 
 func TestProcessStatusCheck_InvalidXML(t *testing.T) {
 	err := statuscheck.ProcessStatusCheck(unreachableES(t), []byte("not xml"))
@@ -33,10 +24,9 @@ func TestProcessStatusCheck_ValidXML_ESUnavailable(t *testing.T) {
 		Timestamp: time.Now().UTC(),
 		Uptime:    3600,
 	}
-
 	body, err := xml.Marshal(sc)
 	assert.NoError(t, err)
-	statuscheck.ProcessStatusCheck(unreachableES(t), body)
+	err = statuscheck.ProcessStatusCheck(unreachableES(t), body)  // Assign the result
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "index")
 }
@@ -60,7 +50,6 @@ func TestProcessUser_InvalidXML(t *testing.T) {
 }
 
 func TestProcessUser_ValidXML_ESUnavailable(t *testing.T) {
-
 	u := gen.UserConfirmed{
 		Id:          gen.UUIDType("550e8400-e29b-41d4-a716-446655440000"),
 		Email:       gen.EmailType("test@example.com"),
@@ -71,10 +60,9 @@ func TestProcessUser_ValidXML_ESUnavailable(t *testing.T) {
 		GdprConsent: true,
 		ConfirmedAt: gen.ISO8601DateTimeType(time.Now().UTC().Format(time.RFC3339)),
 	}
-
 	body, err := xml.Marshal(u)
 	assert.NoError(t, err)
-	err = user.ProcessUser(unreachableES(t), body)
+	err = user.ProcessUser(unreachableES(t), body)  // Assign here too
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "index")
 }

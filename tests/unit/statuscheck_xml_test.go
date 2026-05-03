@@ -1,5 +1,5 @@
 // TODO(nasr): refactor this to the new statuscheck
-package xml_test
+package unit_tests
 
 import (
 	"encoding/xml"

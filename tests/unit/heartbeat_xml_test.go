@@ -6,7 +6,7 @@
 // Test 2 (XMLTagNames): controleert of de XML de juiste tagnamen heeft (<heartbeat>, <serviceId>).
 // Dit is belangrijk omdat andere services berichten sturen met deze exacte tagnamen.
 // Als de tags veranderen, begrijpen services elkaar niet meer.
-package xml_test
+package unit_tests
 
 import (
 	"encoding/xml"
