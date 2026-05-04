@@ -14,24 +14,19 @@ type rawLogBody struct {
 	Msg     string `json:"msg"`
 }
 
-// NOTE(nasr): unused elastic search client, because this isnt needed for the logging system.
-// it uses a differnet logger reference in "integration-project-ehb/controlroom/pkg/logger"
-// we added the parameter so we can keep the same function signature and use a function
-// pointer in the main entry point
 func ProcessLog(_ *elasticsearch.Client, body []byte) error {
 
 	var raw rawLogBody
 
-	if err := json.Unmarshal(body, &raw); err != nil {
-		logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM,
-			fmt.Sprintf("unparseable log body: %s", body)))
-		return nil // don't DLQ on parse failure
+	err := json.Unmarshal(body, &raw)
+
+	fmt.Println("DEBUGGING: ", raw)
+	if err != nil {
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("unparseable log body: %s", body)))
+		return fmt.Errorf("Failed to process Log: %s", err.Error())
 	}
 
-	logger.Log(logger.NewMessage(
-		logger.Severity(raw.Level),
-		logger.Service(raw.Service),
-		raw.Msg,
-	))
+	logger.Log(logger.NewMessage(logger.Severity(raw.Level), logger.Service(raw.Service), raw.Msg))
+
 	return nil
 }
