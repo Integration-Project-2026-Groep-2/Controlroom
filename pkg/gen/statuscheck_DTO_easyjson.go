@@ -51,12 +51,6 @@ func easyjsonA5941de2DecodeIntegrationProjectEhbControlroomPkgGen(in *jlexer.Lex
 			} else {
 				out.Uptime = uint(in.Uint())
 			}
-		case "cpu":
-			if in.IsNull() {
-				in.Skip()
-			} else {
-				out.Cpu = float64(in.Float64())
-			}
 		case "memory":
 			if in.IsNull() {
 				in.Skip()
@@ -97,11 +91,6 @@ func easyjsonA5941de2EncodeIntegrationProjectEhbControlroomPkgGen(out *jwriter.W
 		const prefix string = ",\"uptime\":"
 		out.RawString(prefix)
 		out.Uint(uint(in.Uptime))
-	}
-	{
-		const prefix string = ",\"cpu\":"
-		out.RawString(prefix)
-		out.Float64(float64(in.Cpu))
 	}
 	{
 		const prefix string = ",\"memory\":"

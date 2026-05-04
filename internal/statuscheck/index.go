@@ -21,7 +21,6 @@ func indexStatusCheck(es *elasticsearch.Client, ctx context.Context, sct *gen.St
 		ServiceId: sct.ServiceId,
 		Timestamp: sct.Timestamp,
 		Uptime: sct.Uptime,
-		Cpu: sct.Cpu,
 		Memory: sct.Memory,
 		Disk: sct.Disk,
 	}

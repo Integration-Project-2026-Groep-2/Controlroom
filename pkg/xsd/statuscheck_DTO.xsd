@@ -10,7 +10,6 @@
             <xs:element name="serviceId" type="xs:string"/>
             <xs:element name="timestamp" type="xs:dateTime"/>
             <xs:element name="uptime" type="xs:nonNegativeInteger"/>
-            <xs:element name="cpu" type="xs:decimal"/>
             <xs:element name="memory" type="xs:decimal"/>
             <xs:element name="disk" type="xs:decimal"/>
         </xs:sequence>
