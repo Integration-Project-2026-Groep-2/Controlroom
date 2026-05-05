@@ -31,7 +31,9 @@ func main() {
 	}
 	defer logger.Shutdown()
 
-	logger.Log(logger.NewMessage(logger.WARN, logger.KASSA, fmt.Sprintf("Test error lols")))
+	for i := 0; i < 5; i++ {
+		logger.Log(logger.NewMessage(logger.WARN, logger.KASSA, fmt.Sprintf("Test error lols")))
+	}
 
 	// 4. Wait a moment for the background worker to process the queue
 	fmt.Println("Waiting for Elasticsearch indexing...")
