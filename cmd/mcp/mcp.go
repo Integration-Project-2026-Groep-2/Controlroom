@@ -62,7 +62,7 @@ func elasticQuery(index, query string, size int, client *elasticsearch.Client) (
 	body := SearchRequest{
 		Size: size,
 		Sort: []map[string]map[string]string{
-			{"@timestamp": {"order": "desc"}},
+			{"timestamp": {"order": "desc"}},
 		},
 		Query: map[string]any{
 			"query_string": map[string]any{
@@ -103,6 +103,8 @@ func elasticQuery(index, query string, size int, client *elasticsearch.Client) (
 	for _, h := range result.Hits.Hits {
 		docs = append(docs, h.Source)
 	}
+
+	fmt.Println("the data:", docs)
 
 	return docs, nil
 }
