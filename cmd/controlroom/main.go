@@ -20,6 +20,7 @@ import (
 	"integration-project-ehb/controlroom/internal/heartbeat"
 	"integration-project-ehb/controlroom/internal/statuscheck"
 	"integration-project-ehb/controlroom/internal/user"
+	"integration-project-ehb/controlroom/pkg/analyser"
 	"integration-project-ehb/controlroom/pkg/logger"
 	"integration-project-ehb/controlroom/pkg/watchdog"
 )
@@ -226,6 +227,19 @@ func main() {
 			select {
 			case <-ticker.C:
 				watchdog.CheckHeartbeats(client)
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	go func() {
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				analyser.CheckWarnings(client)
 			case <-ctx.Done():
 				return
 			}
