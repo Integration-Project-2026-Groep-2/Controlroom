@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+
+  <!-- Main Element -->
+  <xs:element name="ESResponse" type="ESResponseType"/>
+
+  <!-- Named Types to control Struct naming -->
+  <xs:complexType name="ESWarningResponse">
+    <xs:sequence>
+      <xs:element name="took" type="xs:integer"/>
+      <xs:element name="timed_out" type="xs:boolean"/>
+      <xs:element name="_shards" type="Shards"/>
+      <xs:element name="hits" type="HitsRoot"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="Shards">
+    <xs:sequence>
+      <xs:element name="total" type="xs:integer"/>
+      <xs:element name="successful" type="xs:integer"/>
+      <xs:element name="skipped" type="xs:integer"/>
+      <xs:element name="failed" type="xs:integer"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="HitsRoot">
+    <xs:sequence>
+      <xs:element name="total" type="Total"/>
+      <xs:element name="max_score" type="xs:double" nillable="true"/>
+      <xs:element name="hits" type="Hit" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="Total">
+    <xs:sequence>
+      <xs:element name="value" type="xs:integer"/>
+      <xs:element name="relation" type="xs:string"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="Hit">
+    <xs:sequence>
+      <xs:element name="_index" type="xs:string"/>
+      <xs:element name="_id" type="xs:string"/>
+      <xs:element name="_score" type="xs:double"/>
+      <xs:element name="_source" type="Source"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="Source">
+    <xs:sequence>
+      <xs:element name="level" type="xs:string"/>
+      <xs:element name="timestamp" type="xs:dateTime"/>
+      <xs:element name="service" type="xs:string"/>
+      <xs:element name="data" type="xs:string"/>
+      <xs:element name="indexed" type="xs:dateTime"/>
+    </xs:sequence>
+  </xs:complexType>
+
+</xs:schema>
