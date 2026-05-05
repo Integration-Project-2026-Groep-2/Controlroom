@@ -20,7 +20,7 @@ type SimpleCount struct {
 	Count int `json:"count"`
 }
 
-func CheckWarnings(es *elasticsearch.Client) {
+func CheckWarnings(es *elasticsearch.Client) ([]string, error) {
 	//NOTE(Steven): When service names get replaced by env variables, other ways should be found to exclude. Also env file?
 	// use all services, excluding controlroom and watchdog
 	services := [6]string{"CRM", "KASSA", "FACTURATIE", "MAILING", "FRONTEND", "PLANNING"}
@@ -34,12 +34,12 @@ func CheckWarnings(es *elasticsearch.Client) {
 			warningXML, err := queryWarnings(es, value, warningSize)
 			if err != nil {
 				logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("%v", err)))
+				return nil, err
 			}
 			warnings = append(warnings, warningXML)
 		}
 	}
-	fmt.Println(fmt.Sprintf("Size: %d", len(warnings)))
-	fmt.Println(fmt.Sprintf("Warning: %s", warnings[0]))
+	return warnings, nil
 }
 
 func createquery(service string) *strings.Builder {

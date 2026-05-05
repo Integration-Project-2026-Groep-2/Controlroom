@@ -20,7 +20,7 @@ import (
 	"integration-project-ehb/controlroom/internal/heartbeat"
 	"integration-project-ehb/controlroom/internal/statuscheck"
 	"integration-project-ehb/controlroom/internal/user"
-	"integration-project-ehb/controlroom/pkg/analyser"
+	"integration-project-ehb/controlroom/internal/warning_producer"
 	"integration-project-ehb/controlroom/pkg/logger"
 	"integration-project-ehb/controlroom/pkg/watchdog"
 )
@@ -40,6 +40,36 @@ func setup(ch *amqp.Channel) error {
 
 	if err := ch.ExchangeDeclare("controlroom.dlx", "direct", true, false, false, false, nil); err != nil {
 		return fmt.Errorf("dlx: %w", err)
+	}
+
+	//Setup producer
+	if err := ch.ExchangeDeclare("news.topic", "topic", true, false, false, false, nil); err != nil {
+		return fmt.Errorf("news.topic: %w", err)
+	}
+
+	// 2. FIX: Declare the Queue before binding it
+	_, err := ch.QueueDeclare(
+		"mailing.news.warning", // name
+		true,                   // durable
+		false,                  // auto-delete
+		false,                  // exclusive
+		false,                  // no-wait
+		nil,                    // arguments
+	)
+	if err != nil {
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("failed to declare queue 'mailing.news.warning': %w", err)))
+	}
+
+	err = ch.QueueBind(
+		"mailing.news.warning", // queue name
+		"news.warning",         // routing key
+		"news.topic",           // exchange
+		false,
+		nil,
+	)
+
+	if err != nil {
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("Error binding queue to exchange: %w", err)))
 	}
 
 	logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, "declared DLX exchange"))
@@ -155,6 +185,15 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 
 	logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, "all consumers running, waiting for messages"))
 
+	pubCh, err := conn.Channel()
+	if err != nil {
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("producer channel: %w", err)))
+	}
+	defer pubCh.Close()
+	go warning_producer.RunWarningProducer(client, ctx, pubCh)
+
+	logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, "news producer started (interval: 120s)"))
+
 	select {
 	case reason := <-closeCh:
 		if reason == nil {
@@ -227,19 +266,6 @@ func main() {
 			select {
 			case <-ticker.C:
 				watchdog.CheckHeartbeats(client)
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-
-	go func() {
-		ticker := time.NewTicker(5 * time.Second)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ticker.C:
-				analyser.CheckWarnings(client)
 			case <-ctx.Done():
 				return
 			}
