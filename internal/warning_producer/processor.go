@@ -12,7 +12,7 @@ import (
 )
 
 func RunWarningProducer(es *elasticsearch.Client, ctx context.Context, ch *amqp.Channel) {
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(300 * time.Second)
 	defer ticker.Stop()
 
 	for {
