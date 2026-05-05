@@ -17,12 +17,12 @@ func indexStatusCheck(es *elasticsearch.Client, ctx context.Context, sct *gen.St
 
 	logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, fmt.Sprintf("indexing statuscheck for %s", sct.ServiceId)))
 
-	doc :=  gen.StatusCheckDoc{
+	doc := gen.StatusCheckDoc{
 		ServiceId: sct.ServiceId,
 		Timestamp: sct.Timestamp,
-		Uptime: sct.Uptime,
-		Memory: sct.Memory,
-		Disk: sct.Disk,
+		Uptime:    sct.Uptime,
+		Memory:    sct.Memory,
+		Disk:      sct.Disk,
 	}
 
 	jsonData, err := json.Marshal(doc)

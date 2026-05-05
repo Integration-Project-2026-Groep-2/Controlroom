@@ -26,7 +26,7 @@ func TestProcessStatusCheck_ValidXML_ESUnavailable(t *testing.T) {
 	}
 	body, err := xml.Marshal(sc)
 	assert.NoError(t, err)
-	err = statuscheck.ProcessStatusCheck(unreachableES(t), body)  // Assign the result
+	err = statuscheck.ProcessStatusCheck(unreachableES(t), body) // Assign the result
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "index")
 }
@@ -62,7 +62,7 @@ func TestProcessUser_ValidXML_ESUnavailable(t *testing.T) {
 	}
 	body, err := xml.Marshal(u)
 	assert.NoError(t, err)
-	err = user.ProcessUser(unreachableES(t), body)  // Assign here too
+	err = user.ProcessUser(unreachableES(t), body) // Assign here too
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "index")
 }

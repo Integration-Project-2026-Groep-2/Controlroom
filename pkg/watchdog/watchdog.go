@@ -40,7 +40,7 @@ func CheckHeartbeats(client *elasticsearch.Client) {
 		client.Search.WithBody(strings.NewReader(query)),
 	)
 	if err != nil {
-			logger.Log(logger.NewMessage(logger.WARN, logger.WATCHDOG, fmt.Sprintf("Failed to query elastic (%s): ", err)))
+		logger.Log(logger.NewMessage(logger.WARN, logger.WATCHDOG, fmt.Sprintf("Failed to query elastic (%s): ", err)))
 
 	}
 

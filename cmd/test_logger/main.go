@@ -31,7 +31,7 @@ func main() {
 	}
 	defer logger.Shutdown()
 
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		logger.Log(logger.NewMessage(logger.WARN, logger.KASSA, fmt.Sprintf("Test error lols")))
 	}
 

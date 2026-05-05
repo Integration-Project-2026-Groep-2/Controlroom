@@ -59,7 +59,7 @@ func setup(ch *amqp.Channel) error {
 		nil,                    // arguments
 	)
 	if err != nil {
-		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("failed to declare queue 'mailing.news.warning': %w", err)))
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("failed to declare queue 'mailing.news.warning': %v", err)))
 	}
 
 	err = ch.QueueBind(
@@ -71,7 +71,7 @@ func setup(ch *amqp.Channel) error {
 	)
 
 	if err != nil {
-		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("Error binding queue to exchange: %w", err)))
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("Error binding queue to exchange: %v", err)))
 	}
 
 	logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, "declared DLX exchange"))
@@ -189,7 +189,7 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 
 	pubCh, err := conn.Channel()
 	if err != nil {
-		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("producer channel: %w", err)))
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("producer channel: %v", err)))
 	}
 	defer pubCh.Close()
 	go warning_producer.RunWarningProducer(client, ctx, pubCh)

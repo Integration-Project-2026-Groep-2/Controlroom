@@ -44,7 +44,7 @@ func parseArguments(req mcp.CallToolRequest) map[string]any {
 	return m
 }
 
- // formatDocs renders a slice of ES source docs as a readable text block.
+// formatDocs renders a slice of ES source docs as a readable text block.
 func formatDocs(docs []map[string]any) string {
 	if len(docs) == 0 {
 		return "No results found."
@@ -123,7 +123,7 @@ func buildServer(client *elasticsearch.Client) *server.MCPServer {
 
 	s.AddTool(errorTool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 
-		arguments := parseArguments(req )
+		arguments := parseArguments(req)
 		limit := 20
 
 		query, ok := arguments["query"].(string)
@@ -204,21 +204,21 @@ func buildServer(client *elasticsearch.Client) *server.MCPServer {
 	return s
 }
 
-// SetupMCP builds and runs the Controlroom MCP server over SSE
-// so mcp-master can reach it across the Docker network.
 func SetupMCP(client *elasticsearch.Client) error {
 	s := buildServer(client)
-	port  := ":" + os.Getenv("MCP_PORT")
 
-	log.Println(port)
+	port := os.Getenv("MCP_PORT")
+	listenAddr := ":" + port
 
-	sseServer := server.NewSSEServer(s, server.WithBaseURL(port))
+	log.Printf("Starting MCP server on %s", listenAddr)
 
-	logger.Log(logger.NewMessage(logger.INFO, logger.MCP, fmt.Sprintf("controlroom-mcp listening on %s (SSE)\n", port)))
+	httpServer := server.NewStreamableHTTPServer(s)
 
-	if err := sseServer.Start(port); err != nil {
-		logger.Log(logger.NewMessage(logger.ERROR, logger.MCP, fmt.Sprintf("mcp sse server: %w", err)))
-		return fmt.Errorf("mcp sse server: %w", err)
+	logger.Log(logger.NewMessage(logger.INFO, logger.MCP, fmt.Sprintf("controlroom-mcp listening on %s (HTTP Stream)\n", listenAddr)))
+
+	if err := httpServer.Start(listenAddr); err != nil {
+		logger.Log(logger.NewMessage(logger.ERROR, logger.MCP, fmt.Sprintf("mcp http stream server error: %v", err)))
+		return fmt.Errorf("mcp http stream server: %w", err)
 	}
 	return nil
 }
