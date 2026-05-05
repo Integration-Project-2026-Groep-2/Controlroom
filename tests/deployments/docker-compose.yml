@@ -65,6 +65,10 @@ services:
       - CONTROLROOM_ES_PASS=${CONTROLROOM_ES_PASS}
       - TEAMS_WEBHOOK_URL=${TEAMS_WEBHOOK_URL}
       - MONITORED_SERVICES=${MONITORED_SERVICES}
+      - MCP_PORT=5555
+      - MCP_URL=http://controlroom
+    ports:
+      - "5555:5555"
     networks:
       - controlroom-network
     restart: unless-stopped

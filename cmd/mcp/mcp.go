@@ -5,9 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
+	"os"
 	"strings"
 
-	"integration-project-ehb/controlroom/cmd/config"
 	"integration-project-ehb/controlroom/pkg/logger"
 
 	"github.com/elastic/go-elasticsearch/v9"
@@ -81,6 +82,7 @@ func elasticQuery(index, query string, size int, client *elasticsearch.Client) (
 		client.Search.WithBody(&buf),
 		client.Search.WithTrackTotalHits(true),
 	)
+
 	if err != nil {
 		return nil, fmt.Errorf("search request: %w", err)
 	}
@@ -106,12 +108,7 @@ func elasticQuery(index, query string, size int, client *elasticsearch.Client) (
 }
 
 func buildServer(client *elasticsearch.Client) *server.MCPServer {
-	s := server.NewMCPServer(
-		CR_MCP_NAME,
-		CR_MCP_VERSION,
-		server.WithToolCapabilities(false),
-		server.WithRecovery(),
-	)
+	s := server.NewMCPServer(CR_MCP_NAME, CR_MCP_VERSION, server.WithToolCapabilities(false), server.WithRecovery())
 
 	errorTool := mcp.NewTool("error_analysis",
 		mcp.WithDescription("Query error logs from Elasticsearch. Accepts a Lucene query string (e.g. 'level:error AND service:controlroom')."),
@@ -123,6 +120,7 @@ func buildServer(client *elasticsearch.Client) *server.MCPServer {
 			mcp.Description("Max number of results to return (default 20)"),
 		),
 	)
+
 	s.AddTool(errorTool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 
 		arguments := parseArguments(req )
@@ -210,12 +208,16 @@ func buildServer(client *elasticsearch.Client) *server.MCPServer {
 // so mcp-master can reach it across the Docker network.
 func SetupMCP(client *elasticsearch.Client) error {
 	s := buildServer(client)
+	port  := ":" + os.Getenv("MCP_PORT")
 
-	sseServer := server.NewSSEServer(s, server.WithBaseURL(config.MCPURL))
+	log.Println(port)
 
-	logger.Log(logger.NewMessage(logger.INFO, logger.MCP, fmt.Sprintf("controlroom-mcp listening on %s (SSE)\n", config.MCP_PORT)))
+	sseServer := server.NewSSEServer(s, server.WithBaseURL(port))
 
-	if err := sseServer.Start(config.MCP_PORT); err != nil {
+	logger.Log(logger.NewMessage(logger.INFO, logger.MCP, fmt.Sprintf("controlroom-mcp listening on %s (SSE)\n", port)))
+
+	if err := sseServer.Start(port); err != nil {
+		logger.Log(logger.NewMessage(logger.ERROR, logger.MCP, fmt.Sprintf("mcp sse server: %w", err)))
 		return fmt.Errorf("mcp sse server: %w", err)
 	}
 	return nil

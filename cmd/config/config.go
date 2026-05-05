@@ -70,8 +70,6 @@ var ConsumerDefinitions = []ConsumerDef{
 }
 
 var ElasticUrl string = os.Getenv("ELASTICSEARCH_URL")
-var MCPURL string = os.Getenv("MCP_URL")
-var MCP_PORT string = os.Getenv("MCP_PORT")
 
 var ElasticConfig = elasticsearch.Config{
 	Addresses: []string{ElasticUrl},
