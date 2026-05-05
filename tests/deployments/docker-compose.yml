@@ -88,7 +88,8 @@ services:
       - CONTROLROOM_ES_PASS=${CONTROLROOM_ES_PASS}
     # We target ONLY the test main.go
     command: go run /app/cmd/test_logger/
-    networks: controlroom-network
+    networks: 
+      - controlroom-network
 
 networks:
   controlroom-network:
