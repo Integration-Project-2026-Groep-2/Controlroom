@@ -2,6 +2,9 @@ package config
 
 import (
 	"integration-project-ehb/controlroom/internal/cr_rabbitmq"
+	"os"
+
+	"github.com/elastic/go-elasticsearch/v9"
 )
 
 type cr_consumer_t int8
@@ -64,4 +67,14 @@ var ConsumerDefinitions = []ConsumerDef{
 		Qos:     10,
 		Passive: true,
 	},
+}
+
+var ElasticUrl string = os.Getenv("ELASTICSEARCH_URL")
+var MCPURL string = os.Getenv("MCP_URL")
+var MCP_PORT string = os.Getenv("MCP_PORT")
+
+var ElasticConfig = elasticsearch.Config{
+	Addresses: []string{ElasticUrl},
+	Username:  os.Getenv("CONTROLROOM_ES_USER"),
+	Password:  os.Getenv("CONTROLROOM_ES_PASS"),
 }
