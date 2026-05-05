@@ -68,6 +68,27 @@ services:
     networks:
       - controlroom-network
     restart: unless-stopped
+    
+  # Used for logger tests. 
+  # Will not be activated at docker-compose up -d
+  # Activated with docker compose run --rm test-logger, and will be deleted after the test
+  #Used for the simple reason that I cannot get it to work outside the controlroom-network
+  test-logger:
+    image: golang:1.26.1-alpine
+    profiles:
+      - debug
+    working_dir: /app
+    volumes:
+      # We mount the whole project so the Go compiler can find 
+      # the "internal" and "pkg" folders required by your test imports
+      - ../..:/app
+    environment:
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - CONTROLROOM_ES_USER=${CONTROLROOM_ES_USER}
+      - CONTROLROOM_ES_PASS=${CONTROLROOM_ES_PASS}
+    # We target ONLY the test main.go
+    command: go run /app/cmd/test_logger/
+    networks:
 
 networks:
   controlroom-network:
