@@ -37,6 +37,7 @@ const (
 	FRONTEND    Service = "FRONTEND"
 	PLANNING    Service = "PLANNING"
 	WATCHDOG    Service = "WATCHDOG"
+	MCP         Service = "MCP-SERVER"
 )
 
 var (

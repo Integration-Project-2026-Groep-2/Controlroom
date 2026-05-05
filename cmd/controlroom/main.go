@@ -15,6 +15,7 @@ import (
 	"integration-project-ehb/controlroom/internal/cr_rabbitmq"
 
 	"integration-project-ehb/controlroom/cmd/config"
+	"integration-project-ehb/controlroom/cmd/mcp"
 	"integration-project-ehb/controlroom/internal/company"
 	"integration-project-ehb/controlroom/internal/cr_logger"
 	"integration-project-ehb/controlroom/internal/heartbeat"
@@ -209,19 +210,13 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 }
 
 func main() {
-	cfg := elasticsearch.Config{
-		Addresses: []string{os.Getenv("ELASTICSEARCH_URL")},
-		Username:  os.Getenv("CONTROLROOM_ES_USER"),
-		Password:  os.Getenv("CONTROLROOM_ES_PASS"),
-	}
-
-	if err := logger.Init(&cfg, "controlroom-logs", os.Stdout, 4); err != nil {
+	if err := logger.Init(&config.ElasticConfig, "controlroom-logs", os.Stdout, 4); err != nil {
 		fmt.Fprintf(os.Stderr, "logger init: %v\n", err)
 		os.Exit(4)
 	}
 	defer logger.Shutdown()
 
-	client, err := elasticsearch.NewClient(cfg)
+	client, err := elasticsearch.NewClient(config.ElasticConfig)
 	if err != nil {
 		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("elasticsearch client config: %v", err)))
 		os.Exit(5)
@@ -247,6 +242,16 @@ func main() {
 		<-sigChan
 		logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, "shutdown signal received, draining queues..."))
 		cancel()
+	}()
+
+	// initialized mcp server
+	// NOTE(nasr): runs alongside the RabbitMQ session loop so mcp-master can
+	// reach our tools over SSE without blocking the consumer goroutines.
+	go func() {
+		err := mcp.SetupMCP(client)
+		if err != nil {
+			logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("mcp server exited: %v", err)))
+		}
 	}()
 
 	if watchdog.WDWebhook == "" {
