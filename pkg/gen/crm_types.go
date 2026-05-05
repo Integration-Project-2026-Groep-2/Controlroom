@@ -24,38 +24,37 @@ type BelgianVatNumberType string
 type UserRoleType string
 
 const (
-	UserRoleTypeVISITOR              UserRoleType = "VISITOR"
-	UserRoleTypeCOMPANYCONTACT       UserRoleType = "COMPANY_CONTACT"
-	UserRoleTypeSPEAKER              UserRoleType = "SPEAKER"
-	UserRoleTypeEVENTMANAGER         UserRoleType = "EVENT_MANAGER"
-	UserRoleTypeCASHIER              UserRoleType = "CASHIER"
-	UserRoleTypeBARSTAFF             UserRoleType = "BAR_STAFF"
-	UserRoleTypeADMIN                UserRoleType = "ADMIN"
+	UserRoleTypeVISITOR        UserRoleType = "VISITOR"
+	UserRoleTypeCOMPANYCONTACT UserRoleType = "COMPANY_CONTACT"
+	UserRoleTypeSPEAKER        UserRoleType = "SPEAKER"
+	UserRoleTypeEVENTMANAGER   UserRoleType = "EVENT_MANAGER"
+	UserRoleTypeCASHIER        UserRoleType = "CASHIER"
+	UserRoleTypeBARSTAFF       UserRoleType = "BAR_STAFF"
+	UserRoleTypeADMIN          UserRoleType = "ADMIN"
 )
 
 type RegistrationRoleType string
 
 const (
-	RegistrationRoleTypeVISITOR      RegistrationRoleType = "VISITOR"
+	RegistrationRoleTypeVISITOR        RegistrationRoleType = "VISITOR"
 	RegistrationRoleTypeCOMPANYCONTACT RegistrationRoleType = "COMPANY_CONTACT"
 )
 
 type FacturatieUserRoleType string
 
 const (
-	FacturatieUserRoleTypeVISITOR    FacturatieUserRoleType = "VISITOR"
+	FacturatieUserRoleTypeVISITOR        FacturatieUserRoleType = "VISITOR"
 	FacturatieUserRoleTypeCOMPANYCONTACT FacturatieUserRoleType = "COMPANY_CONTACT"
-	FacturatieUserRoleTypeSPEAKER    FacturatieUserRoleType = "SPEAKER"
-	FacturatieUserRoleTypeEVENTMANAGER FacturatieUserRoleType = "EVENT_MANAGER"
-	FacturatieUserRoleTypeCASHIER    FacturatieUserRoleType = "CASHIER"
-	FacturatieUserRoleTypeBARSTAFF   FacturatieUserRoleType = "BAR_STAFF"
-	FacturatieUserRoleTypeADMIN      FacturatieUserRoleType = "ADMIN"
+	FacturatieUserRoleTypeSPEAKER        FacturatieUserRoleType = "SPEAKER"
+	FacturatieUserRoleTypeEVENTMANAGER   FacturatieUserRoleType = "EVENT_MANAGER"
+	FacturatieUserRoleTypeCASHIER        FacturatieUserRoleType = "CASHIER"
+	FacturatieUserRoleTypeBARSTAFF       FacturatieUserRoleType = "BAR_STAFF"
+	FacturatieUserRoleTypeADMIN          FacturatieUserRoleType = "ADMIN"
 )
 
 type PlanningUserRoleType string
 
 const (
-	PlanningUserRoleTypeSPEAKER      PlanningUserRoleType = "SPEAKER"
-	PlanningUserRoleTypeVISITOR      PlanningUserRoleType = "VISITOR"
+	PlanningUserRoleTypeSPEAKER PlanningUserRoleType = "SPEAKER"
+	PlanningUserRoleTypeVISITOR PlanningUserRoleType = "VISITOR"
 )
-

@@ -12,10 +12,9 @@ var _ = xml.Name{}
 var _ = time.Time{}
 
 type StatusCheckDoc struct {
-	ServiceId                string               `xml:"serviceId" json:"service_id" validate:"required"`
-	Timestamp                time.Time            `xml:"timestamp" json:"timestamp" validate:"required"`
-	Uptime                   uint                 `xml:"uptime" json:"uptime" validate:"required"`
-	Memory                   float64              `xml:"memory" json:"memory" validate:"required"`
-	Disk                     float64              `xml:"disk" json:"disk" validate:"required"`
+	ServiceId string    `xml:"serviceId" json:"service_id" validate:"required"`
+	Timestamp time.Time `xml:"timestamp" json:"timestamp" validate:"required"`
+	Uptime    uint      `xml:"uptime" json:"uptime" validate:"required"`
+	Memory    float64   `xml:"memory" json:"memory" validate:"required"`
+	Disk      float64   `xml:"disk" json:"disk" validate:"required"`
 }
-
