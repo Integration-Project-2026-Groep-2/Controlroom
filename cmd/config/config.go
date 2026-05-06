@@ -76,3 +76,5 @@ var ElasticConfig = elasticsearch.Config{
 	Username:  os.Getenv("CONTROLROOM_ES_USER"),
 	Password:  os.Getenv("CONTROLROOM_ES_PASS"),
 }
+
+var Services = [6]string{"CRM", "FACTURATIE", "FRONTEND", "MAILING", "PLANNING", "KASSA"}
