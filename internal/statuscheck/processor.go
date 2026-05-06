@@ -27,6 +27,6 @@ func ProcessStatusCheck(es *elasticsearch.Client, body []byte) error {
 		return fmt.Errorf("index: %w", err)
 	}
 
-	logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("Indexed user object: %s", sct.ServiceId)))
+	// logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("Finished processing StatusCheck: %s", sct.ServiceId)))
 	return nil
 }
