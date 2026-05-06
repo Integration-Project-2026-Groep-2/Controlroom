@@ -22,6 +22,7 @@ import (
 	"integration-project-ehb/controlroom/internal/heartbeat"
 	"integration-project-ehb/controlroom/internal/statuscheck"
 	"integration-project-ehb/controlroom/internal/user"
+	userack "integration-project-ehb/controlroom/internal/user_ack"
 	"integration-project-ehb/controlroom/internal/warning_producer"
 	"integration-project-ehb/controlroom/pkg/logger"
 	"integration-project-ehb/controlroom/pkg/watchdog"
@@ -178,11 +179,20 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 		case config.STATUSCHECK:
 			go cr_rabbitmq.Consume(cfg, msgs, ctx, statuscheck.ProcessStatusCheck)
 		case config.USER:
-			go cr_rabbitmq.Consume(cfg, msgs, ctx, user.ProcessUser)
+			wrapper := func(es *elasticsearch.Client, body []byte) error {
+				if err := user.ProcessUser(es, body); err != nil {
+					return err
+				}
+				if err := userack.ProcessCRMAck(es, body); err != nil {
+					return err
+				}
+				return nil
+			}
+			go cr_rabbitmq.Consume(cfg, msgs, ctx, wrapper)
 		case config.COMPANY:
 			go cr_rabbitmq.Consume(cfg, msgs, ctx, company.ProcessCompany)
-		case config.USER_ACT:
-			go cr_rabbitmq.Consume(cfg, msgs, ctx, user.ProcessUserAct)
+		case config.USER_ACK:
+			go cr_rabbitmq.Consume(cfg, msgs, ctx, userack.ProcessControlroomAck)
 		}
 		logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("%s consumer started (qos: %d)", def.Queue.Name, def.Qos)))
 	}
