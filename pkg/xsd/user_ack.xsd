@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified">
-    <xs:element name="UserDoc">
+    <xs:element name="UserAck">
         <xs:complexType>
             <xs:sequence>
-                <xs:element name="id"          type="UUIDType"/>
+                <xs:element name="userId"          type="UUIDType"/>
                 <xs:element name="indexed"     type="xs:dateTime"/>
 		        <xs:element name="service"     type="string"/>	
             </xs:sequence>
