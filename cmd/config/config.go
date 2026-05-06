@@ -15,6 +15,7 @@ const (
 	STATUSCHECK
 	USER
 	COMPANY
+	USER_ACT
 )
 
 type ConsumerDef struct {
@@ -64,6 +65,12 @@ var ConsumerDefinitions = []ConsumerDef{
 	{
 		Type:    COMPANY,
 		Queue:   cr_rabbitmq.QueueInfo{Name: "crm.company.confirmed", Durable: true},
+		Qos:     10,
+		Passive: true,
+	},
+	{
+		Type:    USER_ACT,
+		Queue:   cr_rabbitmq.QueueInfo{Name: "controlroom.user.confirmed", Durable: true},
 		Qos:     10,
 		Passive: true,
 	},
