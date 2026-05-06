@@ -181,6 +181,8 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 			go cr_rabbitmq.Consume(cfg, msgs, ctx, user.ProcessUser)
 		case config.COMPANY:
 			go cr_rabbitmq.Consume(cfg, msgs, ctx, company.ProcessCompany)
+		case config.USER_ACT:
+			go cr_rabbitmq.Consume(cfg, msgs, ctx, user.ProcessUserAct)
 		}
 		logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("%s consumer started (qos: %d)", def.Queue.Name, def.Qos)))
 	}
