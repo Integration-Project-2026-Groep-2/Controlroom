@@ -8,6 +8,7 @@ Receives, validates, and stores event-driven data (heartbeats, status checks, us
 - RabbitMQ (`amqp091-go`)
 - Elasticsearch 9 (`go-elasticsearch/v9`)
 - Kibana 9.3.1
+- Go MCP SDK
 
 ## Quick Start
 
@@ -44,6 +45,8 @@ docker compose up -d --build
 go test ./tests/...
 ```
 
+Running tests individually requires you to pass helper.go as a second file argument because it contains helper functions that the tests depend on.
+
 ## Hosted
 
 [control-room.integration-project-2026-groep-2.my.be](https://control-room.integration-project-2026-groep-2.my.be)
@@ -51,10 +54,10 @@ go test ./tests/...
 
 ## Developers
 
-Marwan Makouh
-Thomas Heusdens
-Steven Deloof
-Abdellah El Morabit
+- Marwan Makouh
+- Thomas Heusdens
+- Steven Deloof
+- Abdellah El Morabit
 
 
 # Misc.
@@ -64,4 +67,12 @@ AI generation has been used for the file writing but the parsing and lexing is h
 This simplified  our workflow to just drag and dropping XSD's developped by other teams in the `pkg/xml` folder and
 running the meta program.
 
+(won't do this anymore)
 We're hoping on expanding this package in the future to generate code based on exchange and queue declarations.
+
+
+## Extra
+
+Recently we've added an mcp integration for querying information out of elastic and giving cool AI summaries.
+
+
