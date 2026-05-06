@@ -54,6 +54,6 @@ func indexStatusCheck(es *elasticsearch.Client, ctx context.Context, sct *gen.St
 		return fmt.Errorf("elasticsearch error: %s", res.String())
 	}
 
-	logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("indexed statuscheck for %s", sct.ServiceId)))
+	// logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("indexed statuscheck for %s", sct.ServiceId)))
 	return nil
 }

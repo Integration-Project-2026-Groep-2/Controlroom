@@ -57,6 +57,6 @@ func indexHeartbeat(es *elasticsearch.Client, ctx context.Context, hb *gen.Heart
 		return fmt.Errorf("elasticsearch error: %s", res.String())
 	}
 
-	logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("indexed heartbeat for %s", hb.ServiceId)))
+	// logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("indexed heartbeat for %s", hb.ServiceId)))
 	return nil
 }
