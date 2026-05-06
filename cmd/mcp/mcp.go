@@ -136,7 +136,7 @@ func buildServer(client *elasticsearch.Client) *server.MCPServer {
 			limit = int(raw)
 		}
 
-		docs, err := elasticQuery("logs", query, limit, client)
+		docs, err := elasticQuery("controlroom-logs", query, limit, client)
 
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Elasticsearch error: %v", err)), nil
