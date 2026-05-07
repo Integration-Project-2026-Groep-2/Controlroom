@@ -69,10 +69,12 @@ var ConsumerDefinitions = []ConsumerDef{
 		Passive: true,
 	},
 	{
-		Type:    USER_ACK,
-		Queue:   cr_rabbitmq.QueueInfo{Name: "controlroom.user.confirmed", Durable: true},
-		Qos:     10,
-		Passive: true,
+		Type:     USER_ACK,
+		Exchange: cr_rabbitmq.ExchangeInfo{Name: "controlroom.user.confirmed.direct", Kind: "direct", Durable: true},
+		Queue:    cr_rabbitmq.QueueInfo{Name: "controlroom.user.confirmed", Durable: true},
+		Binding:  cr_rabbitmq.BindingInfo{Key: "routing.controlroom.user.confirmed"},
+		Qos:      10,
+		Passive:  false,
 	},
 }
 
