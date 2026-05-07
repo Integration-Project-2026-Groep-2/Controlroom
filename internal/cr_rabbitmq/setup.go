@@ -109,7 +109,7 @@ func Consume(cfg *ConsumerConfig, msgs <-chan amqp.Delivery, ctx context.Context
 	for {
 		select {
 		case <-ctx.Done():
-			logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("[%s] context cancelled, shutting down", cfg.DLQName)))
+			// logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("[%s] context cancelled, shutting down", cfg.DLQName)))
 			return
 		case msg, ok := <-msgs:
 			if !ok {
@@ -117,7 +117,7 @@ func Consume(cfg *ConsumerConfig, msgs <-chan amqp.Delivery, ctx context.Context
 				return
 			}
 
-			logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("[%s] received message (tag=%d, len=%d)", cfg.DLQName, msg.DeliveryTag, len(msg.Body))))
+			// logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("[%s] received message (tag=%d, len=%d)", cfg.DLQName, msg.DeliveryTag, len(msg.Body))))
 
 			if err := handler(cfg.Client, msg.Body); err != nil {
 				logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("[%s] handler failed (tag=%d): %v", cfg.DLQName, msg.DeliveryTag, err)))
@@ -137,7 +137,7 @@ func Consume(cfg *ConsumerConfig, msgs <-chan amqp.Delivery, ctx context.Context
 					logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("[%s] ACK failed (tag=%d): %v", cfg.DLQName, msg.DeliveryTag, err)))
 					return
 				}
-				logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("[%s] message ACKed (tag=%d)", cfg.DLQName, msg.DeliveryTag)))
+				// logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("[%s] message ACKed (tag=%d)", cfg.DLQName, msg.DeliveryTag)))
 			}
 		}
 	}
