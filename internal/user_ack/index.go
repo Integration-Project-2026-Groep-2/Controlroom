@@ -29,6 +29,7 @@ func indexUserAck(es *elasticsearch.Client, ctx context.Context, doc *UserAckDoc
 		return fmt.Errorf("elasticsearch client is nil")
 	}
 
+	// TODO(nasr): replace with easy json
 	// Converteer onze geünificeerde struct naar JSON
 	jsonData, err := json.Marshal(doc)
 	if err != nil {
@@ -60,6 +61,5 @@ func indexUserAck(es *elasticsearch.Client, ctx context.Context, doc *UserAckDoc
 		return fmt.Errorf("elasticsearch error: %s", res.String())
 	}
 
-	logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("indexed user ack for user %s from %s", doc.ID, doc.Service)))
 	return nil
 }
