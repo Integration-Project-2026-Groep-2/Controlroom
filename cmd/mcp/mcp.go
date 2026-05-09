@@ -114,6 +114,7 @@ func buildServer(client *elasticsearch.Client) *server.MCPServer {
 
 	errorTool := mcp.NewTool("error_analysis",
 		mcp.WithDescription("Query error logs from Elasticsearch. Accepts a Lucene query string (e.g. 'level:error AND service:controlroom')."),
+		mcp.WithReadOnlyHintAnnotation(true),
 		mcp.WithString("query",
 			mcp.Required(),
 			mcp.Description("query string to filter error logs"),
@@ -146,6 +147,7 @@ func buildServer(client *elasticsearch.Client) *server.MCPServer {
 
 	heartbeatTool := mcp.NewTool("heartbeat_status",
 		mcp.WithDescription("Fetch recent heartbeat events indexed from the RabbitMQ heartbeat consumer."),
+		mcp.WithReadOnlyHintAnnotation(true),
 		mcp.WithString("service",
 			mcp.Description("Filter by service name (optional, leave empty for all)"),
 		),
@@ -175,6 +177,7 @@ func buildServer(client *elasticsearch.Client) *server.MCPServer {
 
 	statusTool := mcp.NewTool("statuscheck_summary",
 		mcp.WithDescription("Summarise recent statuscheck events indexed from the RabbitMQ statuscheck consumer."),
+		mcp.WithReadOnlyHintAnnotation(true),
 		mcp.WithString("status",
 			mcp.Description("Filter by status value, e.g. 'ok', 'degraded', 'down' (optional)"),
 		),
