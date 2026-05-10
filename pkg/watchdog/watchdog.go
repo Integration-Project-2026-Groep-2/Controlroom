@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/elastic/go-elasticsearch/v9"
@@ -28,11 +29,11 @@ var WDServiceState = map[string]bool{
 var WDQueue = make(chan string, 50) // The FIFO Queue for alerts (Buffer of 50 messages)
 var WDWebhook = os.Getenv("TEAMS_WEBHOOK_URL")
 
-var WDPubChan *amqp.Channel
+var WDPubChan atomic.Pointer[amqp.Channel]
 
 var WDAmqpEnabled = strings.EqualFold(os.Getenv("WATCHDOG_AMQP_ENABLED"), "true")
 
-func SetPubChannel(ch *amqp.Channel) { WDPubChan = ch }
+func SetPubChannel(ch *amqp.Channel) { WDPubChan.Store(ch) }
 
 func BuildPDCEFEnvelope(svc string, count float64) ([]byte, error) {
 	now := time.Now().UTC().Format(time.RFC3339)
@@ -57,7 +58,8 @@ func BuildPDCEFEnvelope(svc string, count float64) ([]byte, error) {
 }
 
 func publishPDCEF(svc string, count float64) {
-	if !WDAmqpEnabled || WDPubChan == nil {
+	ch := WDPubChan.Load()
+	if !WDAmqpEnabled || ch == nil {
 		return
 	}
 	body, err := BuildPDCEFEnvelope(svc, count)
@@ -65,7 +67,7 @@ func publishPDCEF(svc string, count float64) {
 		logger.Log(logger.NewMessage(logger.WARN, logger.WATCHDOG, fmt.Sprintf("marshal heartbeat_failed: %v", err)))
 		return
 	}
-	err = WDPubChan.PublishWithContext(context.Background(),
+	err = ch.PublishWithContext(context.Background(),
 		"ai.events", "event.heartbeat_failed", false, false,
 		amqp.Publishing{ContentType: "application/json", Body: body},
 	)
