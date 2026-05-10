@@ -50,6 +50,10 @@ func setup(ch *amqp.Channel) error {
 		return fmt.Errorf("news.topic: %w", err)
 	}
 
+	if err := ch.ExchangeDeclare("ai.events", "topic", true, false, false, false, nil); err != nil {
+		return fmt.Errorf("ai.events: %w", err)
+	}
+
 	// 2. FIX: Declare the Queue before binding it
 	_, err := ch.QueueDeclare(
 		"mailing.news.warning", // name
@@ -207,6 +211,15 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 	go warning_producer.RunWarningProducer(client, ctx, pubCh)
 
 	logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, "news producer started (interval: 120s)"))
+
+	wdPubCh, err := conn.Channel()
+	if err != nil {
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("watchdog publish channel: %v", err)))
+	} else {
+		defer wdPubCh.Close()
+		watchdog.SetPubChannel(wdPubCh)
+		defer watchdog.SetPubChannel(nil)
+	}
 
 	select {
 	case reason := <-closeCh:
