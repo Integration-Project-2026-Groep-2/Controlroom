@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	"integration-project-ehb/controlroom/pkg/logger"
 
@@ -57,18 +58,14 @@ func formatDocs(docs []map[string]any) string {
 	return sb.String()
 }
 
-func elasticQuery(index, query string, size int, client *elasticsearch.Client) ([]map[string]any, error) {
+func elasticQuery(index string, query any, size int, client *elasticsearch.Client) ([]map[string]any, error) {
 
 	body := SearchRequest{
 		Size: size,
 		Sort: []map[string]map[string]string{
 			{"timestamp": {"order": "desc"}},
 		},
-		Query: map[string]any{
-			"query_string": map[string]any{
-				"query": query,
-			},
-		},
+		Query: query,
 	}
 
 	var buf bytes.Buffer
@@ -104,9 +101,23 @@ func elasticQuery(index, query string, size int, client *elasticsearch.Client) (
 		docs = append(docs, h.Source)
 	}
 
-	fmt.Println("the data:", docs)
-
 	return docs, nil
+}
+
+func luceneQuery(q string) map[string]any {
+	return map[string]any{"query_string": map[string]any{"query": q}}
+}
+
+func BuildFetchLogsQuery(service, gte, lte string) map[string]any {
+	return map[string]any{
+		"bool": map[string]any{
+			"filter": []any{
+				map[string]any{"term": map[string]any{"service.keyword": service}},
+				map[string]any{"range": map[string]any{"timestamp": map[string]any{"gte": gte, "lte": lte}}},
+				map[string]any{"terms": map[string]any{"level.keyword": []string{"ERROR", "WARN"}}},
+			},
+		},
+	}
 }
 
 func buildServer(client *elasticsearch.Client) *server.MCPServer {
@@ -137,7 +148,7 @@ func buildServer(client *elasticsearch.Client) *server.MCPServer {
 			limit = int(raw)
 		}
 
-		docs, err := elasticQuery("controlroom-logs", query, limit, client)
+		docs, err := elasticQuery("controlroom-logs", luceneQuery(query), limit, client)
 
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Elasticsearch error: %v", err)), nil
@@ -168,7 +179,7 @@ func buildServer(client *elasticsearch.Client) *server.MCPServer {
 		if strings.TrimSpace(service) != "" {
 			query = fmt.Sprintf("service: %s", service)
 		}
-		docs, err := elasticQuery("heartbeats", query, limit, client)
+		docs, err := elasticQuery("heartbeats", luceneQuery(query), limit, client)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Elasticsearch error: %v", err)), nil
 		}
@@ -199,7 +210,51 @@ func buildServer(client *elasticsearch.Client) *server.MCPServer {
 		if strings.TrimSpace(status) != "" {
 			query = fmt.Sprintf("status:%s", status)
 		}
-		docs, err := elasticQuery("statuscheck", query, limit, client)
+		docs, err := elasticQuery("statuscheck", luceneQuery(query), limit, client)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Elasticsearch error: %v", err)), nil
+		}
+		return mcp.NewToolResultText(formatDocs(docs)), nil
+	})
+
+	fetchLogsTool := mcp.NewTool("fetch_logs",
+		mcp.WithDescription("Fetch ERROR/WARN log entries for a service in a time-window centered around a failure timestamp. Server builds a typed bool query against the controlroom-logs Elasticsearch index. Returns up to 50 entries sorted by timestamp desc."),
+		mcp.WithReadOnlyHintAnnotation(true),
+		mcp.WithString("service",
+			mcp.Required(),
+			mcp.Description("Service name (matches service.keyword exact-match field, e.g. 'kassa', 'crm')"),
+		),
+		mcp.WithString("since",
+			mcp.Required(),
+			mcp.Description("RFC3339 timestamp of the failure point; window centers around this"),
+		),
+		mcp.WithNumber("window_seconds",
+			mcp.Description("Total window width in seconds (default 360 = 5min before + 1min after since)"),
+		),
+	)
+
+	s.AddTool(fetchLogsTool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := parseArguments(req)
+		service, _ := args["service"].(string)
+		since, _ := args["since"].(string)
+		if strings.TrimSpace(service) == "" || strings.TrimSpace(since) == "" {
+			return mcp.NewToolResultError("'service' and 'since' must be non-empty"), nil
+		}
+
+		window := 360
+		if raw, ok := args["window_seconds"].(float64); ok && raw > 0 {
+			window = int(raw)
+		}
+
+		sinceTs, err := time.Parse(time.RFC3339, since)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("'since' must be RFC3339: %v", err)), nil
+		}
+
+		gte := sinceTs.Add(-time.Duration(window)*time.Second*5/6).UTC().Format(time.RFC3339)
+		lte := sinceTs.Add(time.Duration(window)*time.Second/6).UTC().Format(time.RFC3339)
+
+		docs, err := elasticQuery("controlroom-logs", BuildFetchLogsQuery(service, gte, lte), 50, client)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Elasticsearch error: %v", err)), nil
 		}
