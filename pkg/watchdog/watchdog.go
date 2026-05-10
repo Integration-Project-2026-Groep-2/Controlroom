@@ -2,6 +2,7 @@ package watchdog
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"integration-project-ehb/controlroom/pkg/logger"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/elastic/go-elasticsearch/v9"
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 var WDServices = [6]string{"CRM", "FACTURATIE", "FRONTEND", "MAILING", "PLANNING", "KASSA"} // State trackers
@@ -25,6 +27,52 @@ var WDServiceState = map[string]bool{
 
 var WDQueue = make(chan string, 50) // The FIFO Queue for alerts (Buffer of 50 messages)
 var WDWebhook = os.Getenv("TEAMS_WEBHOOK_URL")
+
+var WDPubChan *amqp.Channel
+
+var WDAmqpEnabled = strings.EqualFold(os.Getenv("WATCHDOG_AMQP_ENABLED"), "true")
+
+func SetPubChannel(ch *amqp.Channel) { WDPubChan = ch }
+
+func BuildPDCEFEnvelope(svc string, count float64) ([]byte, error) {
+	now := time.Now().UTC().Format(time.RFC3339)
+	payload := map[string]any{
+		"event":     "heartbeat_failed",
+		"source":    "controlroom-watchdog",
+		"timestamp": now,
+		"payload": map[string]any{
+			"summary":   fmt.Sprintf("%s heartbeat missed (count %v in last 60s)", svc, count),
+			"severity":  "critical",
+			"component": strings.ToLower(svc),
+			"group":     "festival-services",
+			"class":     "heartbeat-loss",
+			"custom_details": map[string]any{
+				"heartbeat_count_last_60s": count,
+				"threshold":                30,
+				"last_check_at":            now,
+			},
+		},
+	}
+	return json.Marshal(payload)
+}
+
+func publishPDCEF(svc string, count float64) {
+	if !WDAmqpEnabled || WDPubChan == nil {
+		return
+	}
+	body, err := BuildPDCEFEnvelope(svc, count)
+	if err != nil {
+		logger.Log(logger.NewMessage(logger.WARN, logger.WATCHDOG, fmt.Sprintf("marshal heartbeat_failed: %v", err)))
+		return
+	}
+	err = WDPubChan.PublishWithContext(context.Background(),
+		"ai.events", "event.heartbeat_failed", false, false,
+		amqp.Publishing{ContentType: "application/json", Body: body},
+	)
+	if err != nil {
+		logger.Log(logger.NewMessage(logger.WARN, logger.WATCHDOG, fmt.Sprintf("publish heartbeat_failed: %v", err)))
+	}
+}
 
 // ProcessAlertQueue runs endlessly in the background.
 func ProcessAlertQueue() {
@@ -106,6 +154,7 @@ func CheckHeartbeats(client *elasticsearch.Client) {
 			fmt.Println("")
 			WDServiceState[svc] = false
 			logger.Log(logger.NewMessage(logger.WARN, logger.WATCHDOG, fmt.Sprintf("%s is OFFLINE!", svc)))
+			publishPDCEF(svc, count)
 			WDQueue <- fmt.Sprintf("**CRITICAL:** Service **%s** is down! (Heartbeats in last 60s: %v)", svc, count)
 
 		}
