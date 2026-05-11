@@ -100,3 +100,22 @@ func TestFetchRecentRuns_NoAuthHeaderWhenTokenEmpty(t *testing.T) {
 	_, _ = c.FetchRecentRuns(context.Background(), "x/y", 5)
 	assert.Empty(t, seenAuth)
 }
+
+// Regression: url.PathEscape on a full "owner/repo" string converts the
+// separator slash to %2F, which GitHub interprets as a literal slash in the
+// repo name and returns 404. r.RequestURI captures the raw on-wire URI before
+// Go's auto-decode applies — r.URL.Path is decoded and would hide this bug.
+func TestFetchRecentRuns_RepoSlashNotURLEncoded(t *testing.T) {
+	var seenURI string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seenURI = r.RequestURI
+		_, _ = w.Write([]byte(`{"workflow_runs":[]}`))
+	}))
+	defer srv.Close()
+
+	c := &Client{BaseURL: srv.URL, HTTP: srv.Client()}
+	_, _ = c.FetchRecentRuns(context.Background(), "Integration-Project-2026-Groep-2/Kassa", 5)
+
+	assert.NotContains(t, seenURI, "%2F", "owner/repo slash must not be URL-encoded")
+	assert.Contains(t, seenURI, "/repos/Integration-Project-2026-Groep-2/Kassa/actions/runs")
+}
