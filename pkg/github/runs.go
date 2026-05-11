@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/url"
 	"os"
 	"time"
 )
@@ -39,7 +38,7 @@ func (c *Client) FetchRecentRuns(ctx context.Context, repo string, limit int) ([
 		limit = 5
 	}
 	u := fmt.Sprintf("%s/repos/%s/actions/runs?head_branch=main&per_page=%d",
-		c.BaseURL, url.PathEscape(repo), limit)
+		c.BaseURL, repo, limit)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
