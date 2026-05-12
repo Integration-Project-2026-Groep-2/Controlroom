@@ -14,6 +14,7 @@ import (
 	"github.com/elastic/go-elasticsearch/v9/esapi"
 )
 
+// TODO(nasr): remove this in the future. why is this even needed here? it's not
 // UserAckDoc is de geünificeerde JSON structuur voor in de data view
 type UserAckDoc struct {
 	ID      string    `json:"id"`

@@ -5,7 +5,7 @@
             <xs:sequence>
                 <xs:element name="userId"          type="UUIDType"/>
                 <xs:element name="indexed"     type="xs:dateTime"/>
-		        <xs:element name="service"     type="string"/>	
+		        <xs:element name="service"     type="xs:string"/>
             </xs:sequence>
         </xs:complexType>
   </xs:element>

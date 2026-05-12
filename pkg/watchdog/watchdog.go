@@ -5,35 +5,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"integration-project-ehb/controlroom/cmd/config"
 	"integration-project-ehb/controlroom/pkg/logger"
 	"net/http"
-	"os"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"github.com/elastic/go-elasticsearch/v9"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
-
-var WDServices = [6]string{"CRM", "FACTURATIE", "FRONTEND", "MAILING", "PLANNING", "KASSA"} // State trackers
-var WDServiceState = map[string]bool{
-	"CRM":        false,
-	"FACTURATIE": false,
-	"FRONTEND":   false,
-	"MAILING":    false,
-	"PLANNING":   false,
-	"KASSA":      false,
-}
-
-var WDQueue = make(chan string, 50) // The FIFO Queue for alerts (Buffer of 50 messages)
-var WDWebhook = os.Getenv("TEAMS_WEBHOOK_URL")
-
-var WDPubChan atomic.Pointer[amqp.Channel]
-
-var WDAmqpEnabled = strings.EqualFold(os.Getenv("WATCHDOG_AMQP_ENABLED"), "true")
-
-func SetPubChannel(ch *amqp.Channel) { WDPubChan.Store(ch) }
 
 func BuildPDCEFEnvelope(svc string, count float64) ([]byte, error) {
 	now := time.Now().UTC().Format(time.RFC3339)
@@ -59,21 +39,52 @@ func BuildPDCEFEnvelope(svc string, count float64) ([]byte, error) {
 
 func publishPDCEF(svc string, count float64) {
 	ch := WDPubChan.Load()
-	if !WDAmqpEnabled || ch == nil {
-		return
-	}
+
 	body, err := BuildPDCEFEnvelope(svc, count)
 	if err != nil {
 		logger.Log(logger.NewMessage(logger.WARN, logger.WATCHDOG, fmt.Sprintf("marshal heartbeat_failed: %v", err)))
 		return
 	}
 	err = ch.PublishWithContext(context.Background(),
-		"ai.events", "event.heartbeat_failed", false, false,
-		amqp.Publishing{ContentType: "application/json", Body: body},
+			config.Producer[config.HEARTBEAT_FAILED_EVENT].Exchange.Name,
+			config.Producer[config.HEARTBEAT_FAILED_EVENT].Key.Key,
+			false,
+			false,
+			amqp.Publishing{
+				ContentType: "application/json",
+				Body: body,
+			},
 	)
 	if err != nil {
 		logger.Log(logger.NewMessage(logger.WARN, logger.WATCHDOG, fmt.Sprintf("publish heartbeat_failed: %v", err)))
 	}
+}
+
+func publishHeartbeatBackOnline(svc string, count float64) {
+
+	ch := WDPubChan.Load()
+
+	body, err := BuildPDCEFEnvelope(svc, count)
+
+	if err != nil {
+		logger.Log(logger.NewMessage(logger.WARN, logger.WATCHDOG, fmt.Sprintf("marshal heartbeat_failed: %v", err)))
+		return
+	}
+	err = ch.PublishWithContext(
+		context.Background(),
+		config.Producer[config.HEARTBEAT_SUCCEEDED_EVENT].Exchange.Name ,
+		config.Producer[config.HEARTBEAT_SUCCEEDED_EVENT].Key.Key,
+		false,
+		false,
+		amqp.Publishing{
+			ContentType: "application/json",
+			Body: body,
+		},
+	)
+	if err != nil {
+		logger.Log(logger.NewMessage(logger.WARN, logger.WATCHDOG, fmt.Sprintf("publish heartbeat_failed: %v", err)))
+	}
+
 }
 
 // ProcessAlertQueue runs endlessly in the background.
@@ -151,9 +162,6 @@ func CheckHeartbeats(client *elasticsearch.Client) {
 			WDQueue <- fmt.Sprintf("**RESOLVED:** Service **%s** is back online!", svc)
 
 		} else if !isCurrentlyOnline && wasOnline {
-			fmt.Println("")
-			fmt.Printf("Service %s is pop at %v", svc, time.Now())
-			fmt.Println("")
 			WDServiceState[svc] = false
 			logger.Log(logger.NewMessage(logger.WARN, logger.WATCHDOG, fmt.Sprintf("%s is OFFLINE!", svc)))
 			publishPDCEF(svc, count)
