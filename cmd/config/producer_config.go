@@ -10,11 +10,12 @@ type cr_producer_events_t int8
 const (
     HEARTBEAT_FAILED_EVENT = iota
     HEARTBEAT_SUCCEEDED_EVENT
-    NEWS_EVENT
+    WARNING_EVENT
 )
 
 const (
     WATCHDOG cr_producer_t = iota
+	CONTROLROOM
 )
 
 type ProducerDef struct {
@@ -22,12 +23,6 @@ type ProducerDef struct {
     Exchange cr_rabbitmq.ExchangeInfo
     Key      cr_rabbitmq.BindingInfo
     Queue    cr_rabbitmq.QueueInfo
-}
-
-var ProducerDefinitions = map[string]cr_producer_events_t{
-    "watchdog.heartbeat_failed":   HEARTBEAT_FAILED_EVENT,
-    "watchdog.heartbeat_success":  HEARTBEAT_SUCCEEDED_EVENT,
-    "watchdog.news":               NEWS_EVENT,
 }
 
 var Producer = map[cr_producer_events_t]ProducerDef{
@@ -53,4 +48,11 @@ var Producer = map[cr_producer_events_t]ProducerDef{
             Key: "event.heartbeat_succeeded",
         },
     },
+
+	WARNING_EVENT: {
+		Type:     0,
+		Exchange: cr_rabbitmq.ExchangeInfo{Name: "news.topic", Kind: "topic"},
+		Key:      cr_rabbitmq.BindingInfo{Key: "news.warning"},
+		Queue: cr_rabbitmq.QueueInfo{Name: "mailing.news.warning", Durable: true},
+	},
 }
