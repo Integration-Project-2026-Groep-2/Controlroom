@@ -79,8 +79,6 @@ func setup(ch *amqp.Channel) error {
 		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("Error binding queue to exchange: %v", err)))
 	}
 
-	logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, "declared DLX exchange"))
-
 	for _, def := range config.ConsumerDefinitions {
 		if def.Passive {
 			continue

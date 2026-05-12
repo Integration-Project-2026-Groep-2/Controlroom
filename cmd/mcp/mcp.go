@@ -252,8 +252,8 @@ func buildServer(client *elasticsearch.Client) *server.MCPServer {
 			return mcp.NewToolResultError(fmt.Sprintf("'since' must be RFC3339: %v", err)), nil
 		}
 
-		gte := sinceTs.Add(-time.Duration(window)*time.Second*5/6).UTC().Format(time.RFC3339)
-		lte := sinceTs.Add(time.Duration(window)*time.Second/6).UTC().Format(time.RFC3339)
+		gte := sinceTs.Add(-time.Duration(window) * time.Second * 5 / 6).UTC().Format(time.RFC3339)
+		lte := sinceTs.Add(time.Duration(window) * time.Second / 6).UTC().Format(time.RFC3339)
 
 		docs, err := elasticQuery("controlroom-logs", BuildFetchLogsQuery(service, gte, lte), 50, client)
 		if err != nil {

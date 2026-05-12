@@ -68,6 +68,7 @@ var ConsumerDefinitions = []ConsumerDef{
 		Qos:     10,
 		Passive: true,
 	},
+	// note(nasr): we can just bind queues to the creation of the things within planning etc
 	{
 		Type:     USER_ACK,
 		Exchange: cr_rabbitmq.ExchangeInfo{Name: "controlroom.user.confirmed.direct", Kind: "direct", Durable: true},
@@ -77,6 +78,7 @@ var ConsumerDefinitions = []ConsumerDef{
 		Qos:      10,
 		Passive:  false,
 	},
+
 }
 
 var ElasticUrl string = os.Getenv("ELASTICSEARCH_URL")
@@ -87,4 +89,9 @@ var ElasticConfig = elasticsearch.Config{
 	Password:  os.Getenv("CONTROLROOM_ES_PASS"),
 }
 
-var Services = [6]string{"CRM", "FACTURATIE", "FRONTEND", "MAILING", "PLANNING", "KASSA"}
+var Services = [6]string{"CRM",
+	"FACTURATIE",
+	"FRONTEND",
+	"MAILING",
+	"PLANNING",
+	"KASSA"}
