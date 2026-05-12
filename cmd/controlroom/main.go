@@ -20,13 +20,13 @@ import (
 	"integration-project-ehb/controlroom/internal/company"
 	"integration-project-ehb/controlroom/internal/cr_logger"
 	"integration-project-ehb/controlroom/internal/heartbeat"
+	"integration-project-ehb/controlroom/internal/k8_retriever"
 	"integration-project-ehb/controlroom/internal/statuscheck"
 	"integration-project-ehb/controlroom/internal/user"
 	userack "integration-project-ehb/controlroom/internal/user_ack"
 	"integration-project-ehb/controlroom/internal/warning_producer"
 	"integration-project-ehb/controlroom/pkg/logger"
 	"integration-project-ehb/controlroom/pkg/watchdog"
-	"integration-project-ehb/controlroom/internal/k8_retriever"
 )
 
 func setup(ch *amqp.Channel) error {
@@ -281,33 +281,35 @@ func main() {
 
 	if watchdog.WDWebhook == "" {
 		logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, "CRITICAL: TEAMS_WEBHOOK_URL is niet ingesteld in de environment!"))
-	}
+	} else {
 
-	for _, svc := range watchdog.WDServices {
-		watchdog.WDServiceState[svc] = true
+		// note(nasr): fix nil pointer dereference when env variable is empty
+		for _, svc := range watchdog.WDServices {
+			watchdog.WDServiceState[svc] = true
+		}
+
+		//-
+		go watchdog.ProcessAlertQueue()
+
+		//-
+		go func() {
+			ticker := time.NewTicker(5 * time.Second)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ticker.C:
+					watchdog.CheckHeartbeats(client)
+				case <-ctx.Done():
+					return
+				}
+			}
+		}()
 	}
 
 	//-
-	go watchdog.ProcessAlertQueue()
 
-	//-
 	go func() {
 		ticker := time.NewTicker(5 * time.Second)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ticker.C:
-				watchdog.CheckHeartbeats(client)
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-
-	//-
-
-	go func() {
-		ticker := time.NewTicker(5 *time.Second)
 		defer ticker.Stop()
 		for {
 			select {
