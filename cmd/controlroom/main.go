@@ -26,6 +26,7 @@ import (
 	"integration-project-ehb/controlroom/internal/warning_producer"
 	"integration-project-ehb/controlroom/pkg/logger"
 	"integration-project-ehb/controlroom/pkg/watchdog"
+	"integration-project-ehb/controlroom/internal/k8_retriever"
 )
 
 func setup(ch *amqp.Channel) error {
@@ -286,8 +287,10 @@ func main() {
 		watchdog.WDServiceState[svc] = true
 	}
 
+	//-
 	go watchdog.ProcessAlertQueue()
 
+	//-
 	go func() {
 		ticker := time.NewTicker(5 * time.Second)
 		defer ticker.Stop()
@@ -297,6 +300,26 @@ func main() {
 				watchdog.CheckHeartbeats(client)
 			case <-ctx.Done():
 				return
+			}
+		}
+	}()
+
+	//-
+
+	go func() {
+		ticker := time.NewTicker(5 *time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				err := internal_k8retriever.ProcessK8sData(client)
+				if err != nil {
+					return
+				}
+
+			case <-ctx.Done():
+				return
+
 			}
 		}
 	}()
