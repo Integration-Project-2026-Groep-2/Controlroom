@@ -59,7 +59,7 @@ var ConsumerDefinitions = []ConsumerDef{
 	},
 	{
 		Type:     USER,
-		Exchange: cr_rabbitmq.ExchangeInfo{Name: "contact.topic", Durable: true},
+		Exchange: cr_rabbitmq.ExchangeInfo{Name: "contact.topic", Kind: "topic", Durable: true},
 		Queue:    cr_rabbitmq.QueueInfo{Name: "crm.user.confirmed", Durable: true},
 		Binding:  cr_rabbitmq.BindingInfo{Key: "crm.user.confirmed"},
 		DLQName:  "controlroom.company.confirmed.queue.dlq",
@@ -68,7 +68,7 @@ var ConsumerDefinitions = []ConsumerDef{
 	},
 	{
 		Type:     COMPANY,
-		Exchange: cr_rabbitmq.ExchangeInfo{Name: "contact.topic", Durable: true},
+		Exchange: cr_rabbitmq.ExchangeInfo{Name: "contact.topic", Kind: "topic", Durable: true},
 		Queue:    cr_rabbitmq.QueueInfo{Name: "crm.company.confirmed", Durable: true},
 		Binding:  cr_rabbitmq.BindingInfo{Key: "crm.company.confirmed"},
 		DLQName:  "controlroom.company.confirmed.queue.dlq",
