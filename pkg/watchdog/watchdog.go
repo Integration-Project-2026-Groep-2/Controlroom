@@ -44,7 +44,7 @@ func BuildOnlineMessage(svc string, count float64) ([]byte, error) {
 		"source":    "controlroom-watchdog",
 		"timestamp": now,
 		"payload": map[string]any{
-			"summary":   fmt.Sprintf("%s heartbeat is back online", svc, count),
+			"summary":   fmt.Sprintf("%s heartbeat is back online", svc),
 			"severity":  "critical",
 			"component": strings.ToLower(svc),
 			"group":     "festival-services",

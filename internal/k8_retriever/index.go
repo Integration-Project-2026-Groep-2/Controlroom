@@ -19,11 +19,10 @@ const (
 	timeout      = 5 * time.Second
 )
 
-
 func indexK8Pod(ctx context.Context, es *elasticsearch.Client, pod k8_retriever.PodInfo) error {
-	logger.Log(logger.NewMessage( logger.DEBUG, logger.CONTROLROOM, fmt.Sprintf("indexing pod %s/%s", pod.Namespace, pod.Name)))
+	logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, fmt.Sprintf("indexing pod %s/%s", pod.Namespace, pod.Name)))
 
-	doc := map[string]interface{}{
+	doc := map[string]any{
 		"namespace":       pod.Namespace,
 		"name":            pod.Name,
 		"phase":           pod.Phase,
@@ -57,7 +56,7 @@ func indexK8Pod(ctx context.Context, es *elasticsearch.Client, pod k8_retriever.
 
 	res, err := req.Do(ctx, es)
 	if err != nil {
-		logger.Log(logger.NewMessage( logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("failed to index pod %s/%s: %v", pod.Namespace, pod.Name, err)))
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("failed to index pod %s/%s: %v", pod.Namespace, pod.Name, err)))
 		return fmt.Errorf("index request: %w", err)
 	}
 

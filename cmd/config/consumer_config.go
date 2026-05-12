@@ -59,9 +59,11 @@ var ConsumerDefinitions = []ConsumerDef{
 	},
 	{
 		Type:    USER,
+		Exchange: cr_rabbitmq.ExchangeInfo{Name: "contact.topic", Durable: true},
 		Queue:   cr_rabbitmq.QueueInfo{Name: "crm.user.confirmed", Durable: true},
+		Binding: cr_rabbitmq.BindingInfo{Key: "crm.user.confirmed"},
 		Qos:     10,
-		Passive: true,
+		Passive: false,
 	},
 	{
 		Type:    COMPANY,
