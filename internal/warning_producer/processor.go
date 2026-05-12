@@ -106,7 +106,6 @@ func analyseCPU(es *elasticsearch.Client) {
 
 		json.NewDecoder(res.Body).Decode(&count)
 
-		fmt.Printf("%s: %d\n", val, count)
 		res.Body.Close()
 	}
 }
