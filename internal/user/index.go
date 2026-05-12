@@ -20,12 +20,14 @@ func indexUser(es *elasticsearch.Client, ctx context.Context, uo *gen.UserConfir
 	logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, "indexing user"))
 
 	doc := gen.UserDoc{
-		Id:      uo.Id,
-		Role:    uo.Role,
-		Indexed: time.Now(),
+		Id:        uo.Id,
+		Role:      uo.Role,
+		CompanyId: uo.CompanyId,
+		Indexed:   time.Now(),
 	}
 
 	jsonData, err := easyjson.Marshal(doc)
+
 	if err != nil {
 		return fmt.Errorf("marshal: %w", err)
 	}

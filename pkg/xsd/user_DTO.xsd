@@ -6,6 +6,7 @@
                 <xs:element name="id"          type="UUIDType"/>
                 <xs:element name="Role"        type="UserRoleType"/>
                 <xs:element name="indexed"     type="xs:dateTime"/>
+                <xs:element name="companyId" type="UUIDType" minOccurs="0"/>
             </xs:sequence>
         </xs:complexType>
   </xs:element>
