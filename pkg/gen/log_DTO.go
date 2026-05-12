@@ -12,9 +12,10 @@ var _ = xml.Name{}
 var _ = time.Time{}
 
 type LogDoc struct {
-	Level     SeverityType `xml:"level" json:"level" validate:"required"`
-	Timestamp time.Time    `xml:"timestamp" json:"timestamp" validate:"required"`
-	Service   string       `xml:"service" json:"service" validate:"required"`
-	Data      string       `xml:"data" json:"data" validate:"required"`
-	Indexed   time.Time    `xml:"indexed" json:"indexed" validate:"required"`
+	Level                    SeverityType         `xml:"level" json:"level" validate:"required"`
+	Timestamp                time.Time            `xml:"timestamp" json:"timestamp" validate:"required"`
+	Service                  string               `xml:"service" json:"service" validate:"required"`
+	Data                     string               `xml:"data" json:"data" validate:"required"`
+	Indexed                  time.Time            `xml:"indexed" json:"indexed" validate:"required"`
 }
+

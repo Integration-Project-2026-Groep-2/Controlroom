@@ -51,6 +51,12 @@ func easyjsonB5ac0c03DecodeIntegrationProjectEhbControlroomPkgGen(in *jlexer.Lex
 					in.AddError((out.Indexed).UnmarshalJSON(data))
 				}
 			}
+		case "company_id":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.CompanyId = UUIDType(in.String())
+			}
 		default:
 			in.SkipRecursive()
 		}
@@ -79,6 +85,11 @@ func easyjsonB5ac0c03EncodeIntegrationProjectEhbControlroomPkgGen(out *jwriter.W
 		const prefix string = ",\"indexed\":"
 		out.RawString(prefix)
 		out.Raw((in.Indexed).MarshalJSON())
+	}
+	{
+		const prefix string = ",\"company_id\":"
+		out.RawString(prefix)
+		out.String(string(in.CompanyId))
 	}
 	out.RawByte('}')
 }

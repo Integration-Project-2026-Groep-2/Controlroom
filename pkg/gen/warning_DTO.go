@@ -12,41 +12,42 @@ var _ = xml.Name{}
 var _ = time.Time{}
 
 type ESWarningResponse struct {
-	Took     int      `xml:"took" json:"took" validate:"required"`
-	TimedOut bool     `xml:"timed_out" json:"timed_out" validate:"required"`
-	Shards   Shards   `xml:"_shards" json:"_shards" validate:"required"`
-	Hits     HitsRoot `xml:"hits" json:"hits" validate:"required"`
+	Took                     int                  `xml:"took" json:"took" validate:"required"`
+	TimedOut                 bool                 `xml:"timed_out" json:"timed_out" validate:"required"`
+	Shards                   Shards               `xml:"_shards" json:"_shards" validate:"required"`
+	Hits                     HitsRoot             `xml:"hits" json:"hits" validate:"required"`
 }
 
 type Shards struct {
-	Total      int `xml:"total" json:"total" validate:"required"`
-	Successful int `xml:"successful" json:"successful" validate:"required"`
-	Skipped    int `xml:"skipped" json:"skipped" validate:"required"`
-	Failed     int `xml:"failed" json:"failed" validate:"required"`
+	Total                    int                  `xml:"total" json:"total" validate:"required"`
+	Successful               int                  `xml:"successful" json:"successful" validate:"required"`
+	Skipped                  int                  `xml:"skipped" json:"skipped" validate:"required"`
+	Failed                   int                  `xml:"failed" json:"failed" validate:"required"`
 }
 
 type HitsRoot struct {
-	Total    Total   `xml:"total" json:"total" validate:"required"`
-	MaxScore float64 `xml:"max_score" json:"max_score" validate:"required"`
-	Hits     []Hit   `xml:"hits" json:"hits" validate:"required"`
+	Total                    Total                `xml:"total" json:"total" validate:"required"`
+	MaxScore                 float64              `xml:"max_score" json:"max_score" validate:"required"`
+	Hits                     []Hit                `xml:"hits" json:"hits" validate:"required"`
 }
 
 type Total struct {
-	Value    int    `xml:"value" json:"value" validate:"required"`
-	Relation string `xml:"relation" json:"relation" validate:"required"`
+	Value                    int                  `xml:"value" json:"value" validate:"required"`
+	Relation                 string               `xml:"relation" json:"relation" validate:"required"`
 }
 
 type Hit struct {
-	Index  string  `xml:"_index" json:"_index" validate:"required"`
-	Id     string  `xml:"_id" json:"_id" validate:"required"`
-	Score  float64 `xml:"_score" json:"_score" validate:"required"`
-	Source Source  `xml:"_source" json:"_source" validate:"required"`
+	Index                    string               `xml:"_index" json:"_index" validate:"required"`
+	Id                       string               `xml:"_id" json:"_id" validate:"required"`
+	Score                    float64              `xml:"_score" json:"_score" validate:"required"`
+	Source                   Source               `xml:"_source" json:"_source" validate:"required"`
 }
 
 type Source struct {
-	Level     string    `xml:"level" json:"level" validate:"required"`
-	Timestamp time.Time `xml:"timestamp" json:"timestamp" validate:"required"`
-	Service   string    `xml:"service" json:"service" validate:"required"`
-	Data      string    `xml:"data" json:"data" validate:"required"`
-	Indexed   time.Time `xml:"indexed" json:"indexed" validate:"required"`
+	Level                    string               `xml:"level" json:"level" validate:"required"`
+	Timestamp                time.Time            `xml:"timestamp" json:"timestamp" validate:"required"`
+	Service                  string               `xml:"service" json:"service" validate:"required"`
+	Data                     string               `xml:"data" json:"data" validate:"required"`
+	Indexed                  time.Time            `xml:"indexed" json:"indexed" validate:"required"`
 }
+
