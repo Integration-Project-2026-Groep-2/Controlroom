@@ -37,6 +37,28 @@ func BuildPDCEFEnvelope(svc string, count float64) ([]byte, error) {
 	return json.Marshal(payload)
 }
 
+func BuildOnlineMessage(svc string, count float64) ([]byte, error) {
+	now := time.Now().UTC().Format(time.RFC3339)
+	payload := map[string]any{
+		"event":     "heartbeat_online",
+		"source":    "controlroom-watchdog",
+		"timestamp": now,
+		"payload": map[string]any{
+			"summary":   fmt.Sprintf("%s heartbeat is back online", svc, count),
+			"severity":  "critical",
+			"component": strings.ToLower(svc),
+			"group":     "festival-services",
+			"class":     "heartbeat-loss",
+			"custom_details": map[string]any{
+				"heartbeat_count_last_60s": count,
+				"threshold":                30,
+				"last_check_at":            now,
+			},
+		},
+	}
+	return json.Marshal(payload)
+}
+
 func publishPDCEF(svc string, count float64) {
 	ch := WDPubChan.Load()
 
@@ -46,14 +68,14 @@ func publishPDCEF(svc string, count float64) {
 		return
 	}
 	err = ch.PublishWithContext(context.Background(),
-			config.Producer[config.HEARTBEAT_FAILED_EVENT].Exchange.Name,
-			config.Producer[config.HEARTBEAT_FAILED_EVENT].Key.Key,
-			false,
-			false,
-			amqp.Publishing{
-				ContentType: "application/json",
-				Body: body,
-			},
+		config.Producer[config.HEARTBEAT_FAILED_EVENT].Exchange.Name,
+		config.Producer[config.HEARTBEAT_FAILED_EVENT].Key.Key,
+		false,
+		false,
+		amqp.Publishing{
+			ContentType: "application/json",
+			Body:        body,
+		},
 	)
 	if err != nil {
 		logger.Log(logger.NewMessage(logger.WARN, logger.WATCHDOG, fmt.Sprintf("publish heartbeat_failed: %v", err)))
@@ -64,7 +86,7 @@ func publishHeartbeatBackOnline(svc string, count float64) {
 
 	ch := WDPubChan.Load()
 
-	body, err := BuildPDCEFEnvelope(svc, count)
+	body, err := BuildOnlineMessage(svc, count)
 
 	if err != nil {
 		logger.Log(logger.NewMessage(logger.WARN, logger.WATCHDOG, fmt.Sprintf("marshal heartbeat_failed: %v", err)))
@@ -72,13 +94,13 @@ func publishHeartbeatBackOnline(svc string, count float64) {
 	}
 	err = ch.PublishWithContext(
 		context.Background(),
-		config.Producer[config.HEARTBEAT_SUCCEEDED_EVENT].Exchange.Name ,
+		config.Producer[config.HEARTBEAT_SUCCEEDED_EVENT].Exchange.Name,
 		config.Producer[config.HEARTBEAT_SUCCEEDED_EVENT].Key.Key,
 		false,
 		false,
 		amqp.Publishing{
 			ContentType: "application/json",
-			Body: body,
+			Body:        body,
 		},
 	)
 	if err != nil {
@@ -159,6 +181,7 @@ func CheckHeartbeats(client *elasticsearch.Client) {
 		if isCurrentlyOnline && !wasOnline {
 			WDServiceState[svc] = true
 			logger.Log(logger.NewMessage(logger.INFO, logger.WATCHDOG, fmt.Sprintf("%s is ONLINE!", svc)))
+			publishHeartbeatBackOnline(svc, count)
 			WDQueue <- fmt.Sprintf("**RESOLVED:** Service **%s** is back online!", svc)
 
 		} else if !isCurrentlyOnline && wasOnline {
