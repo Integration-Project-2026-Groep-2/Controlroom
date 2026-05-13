@@ -55,5 +55,28 @@ func indexCompany(es *elasticsearch.Client, ctx context.Context, comp *gen.Compa
 	}
 
 	logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("indexed company %s", comp.Id)))
+
+	// ==============================================================================
+	// NIEUW: AUTOMATISATIE VAN DE ENRICH POLICY
+	// ==============================================================================
+	enrichReq := esapi.EnrichExecutePolicyRequest{
+		Name: "company_lookup",
+	}
+
+	enrichRes, enrichErr := enrichReq.Do(ctx, es)
+	if enrichErr != nil {
+		// We gebruiken hier WARN in plaats van ERROR, omdat het bedrijf wel al succesvol is opgeslagen.
+		// Een falende policy update mag de rest van de applicatie niet laten crashen.
+		logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, fmt.Sprintf("failed to trigger enrich policy after indexing company %s: %v", comp.Id, enrichErr)))
+	} else {
+		defer enrichRes.Body.Close()
+		if enrichRes.IsError() {
+			logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, fmt.Sprintf("elasticsearch error executing policy: %s", enrichRes.String())))
+		} else {
+			logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("successfully refreshed company_lookup policy for new company %s", comp.Id)))
+		}
+	}
+	// ==============================================================================
+
 	return nil
 }
