@@ -8,8 +8,9 @@ import (
 
 	"integration-project-ehb/controlroom/pkg/gen"
 
-	"github.com/elastic/go-elasticsearch/v9"
 	"integration-project-ehb/controlroom/pkg/logger"
+
+	"github.com/elastic/go-elasticsearch/v9"
 )
 
 func ProcessCompany(es *elasticsearch.Client, body []byte) error {
@@ -22,7 +23,7 @@ func ProcessCompany(es *elasticsearch.Client, body []byte) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := indexCompany(es, ctx, &company); err != nil {
-		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("Failed to index user object: %s", err.Error())))
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("Failed to index company object: %s", err.Error())))
 		return fmt.Errorf("Failed to index company object: %s", err.Error())
 	}
 	logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("Indexed company object: %s", company.Id)))
