@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified">
+
+  <xs:element name="HeartbeatStatusEvent" type="HeartbeatStatusEventType"/>
+
+  <xs:complexType name="HeartbeatStatusEventType">
+    <xs:sequence>
+      <xs:element name="Event" type="xs:string"/>
+      <xs:element name="Source" type="xs:string"/>
+      <xs:element name="Timestamp" type="xs:dateTime"/>
+      <xs:element name="Payload" type="HeartbeatPayloadType"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="HeartbeatPayloadType">
+    <xs:sequence>
+      <xs:element name="Summary" type="xs:string"/>
+      <xs:element name="Severity" type="xs:string"/>
+      <xs:element name="Component" type="xs:string"/>
+      <xs:element name="Group" type="xs:string"/>
+      <xs:element name="Class" type="xs:string"/>
+      <xs:element name="CustomDetails" type="HeartbeatCustomDetailsType"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="HeartbeatCustomDetailsType">
+    <xs:sequence>
+      <xs:element name="HeartbeatCountLast60s" type="xs:decimal"/>
+      <xs:element name="Threshold" type="xs:integer"/>
+      <xs:element name="LastCheckAt" type="xs:dateTime"/>
+    </xs:sequence>
+  </xs:complexType>
+
+</xs:schema>
