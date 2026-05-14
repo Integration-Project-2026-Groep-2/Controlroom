@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type PodInfo struct {
@@ -23,6 +23,24 @@ type PodInfo struct {
 	ContainerCount int    `json:"container_count"`
 }
 
+func formatBytes(bytes int64) string {
+	const (
+		KB = 1024
+		MB = KB * 1024
+		GB = MB * 1024
+	)
+
+	switch {
+	case bytes >= GB:
+		return fmt.Sprintf("%.2fGi", float64(bytes)/float64(GB))
+	case bytes >= MB:
+		return fmt.Sprintf("%.2fMi", float64(bytes)/float64(MB))
+	case bytes >= KB:
+		return fmt.Sprintf("%.2fKi", float64(bytes)/float64(KB))
+	default:
+		return fmt.Sprintf("%dB", bytes)
+	}
+}
 
 func getKubeConfig() (*rest.Config, error) {
 	return rest.InClusterConfig()
@@ -85,23 +103,4 @@ func GetPods(ctx context.Context) ([]PodInfo, error) {
 	}
 
 	return result, nil
-}
-
-func formatBytes(bytes int64) string {
-	const (
-		KB = 1024
-		MB = KB * 1024
-		GB = MB * 1024
-	)
-
-	switch {
-	case bytes >= GB:
-		return fmt.Sprintf("%.2fGi", float64(bytes)/float64(GB))
-	case bytes >= MB:
-		return fmt.Sprintf("%.2fMi", float64(bytes)/float64(MB))
-	case bytes >= KB:
-		return fmt.Sprintf("%.2fKi", float64(bytes)/float64(KB))
-	default:
-		return fmt.Sprintf("%dB", bytes)
-	}
 }

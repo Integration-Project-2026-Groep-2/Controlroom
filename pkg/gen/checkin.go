@@ -12,7 +12,6 @@ var _ = xml.Name{}
 var _ = time.Time{}
 
 type CheckIn struct {
-	Id                       string               `xml:"id" json:"id" validate:"required"`
-	Timestamp                time.Time            `xml:"timestamp" json:"timestamp" validate:"required"`
+	Id        string    `xml:"id" json:"id" validate:"required"`
+	Timestamp time.Time `xml:"timestamp" json:"timestamp" validate:"required"`
 }
-

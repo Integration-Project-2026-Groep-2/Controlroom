@@ -12,8 +12,7 @@ var _ = xml.Name{}
 var _ = time.Time{}
 
 type UserAck struct {
-	UserId                   UUIDType             `xml:"userId" json:"user_id" validate:"required"`
-	Indexed                  time.Time            `xml:"indexed" json:"indexed" validate:"required"`
-	Service                  string               `xml:"service" json:"service" validate:"required"`
+	UserId  UUIDType  `xml:"userId" json:"user_id" validate:"required"`
+	Indexed time.Time `xml:"indexed" json:"indexed" validate:"required"`
+	Service string    `xml:"service" json:"service" validate:"required"`
 }
-
