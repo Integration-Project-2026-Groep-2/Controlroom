@@ -4,212 +4,177 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
-	"integration-project-ehb/controlroom/cmd/config"
-	"integration-project-ehb/controlroom/pkg/logger"
 	"net/http"
 	"strings"
 	"time"
+
+	"integration-project-ehb/controlroom/cmd/config"
+	"integration-project-ehb/controlroom/pkg/gen"
+	"integration-project-ehb/controlroom/pkg/logger"
 
 	"github.com/elastic/go-elasticsearch/v9"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-func BuildPDCEFEnvelope(svc string, count float64) ([]byte, error) {
-	now := time.Now().UTC().Format(time.RFC3339)
-	payload := map[string]any{
-		"event":     "heartbeat_failed",
-		"source":    "controlroom-watchdog",
-		"timestamp": now,
-		"payload": map[string]any{
-			"summary":   fmt.Sprintf("%s heartbeat missed (count %v in last 60s)", svc, count),
-			"severity":  "critical",
-			"component": strings.ToLower(svc),
-			"group":     "festival-services",
-			"class":     "heartbeat-loss",
-			"custom_details": map[string]any{
-				"heartbeat_count_last_60s": count,
-				"threshold":                30,
-				"last_check_at":            now,
+func publishHeartbeatStatus(svc string, count float64, up bool, severity SeverityLevel, event EventType) {
+
+	ch := WatchdogChan.Load()
+
+	if ch == nil {
+		logger.Log(logger.NewMessage(logger.WARN, logger.WATCHDOG, "RabbitMQ channel is not initialized"))
+		return
+	}
+
+	summary := fmt.Sprintf("%s heartbeat is back online", svc)
+
+	if !up {
+		summary = fmt.Sprintf("%s heartbeat missed (count %v in last 60s)", svc, count)
+	}
+
+	var buf bytes.Buffer
+	var body = gen.HeartbeatStatusEventType{
+
+		Event:     string(event),
+		Source:    "controlroom-watchdog",
+		Timestamp: time.Now().UTC(),
+		Payload: gen.HeartbeatPayloadType{
+			Summary:   summary,
+			Severity:  string(severity),
+			Component: strings.ToLower(svc),
+			Group:     "services",
+			Class:     "heartbeat-loss",
+			CustomDetails: gen.HeartbeatCustomDetailsType{
+				HeartbeatCountLast60s: count,
+				Threshold:             30,
+				LastCheckAt:           time.Now().UTC(),
 			},
 		},
 	}
-	return json.Marshal(payload)
-}
 
-func BuildOnlineMessage(svc string, count float64) ([]byte, error) {
-	now := time.Now().UTC().Format(time.RFC3339)
-	payload := map[string]any{
-		"event":     "heartbeat_online",
-		"source":    "controlroom-watchdog",
-		"timestamp": now,
-		"payload": map[string]any{
-			"summary":   fmt.Sprintf("%s heartbeat is back online", svc),
-			"severity":  "critical",
-			"component": strings.ToLower(svc),
-			"group":     "festival-services",
-			"class":     "heartbeat-loss",
-			"custom_details": map[string]any{
-				"heartbeat_count_last_60s": count,
-				"threshold":                30,
-				"last_check_at":            now,
-			},
-		},
-	}
-	return json.Marshal(payload)
-}
-
-func publishPDCEF(svc string, count float64) {
-	ch := WDPubChan.Load()
-
-	body, err := BuildPDCEFEnvelope(svc, count)
-	if err != nil {
-		logger.Log(logger.NewMessage(logger.WARN, logger.WATCHDOG, fmt.Sprintf("marshal heartbeat_failed: %v", err)))
+	enc := xml.NewEncoder(&buf)
+	if err := enc.Encode(body); err != nil {
+		logger.Log(logger.NewMessage(logger.ERROR, logger.WATCHDOG, fmt.Sprintf("failed to encode to xml: %v", err)))
 		return
 	}
-	err = ch.PublishWithContext(context.Background(),
-		config.Producer[config.HEARTBEAT_FAILED_EVENT].Exchange.Name,
-		config.Producer[config.HEARTBEAT_FAILED_EVENT].Key.Key,
-		false,
-		false,
-		amqp.Publishing{
-			ContentType: "application/json",
-			Body:        body,
-		},
-	)
-	if err != nil {
-		logger.Log(logger.NewMessage(logger.WARN, logger.WATCHDOG, fmt.Sprintf("publish heartbeat_failed: %v", err)))
+
+	if err := enc.Flush(); err != nil {
+		logger.Log(logger.NewMessage(logger.ERROR, logger.WATCHDOG, fmt.Sprintf("failed to encode to xml, (flush thing): %v", err)))
 	}
-}
 
-func publishHeartbeatBackOnline(svc string, count float64) {
-
-	ch := WDPubChan.Load()
-
-	body, err := BuildOnlineMessage(svc, count)
-
-	if err != nil {
-		logger.Log(logger.NewMessage(logger.WARN, logger.WATCHDOG, fmt.Sprintf("marshal heartbeat_failed: %v", err)))
-		return
-	}
-	err = ch.PublishWithContext(
+	if err := ch.PublishWithContext(
 		context.Background(),
 		config.Producer[config.HEARTBEAT_SUCCEEDED_EVENT].Exchange.Name,
 		config.Producer[config.HEARTBEAT_SUCCEEDED_EVENT].Key.Key,
 		false,
 		false,
 		amqp.Publishing{
-			ContentType: "application/json",
-			Body:        body,
+			ContentType: "application/xml",
+			Body:        buf.Bytes(),
 		},
-	)
-	if err != nil {
-		logger.Log(logger.NewMessage(logger.WARN, logger.WATCHDOG, fmt.Sprintf("publish heartbeat_failed: %v", err)))
+	); err != nil {
+		logger.Log(logger.NewMessage(logger.WARN, logger.WATCHDOG, fmt.Sprintf("publish heartbeat event failed: %v", err)))
 	}
 
-}
-
-// ProcessAlertQueue runs endlessly in the background.
-func ProcessAlertQueue() {
-	for message := range WDQueue {
-		sendTeamsAlert(message)
-		time.Sleep(6 * time.Second)
-	}
 }
 
 func CheckHeartbeats(client *elasticsearch.Client) {
 	counts := make(map[string]float64)
-	for _, svc := range WDServices {
-		svc = strings.ToLower(svc)
-		query := `{
-			"size": 0,
+
+	for _, svc := range Services {
+		svcLower := strings.ToLower(svc)
+
+		// Create a proper Elasticsearch query structure
+		query := fmt.Sprintf(`{
 			"query": {
 				"bool": {
-				"filter": [
-					{ "range": { "timestamp": { "gte": "now-60s" } } },
-					{ "term": { "service_id.keyword": "SERVICE" } }
-				]
+					"must": [
+						{ "match": { "service.name": "%s" } },
+						{ "range": { "@timestamp": { "gte": "now-60s" } } }
+					]
 				}
 			}
-		}`
+		}`, svcLower)
 
-		query = strings.Replace(query, "SERVICE", svc, 1)
-
-		// TODO(nasr): error handling
 		res, err := client.Search(
 			client.Search.WithIndex("heartbeats"),
 			client.Search.WithBody(strings.NewReader(query)),
 		)
 		if err != nil {
-			logger.Log(logger.NewMessage(logger.WARN, logger.WATCHDOG, fmt.Sprintf("Failed to query elastic (%s): ", err)))
-
+			logger.Log(logger.NewMessage(logger.WARN, logger.WATCHDOG, fmt.Sprintf("Failed to query elastic (%s): %v", svc, err)))
+			continue
 		}
 
-		//  Netwerk is oké, maar http error (bijv. 401 unauthorized / 403 forbidden)
 		if res.IsError() {
 			if res.StatusCode == 401 || res.StatusCode == 403 {
-				logger.Log(logger.NewMessage(logger.WARN, logger.WATCHDOG, fmt.Sprintf("Authenticatie fout (%d): Geen toegang. Wachten tot account in Kibana is aangemaakt.", res.StatusCode)))
+				logger.Log(logger.NewMessage(logger.ERROR, logger.WATCHDOG, fmt.Sprintf("Authenticatie fout (%d): Geen toegang. Wachten tot account in Kibana is aangemaakt.", res.StatusCode)))
 			} else {
-				logger.Log(logger.NewMessage(logger.ERROR, logger.WATCHDOG, fmt.Sprintf("%s is ONLINE!", res.String())))
+				logger.Log(logger.NewMessage(logger.WARN, logger.WATCHDOG, fmt.Sprintf("Elasticsearch error: %s", res.String())))
 			}
-
 			res.Body.Close()
-			return // Sla service checks over, stuur GEEN Teams alert!
+			continue
 		}
 
-		// Alles is normaal, check de services
 		var result map[string]any
-		json.NewDecoder(res.Body).Decode(&result)
-
-		if hits, ok := result["hits"].(map[string]any); ok {
-			if total, ok := hits["total"].(map[string]any); ok {
-				if value, ok := total["value"].(float64); ok {
-					counts[strings.ToUpper(svc)] = value
+		if err := json.NewDecoder(res.Body).Decode(&result); err == nil {
+			if hits, ok := result["hits"].(map[string]any); ok {
+				if total, ok := hits["total"].(map[string]any); ok {
+					if value, ok := total["value"].(float64); ok {
+						counts[strings.ToUpper(svc)] = value
+					}
 				}
 			}
 		}
 		res.Body.Close()
 	}
 
-	for _, svc := range WDServices {
+	StateMutex.Lock()
+	defer StateMutex.Unlock()
 
+	for _, svc := range Services {
 		count := counts[svc]
-		// heartbeat margin / minute
 		isCurrentlyOnline := count >= 30
-		wasOnline := WDServiceState[svc]
+		wasOnline := ServiceState[svc]
 
 		if isCurrentlyOnline && !wasOnline {
-			WDServiceState[svc] = true
+			ServiceState[svc] = true
 			logger.Log(logger.NewMessage(logger.INFO, logger.WATCHDOG, fmt.Sprintf("%s is ONLINE!", svc)))
-			publishHeartbeatBackOnline(svc, count)
-			WDQueue <- fmt.Sprintf("**RESOLVED:** Service **%s** is back online!", svc)
+
+			publishHeartbeatStatus(svc, count, true, Info, HeartbeatOnline)
+			WatchdogQueue <- fmt.Sprintf("**RESOLVED:** Service **%s** is back online!", svc)
 
 		} else if !isCurrentlyOnline && wasOnline {
-			WDServiceState[svc] = false
+			ServiceState[svc] = false
 			logger.Log(logger.NewMessage(logger.WARN, logger.WATCHDOG, fmt.Sprintf("%s is OFFLINE!", svc)))
-			publishPDCEF(svc, count)
-			WDQueue <- fmt.Sprintf("**CRITICAL:** Service **%s** is down! (Heartbeats in last 60s: %v)", svc, count)
 
+			// Passed all 5 required arguments
+			publishHeartbeatStatus(svc, count, false, Critical, HeartbeatFailed)
+			WatchdogQueue <- fmt.Sprintf("**CRITICAL:** Service **%s** is down! (Heartbeats in last 60s: %v)", svc, count)
 		}
 	}
 }
 
-func sendTeamsAlert(message string) {
+func AlertTeams(message string) {
+	if TeamsWebhook == "" {
+		logger.Log(logger.NewMessage(logger.WARN, logger.WATCHDOG, "Teams webhook URL is not configured"))
+		return
+	}
 
-	payload := map[string]any{
-		"type": "message",
-		"attachments": []map[string]any{
+	data := TeamsAlertCard{
+		Type: "message",
+		Attachments: []TeamAttachment{
 			{
-				"contentType": "application/vnd.microsoft.card.adaptive",
-				"content": map[string]any{
-					"$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
-					"type":    "AdaptiveCard",
-					"version": "1.2",
-					"body": []map[string]any{
+				ContentType: "application/vnd.microsoft.card.adaptive",
+				Content: &AdaptiveCard{
+					Schema:  "http://adaptivecards.io/schemas/adaptive-card.json",
+					Type:    "AdaptiveCard",
+					Version: "1.2",
+					Body: []TextBlock{
 						{
-							"type": "TextBlock",
-							"text": message,
-							"wrap": true,
+							Type: "TextBlock",
+							Text: message,
+							Wrap: true,
 						},
 					},
 				},
@@ -217,14 +182,17 @@ func sendTeamsAlert(message string) {
 		},
 	}
 
-	jsonValue, _ := json.Marshal(payload)
-	resp, err := http.Post(WDWebhook, "application/json", bytes.NewBuffer(jsonValue))
-
+	body, err := json.Marshal(data)
 	if err != nil {
 		logger.Log(logger.NewMessage(logger.WARN, logger.WATCHDOG, err.Error()))
 		return
 	}
 
+	resp, err := http.Post(TeamsWebhook, "application/json", bytes.NewBuffer(body))
+	if err != nil {
+		logger.Log(logger.NewMessage(logger.WARN, logger.WATCHDOG, err.Error()))
+		return
+	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {

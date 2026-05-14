@@ -10,7 +10,7 @@ import (
 )
 
 func TestBuildPDCEFEnvelope_TopLevelFields(t *testing.T) {
-	body, err := watchdog.BuildPDCEFEnvelope("KASSA", 0)
+	body, err := watchdog.BuildOfflineMessage("KASSA", 0)
 	assert.NoError(t, err)
 
 	var env map[string]any
@@ -22,7 +22,7 @@ func TestBuildPDCEFEnvelope_TopLevelFields(t *testing.T) {
 }
 
 func TestBuildPDCEFEnvelope_PayloadShape(t *testing.T) {
-	body, _ := watchdog.BuildPDCEFEnvelope("KASSA", 12)
+	body, _ := watchdog.BuildOfflineMessage("KASSA", 12)
 
 	var env map[string]any
 	_ = json.Unmarshal(body, &env)
@@ -44,7 +44,7 @@ func TestBuildPDCEFEnvelope_PayloadShape(t *testing.T) {
 }
 
 func TestBuildPDCEFEnvelope_LowercasesComponent(t *testing.T) {
-	body, _ := watchdog.BuildPDCEFEnvelope("FACTURATIE", 0)
+	body, _ := watchdog.BuildOfflineMessage("FACTURATIE", 0)
 	var env map[string]any
 	_ = json.Unmarshal(body, &env)
 	payload := env["payload"].(map[string]any)
