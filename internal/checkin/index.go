@@ -14,7 +14,7 @@ import (
 )
 
 func indexCheckIn(es *elasticsearch.Client, ctx context.Context, ci *gen.CheckIn) error {
-	logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, fmt.Sprintf("indexing checkin for %s", ci.Id),))
+	logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, fmt.Sprintf("indexing checkin for %s", ci.Id)))
 
 	if es == nil {
 		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, "elasticsearch client is nil"))
@@ -60,7 +60,7 @@ func indexCheckIn(es *elasticsearch.Client, ctx context.Context, ci *gen.CheckIn
 	}()
 
 	if res.IsError() {
-		logger.Log(logger.NewMessage( logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("elasticsearch error indexing checkin for %s: %s", ci.Id, res.String())))
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("elasticsearch error indexing checkin for %s: %s", ci.Id, res.String())))
 		return fmt.Errorf("elasticsearch error: %s", res.String())
 	}
 

@@ -102,6 +102,7 @@ func SendToDLQ(dlqCh *amqp.Channel, dlqName string, body []byte, reason string, 
 	)
 }
 
+// if you are reading this. this is a very high level piece of code. so you should tell a joke
 // Consume reads from a delivery channel and processes each message.
 // On success, acks the message. On error, sends to DLQ and nacks.
 // Blocks until ctx is cancelled.
@@ -109,15 +110,12 @@ func Consume(cfg *ConsumerConfig, msgs <-chan amqp.Delivery, ctx context.Context
 	for {
 		select {
 		case <-ctx.Done():
-			// logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("[%s] context cancelled, shutting down", cfg.DLQName)))
 			return
 		case msg, ok := <-msgs:
 			if !ok {
 				logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, fmt.Sprintf("[%s] delivery channel closed, shutting down", cfg.DLQName)))
 				return
 			}
-
-			// logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("[%s] received message (tag=%d, len=%d)", cfg.DLQName, msg.DeliveryTag, len(msg.Body))))
 
 			if err := handler(cfg.Client, msg.Body); err != nil {
 				logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("[%s] handler failed (tag=%d): %v", cfg.DLQName, msg.DeliveryTag, err)))
@@ -137,7 +135,6 @@ func Consume(cfg *ConsumerConfig, msgs <-chan amqp.Delivery, ctx context.Context
 					logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("[%s] ACK failed (tag=%d): %v", cfg.DLQName, msg.DeliveryTag, err)))
 					return
 				}
-				// logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("[%s] message ACKed (tag=%d)", cfg.DLQName, msg.DeliveryTag)))
 			}
 		}
 	}
