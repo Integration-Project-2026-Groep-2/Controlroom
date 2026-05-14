@@ -14,11 +14,10 @@ var _ = time.Time{}
 type SeverityType string
 
 const (
-	SeverityTypeDEBUG                SeverityType = "DEBUG"
-	SeverityTypeINFO                 SeverityType = "INFO"
-	SeverityTypeWARN                 SeverityType = "WARN"
-	SeverityTypeERROR                SeverityType = "ERROR"
-	SeverityTypeFATAL                SeverityType = "FATAL"
-	SeverityTypePANIC                SeverityType = "PANIC"
+	SeverityTypeDEBUG SeverityType = "DEBUG"
+	SeverityTypeINFO  SeverityType = "INFO"
+	SeverityTypeWARN  SeverityType = "WARN"
+	SeverityTypeERROR SeverityType = "ERROR"
+	SeverityTypeFATAL SeverityType = "FATAL"
+	SeverityTypePANIC SeverityType = "PANIC"
 )
-

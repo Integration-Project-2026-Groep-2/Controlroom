@@ -12,12 +12,11 @@ var _ = xml.Name{}
 var _ = time.Time{}
 
 type Warning struct {
-	Service                  string               `xml:"service" json:"service" validate:"required"`
-	Warnings                 []Warningdata        `xml:"warnings" json:"warnings"`
+	Service  string        `xml:"service" json:"service" validate:"required"`
+	Warnings []Warningdata `xml:"warnings" json:"warnings"`
 }
 
 type Warningdata struct {
-	Timestamp                time.Time            `xml:"timestamp" json:"timestamp" validate:"required"`
-	Issue                    string               `xml:"issue" json:"issue" validate:"required"`
+	Timestamp time.Time `xml:"timestamp" json:"timestamp" validate:"required"`
+	Issue     string    `xml:"issue" json:"issue" validate:"required"`
 }
-
