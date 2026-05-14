@@ -37,7 +37,7 @@ func ProcessK8sData(es *elasticsearch.Client) error {
 	indexedCount := 0
 	for _, pod := range pods {
 		if err := indexK8Pod(ctx, es, pod); err != nil {
-			logger.Log(logger.NewMessage( logger.WARN, logger.CONTROLROOM, fmt.Sprintf("failed to index pod %s/%s: %v", pod.Namespace, pod.Name, err)))
+			logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, fmt.Sprintf("failed to index pod %s/%s: %v", pod.Namespace, pod.Name, err)))
 			continue
 		}
 		indexedCount++
@@ -47,4 +47,3 @@ func ProcessK8sData(es *elasticsearch.Client) error {
 
 	return nil
 }
-

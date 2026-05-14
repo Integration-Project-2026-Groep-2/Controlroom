@@ -23,30 +23,39 @@ import (
 	"integration-project-ehb/controlroom/internal/k8_retriever"
 	"integration-project-ehb/controlroom/internal/statuscheck"
 	"integration-project-ehb/controlroom/internal/user"
-	userack "integration-project-ehb/controlroom/internal/user_ack"
+	"integration-project-ehb/controlroom/internal/user_ack"
 	"integration-project-ehb/controlroom/internal/warning_producer"
 	"integration-project-ehb/controlroom/pkg/logger"
 	"integration-project-ehb/controlroom/pkg/watchdog"
 )
 
 func setup(ch *amqp.Channel) error {
+
 	logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, "declaring exchanges"))
+
 	for _, def := range config.ConsumerDefinitions {
-		if def.Passive {
+
+		if !def.Passive {
+
+			if err := ch.ExchangeDeclare(def.Exchange.Name, def.Exchange.Kind, def.Exchange.Durable, false, false, false, nil); err != nil {
+				return fmt.Errorf("exchange %s: %w", def.Exchange.Name, err)
+			}
+
+			logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, fmt.Sprintf("declared exchange %s (%s)", def.Exchange.Name, def.Exchange.Kind)))
+
+		} else {
+			//- skip the declaration of the exchange if the responsibility isn't ours
 			continue
 		}
-
-		if err := ch.ExchangeDeclare(def.Exchange.Name, def.Exchange.Kind, def.Exchange.Durable, false, false, false, nil); err != nil {
-			return fmt.Errorf("exchange %s: %w", def.Exchange.Name, err)
-		}
-		logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, fmt.Sprintf("declared exchange %s (%s)", def.Exchange.Name, def.Exchange.Kind)))
 	}
 
 	if err := ch.ExchangeDeclare("controlroom.dlx", "direct", true, false, false, false, nil); err != nil {
+		logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, fmt.Sprintf("failed to declare dlx exchange: %v", err)))
 		return fmt.Errorf("dlx: %w", err)
 	}
 
-	//Setup producer
+	//- /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	//- note(steven): setup news producer
 	if err := ch.ExchangeDeclare("news.topic", "topic", true, false, false, false, nil); err != nil {
 		return fmt.Errorf("news.topic: %w", err)
 	}
@@ -55,30 +64,15 @@ func setup(ch *amqp.Channel) error {
 		return fmt.Errorf("ai.events: %w", err)
 	}
 
-	// 2. FIX: Declare the Queue before binding it
-	_, err := ch.QueueDeclare(
-		"mailing.news.warning", // name
-		true,                   // durable
-		false,                  // auto-delete
-		false,                  // exclusive
-		false,                  // no-wait
-		nil,                    // arguments
-	)
-	if err != nil {
+	if _, err := ch.QueueDeclare("mailing.news.warning", true, false, false, false, nil); err != nil {
 		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("failed to declare queue 'mailing.news.warning': %v", err)))
 	}
 
-	err = ch.QueueBind(
-		"mailing.news.warning", // queue name
-		"news.warning",         // routing key
-		"news.topic",           // exchange
-		false,
-		nil,
-	)
-
-	if err != nil {
-		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("Error binding queue to exchange: %v", err)))
+	if err := ch.QueueBind("mailing.news.warning", "news.warning", "news.topic", false, nil); err != nil {
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("failed to bind queue 'mailing.news.warning': %v", err)))
 	}
+
+	//- /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	for _, def := range config.ConsumerDefinitions {
 		if def.Passive {
@@ -173,6 +167,24 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 			DLQCh:   dlqCh,
 			DLQName: def.DLQName,
 		}
+
+		//- setup rabbitmq heartbeat
+		//- publish a heartbeat and consume it
+		//- we are sending it with the service name RMQ
+		//- by doing this we also do a e2e test of the complete communication
+		//- every second
+		go func() {
+			ticker := time.NewTicker(time.Second)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ticker.C:
+					cr_rabbitmq.PublishHeartbeat(ch)
+				case <-ctx.Done():
+					return
+				}
+			}
+		}()
 
 		switch def.Type {
 		case config.HEARTBEAT:
@@ -269,9 +281,7 @@ func main() {
 		cancel()
 	}()
 
-	// initialized mcp server
-	// NOTE(nasr): runs alongside the RabbitMQ session loop so mcp-master can
-	// reach our tools over SSE without blocking the consumer goroutines.
+	// NOTE(nasr): runs alongside the RabbitMQ session loop so mcp-master can initialized mcp server
 	go func() {
 		err := mcp.SetupMCP(client)
 		if err != nil {
@@ -279,17 +289,28 @@ func main() {
 		}
 	}()
 
-	if watchdog.WDWebhook == "" {
+	if watchdog.TeamsWebhook == "" {
 		logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, "CRITICAL: TEAMS_WEBHOOK_URL is niet ingesteld in de environment!"))
 	} else {
-
 		// note(nasr): fix nil pointer dereference when env variable is empty
-		for _, svc := range watchdog.WDServices {
-			watchdog.WDServiceState[svc] = true
+		for _, svc := range watchdog.Services {
+			watchdog.ServiceState[svc] = true
 		}
 
-		//-
-		go watchdog.ProcessAlertQueue()
+		//- note(nasr): inlining of the previous process alert queues function
+		go func() {
+			for message := range watchdog.WatchdogQueue {
+				watchdog.AlertTeams(message)
+				time.Sleep(6 * time.Second)
+			}
+
+		}()
+
+		//- deprecated now
+		//- the content below is age restricted
+		//- only read this if the user is older then 65
+		//- because this code is handwritten :)
+		//- go watchdog.ProcessAlertQueue()
 
 		//-
 		go func() {
@@ -306,8 +327,8 @@ func main() {
 		}()
 	}
 
-	//-
-
+	//- gathering k8 resources. imrpovement over statuschecks. provide more accurate information
+	//- because the services are running containerized
 	go func() {
 		ticker := time.NewTicker(5 * time.Second)
 		defer ticker.Stop()
@@ -316,9 +337,9 @@ func main() {
 			case <-ticker.C:
 				err := internal_k8retriever.ProcessK8sData(client)
 				if err != nil {
+					logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, fmt.Sprintf("failed to gather k8 resources %v", err)))
 					return
 				}
-
 			case <-ctx.Done():
 				return
 
