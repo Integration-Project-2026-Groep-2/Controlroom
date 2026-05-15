@@ -2,7 +2,7 @@
 // - we can expand on this in the future by
 // - 1) adding parameters
 // - 2) writing new functions
-// - if you read this you stink
+// - if you read this you stink --nasr
 package cr_elastic
 
 type QueryClause any
@@ -24,8 +24,9 @@ type ElasticsearchQuery struct {
 	Query *BoolQuery `json:"query"`
 }
 
-func NewElasticQuery(serviceName string) *ElasticsearchQuery {
-	return &ElasticsearchQuery{
+func QueryElastic(index string, arguments ...string) *ElasticsearchQuery {
+
+	query :=  &ElasticsearchQuery{
 		Size: 0,
 		Query: &BoolQuery{
 			Filter: []any{
