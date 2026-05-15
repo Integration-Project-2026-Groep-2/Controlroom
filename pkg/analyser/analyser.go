@@ -53,7 +53,7 @@ func createquery(service string) *strings.Builder {
 					%s
 				],
 				"must_not": [
-					
+
 				]
 				}
 			}
@@ -125,7 +125,7 @@ func queryWarnings(es *elasticsearch.Client, service string, amount int) (string
 
 		message.Warnings[index] = currentWarning
 	}
-	// 1. Generate the XML bytes (with indentation for readability)
+
 	bytes, err := xml.MarshalIndent(message, "", "  ")
 	if err != nil {
 		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, "Couldn't convert the warning struct to an xml file"))
