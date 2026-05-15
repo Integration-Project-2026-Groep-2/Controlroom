@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -262,7 +263,12 @@ func buildServer(client *elasticsearch.Client) *server.MCPServer {
 		return mcp.NewToolResultText(formatDocs(docs)), nil
 	})
 
-	ghClient := github.NewClient()
+	githubConfig := github.GithubClient{
+		HTTP:  &http.Client{},
+		Token: os.Getenv("GITHUB_TOKEN"),
+	}
+
+
 	fetchDeploysTool := mcp.NewTool("fetch_recent_deploys",
 		mcp.WithDescription("Fetch the N most recent CD-workflow runs for a service via the GitHub Actions Runs API. Returns head_sha, created_at, conclusion, workflow_name, html_url per run, sorted by created_at desc."),
 		mcp.WithReadOnlyHintAnnotation(true),
@@ -288,7 +294,7 @@ func buildServer(client *elasticsearch.Client) *server.MCPServer {
 			limit = int(raw)
 		}
 
-		runs, err := ghClient.FetchRecentRuns(ctx, repo, limit)
+		runs, err := .FetchRecentRuns(ctx, repo, limit)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("github query failed: %v", err)), nil
 		}
