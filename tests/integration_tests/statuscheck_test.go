@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"integration-project-ehb/controlroom/cmd/config"
+	"integration-project-ehb/controlroom/internal/cr_config"
 	"integration-project-ehb/controlroom/internal/cr_rabbitmq"
 	"integration-project-ehb/controlroom/pkg/gen"
 

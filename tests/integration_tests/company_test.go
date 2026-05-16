@@ -9,7 +9,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	amqp "github.com/rabbitmq/amqp091-go"
 
-	"integration-project-ehb/controlroom/cmd/config"
+	"integration-project-ehb/controlroom/internal/cr_config"
 	"integration-project-ehb/controlroom/internal/cr_rabbitmq"
 	"integration-project-ehb/controlroom/pkg/gen"
 )
