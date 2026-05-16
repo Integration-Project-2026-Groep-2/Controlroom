@@ -1,11 +1,10 @@
-package internal_k8retriever
+package k8retriever
 
 import (
 	"context"
 	"fmt"
 
 	"github.com/elastic/go-elasticsearch/v9"
-	"integration-project-ehb/controlroom/pkg/k8_retriever"
 	"integration-project-ehb/controlroom/pkg/logger"
 )
 
@@ -18,7 +17,7 @@ func ProcessK8sData(es *elasticsearch.Client) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	pods, err := k8_retriever.GetPods(ctx)
+	pods, err := GetPods(ctx)
 	if err != nil {
 		logger.Log(logger.NewMessage(
 			logger.ERROR,
