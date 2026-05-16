@@ -267,59 +267,58 @@ func buildServer(client *elasticsearch.Client) *server.MCPServer {
 	config := cr_github.GithubConfig{
 		HTTP:  &http.Client{},
 		Token: os.Getenv("GITHUB_TOKEN"),
-		Org  : os.Getenv("org"),
+		Org:   os.Getenv("org"),
 	}
 
+	fetchDeploysTool := mcp.NewTool("fetch_recent_deploys",
+		mcp.WithDescription("Fetch the N most recent CD-workflow runs for a service via the GitHub Actions Runs API. Returns head_sha, created_at, conclusion, workflow_name, html_url per run, sorted by created_at desc."),
+		mcp.WithReadOnlyHintAnnotation(true),
+		mcp.WithString("service",
+			mcp.Required(),
+			mcp.Description("Service name (kassa, crm, controlroom, frontend, mailing, facturatie, planning, iot, mcp-master)"),
+		),
+		mcp.WithNumber("limit",
+			mcp.Description("Max runs to return (default 5, max 30)"),
+		),
+	)
 
-		fetchDeploysTool := mcp.NewTool("fetch_recent_deploys",
-			mcp.WithDescription("Fetch the N most recent CD-workflow runs for a service via the GitHub Actions Runs API. Returns head_sha, created_at, conclusion, workflow_name, html_url per run, sorted by created_at desc."),
-			mcp.WithReadOnlyHintAnnotation(true),
-			mcp.WithString("service",
-				mcp.Required(),
-				mcp.Description("Service name (kassa, crm, controlroom, frontend, mailing, facturatie, planning, iot, mcp-master)"),
-			),
-			mcp.WithNumber("limit",
-				mcp.Description("Max runs to return (default 5, max 30)"),
-			),
-		)
+	s.AddTool(fetchDeploysTool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := parseArguments(req)
+		service, _ := args["service"].(string)
 
-		s.AddTool(fetchDeploysTool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			args := parseArguments(req)
-			service, _ := args["service"].(string)
+		ServiceRepo, err := cr_github.FetchRepos(ctx, &config)
 
-			ServiceRepo, err := cr_github.FetchRepos(ctx, &config)
+		if err != nil {
+			logger.Log(logger.NewMessage(logger.ERROR, logger.MCP, "there is an issue with the configuration of the github client"))
+		}
 
-			if err != nil  {
-				logger.Log(logger.NewMessage(logger.ERROR, logger.MCP, "there is an issue with the configuration of the github client"))
+		repo, ok := ServiceRepo[strings.ToLower(strings.TrimSpace(service))]
+		if !ok {
+			return mcp.NewToolResultError(fmt.Sprintf("unknown service '%s'", service)), nil
+		}
+
+		limit := 5
+		if raw, ok := args["limit"].(float64); ok && raw > 0 {
+			limit = int(raw)
+		}
+
+		runs, err := cr_github.FetchRecentRuns(ctx, &config, repo, limit)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("github query failed: %v", err)), nil
+		}
+
+		docs := make([]map[string]any, len(runs))
+		for i, r := range runs {
+			docs[i] = map[string]any{
+				"revision":      r.HeadSHA,
+				"deployed_at":   r.CreatedAt.UTC().Format(time.RFC3339),
+				"conclusion":    r.Conclusion,
+				"workflow_name": r.WorkflowName,
+				"html_url":      r.HTMLURL,
 			}
-
-			repo, ok := ServiceRepo[strings.ToLower(strings.TrimSpace(service))]
-			if !ok {
-				return mcp.NewToolResultError(fmt.Sprintf("unknown service '%s'", service)), nil
-			}
-
-			limit := 5
-			if raw, ok := args["limit"].(float64); ok && raw > 0 {
-				limit = int(raw)
-			}
-
-			runs, err := cr_github.FetchRecentRuns(ctx, &config, repo, limit)
-			if err != nil {
-				return mcp.NewToolResultError(fmt.Sprintf("github query failed: %v", err)), nil
-			}
-
-			docs := make([]map[string]any, len(runs))
-			for i, r := range runs {
-				docs[i] = map[string]any{
-					"revision":      r.HeadSHA,
-					"deployed_at":   r.CreatedAt.UTC().Format(time.RFC3339),
-					"conclusion":    r.Conclusion,
-					"workflow_name": r.WorkflowName,
-					"html_url":      r.HTMLURL,
-				}
-			}
-			return mcp.NewToolResultText(formatDocs(docs)), nil
-		})
+		}
+		return mcp.NewToolResultText(formatDocs(docs)), nil
+	})
 
 	return s
 }
