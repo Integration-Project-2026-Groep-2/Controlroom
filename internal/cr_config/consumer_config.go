@@ -2,9 +2,6 @@ package config
 
 import (
 	"integration-project-ehb/controlroom/internal/cr_rabbitmq"
-	"os"
-
-	"github.com/elastic/go-elasticsearch/v9"
 )
 
 type cr_consumer_t int8
@@ -93,21 +90,4 @@ var ConsumerDefinitions = []ConsumerDef{
 		Qos:      1,
 		Passive:  false,
 	},
-}
-
-var ElasticUrl string = os.Getenv("ELASTICSEARCH_URL")
-
-var ElasticConfig = elasticsearch.Config{
-	Addresses: []string{ElasticUrl},
-	Username:  os.Getenv("CONTROLROOM_ES_USER"),
-	Password:  os.Getenv("CONTROLROOM_ES_PASS"),
-}
-
-var Services = [6]string{
-	"CRM",
-	"FACTURATIE",
-	"FRONTEND",
-	"MAILING",
-	"PLANNING",
-	"KASSA",
 }

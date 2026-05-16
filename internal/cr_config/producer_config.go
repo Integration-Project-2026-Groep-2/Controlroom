@@ -10,8 +10,10 @@ type cr_producer_events_t int8
 const (
 	HEARTBEAT_FAILED_EVENT = iota
 	HEARTBEAT_SUCCEEDED_EVENT
-	WARNING_EVENT
 	RMQ_HEARTBEAT
+
+	WARNING_EVENT
+	ERROR_EVENT
 )
 
 const (
@@ -30,34 +32,29 @@ type ProducerDef struct {
 var Producer = map[cr_producer_events_t]ProducerDef{
 
 	HEARTBEAT_FAILED_EVENT: {
-		Type: WATCHDOG,
-		Exchange: cr_rabbitmq.ExchangeInfo{
-			Name:    "ai.events",
-			Kind:    "topic",
-			Durable: true,
-		},
-		Key: cr_rabbitmq.BindingInfo{
-			Key: "event.heartbeat_failed",
-		},
+		Type:     WATCHDOG,
+		Exchange: cr_rabbitmq.ExchangeInfo{Name: "ai.events", Kind: "topic", Durable: true},
+		Key:      cr_rabbitmq.BindingInfo{Key: "event.heartbeat_failed"},
 	},
 
 	HEARTBEAT_SUCCEEDED_EVENT: {
-		Type: WATCHDOG,
-		Exchange: cr_rabbitmq.ExchangeInfo{
-			Name:    "ai.events",
-			Kind:    "topic",
-			Durable: true,
-		},
-		Key: cr_rabbitmq.BindingInfo{
-			Key: "event.heartbeat_succeeded",
-		},
+		Type:     WATCHDOG,
+		Exchange: cr_rabbitmq.ExchangeInfo{Name: "ai.events", Kind: "topic", Durable: true},
+		Key:      cr_rabbitmq.BindingInfo{Key: "event.heartbeat_succeeded"},
 	},
 
 	WARNING_EVENT: {
-		Type:     0,
+		Type:     WATCHDOG,
 		Exchange: cr_rabbitmq.ExchangeInfo{Name: "news.topic", Kind: "topic"},
 		Key:      cr_rabbitmq.BindingInfo{Key: "news.warning"},
 		Queue:    cr_rabbitmq.QueueInfo{Name: "mailing.news.warning", Durable: true},
+	},
+
+	ERROR_EVENT: {
+		Type:     WATCHDOG,
+		Exchange: cr_rabbitmq.ExchangeInfo{Name: "news.topic", Kind: "topic"},
+		Key:      cr_rabbitmq.BindingInfo{Key: "news.error"},
+		Queue:    cr_rabbitmq.QueueInfo{Name: "mailing.news.error"},
 	},
 
 	RMQ_HEARTBEAT: {
