@@ -21,6 +21,7 @@ type Run struct {
 	HeadSHA    string    `json:"head_sha"`
 	CreatedAt  time.Time `json:"created_at"`
 	Conclusion string    `json:"conclusion"`
+	WorkflowName string  `json:"workflow_name"`
 	Name       string    `json:"name"`
 	HTMLURL    string    `json:"html_url"`
 }
@@ -72,8 +73,10 @@ func _(ctx context.Context, client *GithubConfig) (map[string]string, error) {
 	return result, nil
 }
 
-func FetchRepos(ctx context.Context, config *GithubConfig, org string) (map[string]string, error) {
-	u := fmt.Sprintf("%s/orgs/%s/repos?per_page=100", base, org)
+// FetchRepos fills the configuration repos with the fetched repos but also returns the repos so we can use them
+// this will probably will piss a lot of people off because it's ugyly but it works so leave me alone
+func FetchRepos(ctx context.Context, config *GithubConfig) (map[string]string, error) {
+	u := fmt.Sprintf("%s/orgs/%s/repos?per_page=100", base, config.Org)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, err
@@ -99,6 +102,9 @@ func FetchRepos(ctx context.Context, config *GithubConfig, org string) (map[stri
 	for _, repo := range repos {
 		result[repo.Name] = repo.URL
 	}
+
+	// note(nasr): extra side effect
+	config.Repos = result
 	return result, nil
 }
 
