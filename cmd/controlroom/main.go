@@ -15,18 +15,17 @@ import (
 
 	"integration-project-ehb/controlroom/internal/cr_rabbitmq"
 
-	"integration-project-ehb/controlroom/cmd/config"
-	"integration-project-ehb/controlroom/cmd/mcp"
 	"integration-project-ehb/controlroom/internal/company"
+	"integration-project-ehb/controlroom/internal/cr_config"
 	"integration-project-ehb/controlroom/internal/cr_logger"
 	"integration-project-ehb/controlroom/internal/heartbeat"
-	"integration-project-ehb/controlroom/internal/k8_retriever"
+	"integration-project-ehb/controlroom/internal/k8retriever"
+	"integration-project-ehb/controlroom/internal/mcp"
 	"integration-project-ehb/controlroom/internal/statuscheck"
 	"integration-project-ehb/controlroom/internal/user"
-	"integration-project-ehb/controlroom/internal/user_ack"
-	"integration-project-ehb/controlroom/internal/warning_producer"
+	"integration-project-ehb/controlroom/internal/user_acknowledgment"
+	"integration-project-ehb/controlroom/internal/watchdog"
 	"integration-project-ehb/controlroom/pkg/logger"
-	"integration-project-ehb/controlroom/pkg/watchdog"
 )
 
 func setup(ch *amqp.Channel) error {
@@ -186,6 +185,56 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 			}
 		}()
 
+		//- watchdog stuff
+		{
+			wdch, err := conn.Channel()
+			if err != nil {
+				logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("watchdog publish channel: %v", err)))
+			} else {
+				defer wdch.Close()
+				watchdog.SetPubChannel(wdch)
+				defer watchdog.SetPubChannel(nil)
+			}
+
+			if watchdog.TeamsWebhook == "" {
+				logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, "CRITICAL: TEAMS_WEBHOOK_URL is niet ingesteld in de environment!"))
+			} else {
+				// note(nasr): fix nil pointer dereference when env variable is empty
+				for _, svc := range watchdog.Services {
+					watchdog.ServiceState[svc] = true
+				}
+
+				//- note(nasr): inlining of the previous process alert queues function
+				go func() {
+					for message := range watchdog.WatchdogQueue {
+						watchdog.AlertTeams(message)
+						time.Sleep(6 * time.Second)
+					}
+
+				}()
+
+				//- deprecated now
+				//- the content below is age restricted
+				//- only read this if the user is older then 65
+				//- because this code is handwritten :)
+				//- go watchdog.ProcessAlertQueue()
+
+				//-
+				go func() {
+					ticker := time.NewTicker(5 * time.Second)
+					defer ticker.Stop()
+					for {
+						select {
+						case <-ticker.C:
+							watchdog.RunWatchdog(client, ctx, wdch)
+						case <-ctx.Done():
+							return
+						}
+					}
+				}()
+			}
+		}
+
 		switch def.Type {
 		case config.HEARTBEAT:
 			go cr_rabbitmq.Consume(cfg, msgs, ctx, heartbeat.ProcessHeartbeat)
@@ -214,24 +263,6 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 
 	logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, "all consumers running, waiting for messages"))
 
-	pubCh, err := conn.Channel()
-	if err != nil {
-		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("producer channel: %v", err)))
-	}
-	defer pubCh.Close()
-	go warning_producer.RunWarningProducer(client, ctx, pubCh)
-
-	logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, "news producer started (interval: 120s)"))
-
-	wdPubCh, err := conn.Channel()
-	if err != nil {
-		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("watchdog publish channel: %v", err)))
-	} else {
-		defer wdPubCh.Close()
-		watchdog.SetPubChannel(wdPubCh)
-		defer watchdog.SetPubChannel(nil)
-	}
-
 	select {
 	case reason := <-closeCh:
 		if reason == nil {
@@ -247,6 +278,7 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 }
 
 func main() {
+
 	if err := logger.Init(&config.ElasticConfig, "controlroom-logs", os.Stdout, 4); err != nil {
 		fmt.Fprintf(os.Stderr, "logger init: %v\n", err)
 		os.Exit(4)
@@ -272,80 +304,49 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	//- signal channel to handle proper exiting the software without stopping stuff in the middle
+	//- or that is what we're trying to do HAHAHHA
+	sc := make(chan os.Signal, 1)
+	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
-		<-sigChan
+		<-sc
 		logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, "shutdown signal received, draining queues..."))
 		cancel()
 	}()
 
-	// NOTE(nasr): runs alongside the RabbitMQ session loop so mcp-master can initialized mcp server
-	go func() {
-		err := mcp.SetupMCP(client)
-		if err != nil {
-			logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("mcp server exited: %v", err)))
-		}
-	}()
-
-	if watchdog.TeamsWebhook == "" {
-		logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, "CRITICAL: TEAMS_WEBHOOK_URL is niet ingesteld in de environment!"))
-	} else {
-		// note(nasr): fix nil pointer dereference when env variable is empty
-		for _, svc := range watchdog.Services {
-			watchdog.ServiceState[svc] = true
-		}
-
-		//- note(nasr): inlining of the previous process alert queues function
+	//- mcp stuff
+	{
+		// NOTE(nasr): runs alongside the RabbitMQ session loop so mcp-master can initialized mcp server
 		go func() {
-			for message := range watchdog.WatchdogQueue {
-				watchdog.AlertTeams(message)
-				time.Sleep(6 * time.Second)
-			}
-
-		}()
-
-		//- deprecated now
-		//- the content below is age restricted
-		//- only read this if the user is older then 65
-		//- because this code is handwritten :)
-		//- go watchdog.ProcessAlertQueue()
-
-		//-
-		go func() {
-			ticker := time.NewTicker(5 * time.Second)
-			defer ticker.Stop()
-			for {
-				select {
-				case <-ticker.C:
-					watchdog.CheckHeartbeats(client)
-				case <-ctx.Done():
-					return
-				}
+			err := mcp.SetupMCP(client)
+			if err != nil {
+				logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("mcp server exited: %v", err)))
 			}
 		}()
 	}
 
 	//- gathering k8 resources. imrpovement over statuschecks. provide more accurate information
 	//- because the services are running containerized
-	go func() {
-		ticker := time.NewTicker(5 * time.Second)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ticker.C:
-				err := internal_k8retriever.ProcessK8sData(client)
-				if err != nil {
-					logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, fmt.Sprintf("failed to gather k8 resources %v", err)))
+	{
+		go func() {
+			ticker := time.NewTicker(5 * time.Second)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ticker.C:
+					err := k8retriever.ProcessK8sData(client)
+					if err != nil {
+						logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, fmt.Sprintf("failed to gather k8 resources %v", err)))
+						return
+					}
+				case <-ctx.Done():
 					return
-				}
-			case <-ctx.Done():
-				return
 
+				}
 			}
-		}
-	}()
+		}()
+	}
 
 	const (
 		initialBackoff = 1 * time.Second
