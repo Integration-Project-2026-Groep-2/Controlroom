@@ -1,11 +1,10 @@
-package internal_k8retriever
+package k8retriever
 
 import (
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"integration-project-ehb/controlroom/pkg/k8_retriever"
 	"integration-project-ehb/controlroom/pkg/logger"
 	"io"
 	"time"
@@ -19,7 +18,7 @@ const (
 	timeout      = 5 * time.Second
 )
 
-func indexK8Pod(ctx context.Context, es *elasticsearch.Client, pod k8_retriever.PodInfo) error {
+func indexK8Pod(ctx context.Context, es *elasticsearch.Client, pod PodInfo) error {
 	logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, fmt.Sprintf("indexing pod %s/%s", pod.Namespace, pod.Name)))
 
 	doc := map[string]any{

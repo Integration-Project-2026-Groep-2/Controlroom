@@ -1,4 +1,4 @@
-package github
+package cr_github
 
 import (
 	"context"

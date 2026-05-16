@@ -1,4 +1,4 @@
-package k8_retriever
+package k8retriever
 
 import (
 	"context"
