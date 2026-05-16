@@ -6,12 +6,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	// "net/http"
+	"net/http"
+
 	"os"
 	"strings"
 	"time"
 
-	// "integration-project-ehb/controlroom/internal/cr_github"
+	"integration-project-ehb/controlroom/internal/cr_github"
 	"integration-project-ehb/controlroom/pkg/logger"
 
 	"github.com/elastic/go-elasticsearch/v9"
@@ -263,11 +264,11 @@ func buildServer(client *elasticsearch.Client) *server.MCPServer {
 		return mcp.NewToolResultText(formatDocs(docs)), nil
 	})
 
-	/*
-		githubconfig := cr_github.GithubConfig{
-			HTTP:  &http.Client{},
-			Token: os.Getenv("GITHUB_TOKEN"),
-		}
+	config := cr_github.GithubConfig{
+		HTTP:  &http.Client{},
+		Token: os.Getenv("GITHUB_TOKEN"),
+		Org  : os.Getenv("org"),
+	}
 
 
 		fetchDeploysTool := mcp.NewTool("fetch_recent_deploys",
@@ -285,7 +286,14 @@ func buildServer(client *elasticsearch.Client) *server.MCPServer {
 		s.AddTool(fetchDeploysTool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			args := parseArguments(req)
 			service, _ := args["service"].(string)
-			repo, ok := cr_github.ServiceRepo[strings.ToLower(strings.TrimSpace(service))]
+
+			ServiceRepo, err := cr_github.FetchRepos(ctx, &config)
+
+			if err != nil  {
+				logger.Log(logger.NewMessage(logger.ERROR, logger.MCP, "there is an issue with the configuration of the github client"))
+			}
+
+			repo, ok := ServiceRepo[strings.ToLower(strings.TrimSpace(service))]
 			if !ok {
 				return mcp.NewToolResultError(fmt.Sprintf("unknown service '%s'", service)), nil
 			}
@@ -295,7 +303,7 @@ func buildServer(client *elasticsearch.Client) *server.MCPServer {
 				limit = int(raw)
 			}
 
-			runs, err := cr_github.FetchRecentRuns(ctx, repo, limit)
+			runs, err := cr_github.FetchRecentRuns(ctx, &config, repo, limit)
 			if err != nil {
 				return mcp.NewToolResultError(fmt.Sprintf("github query failed: %v", err)), nil
 			}
@@ -312,7 +320,6 @@ func buildServer(client *elasticsearch.Client) *server.MCPServer {
 			}
 			return mcp.NewToolResultText(formatDocs(docs)), nil
 		})
-	*/
 
 	return s
 }
