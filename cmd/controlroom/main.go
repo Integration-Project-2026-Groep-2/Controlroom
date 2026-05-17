@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -13,6 +12,7 @@ import (
 	"github.com/elastic/go-elasticsearch/v9"
 	amqp "github.com/rabbitmq/amqp091-go"
 
+	"integration-project-ehb/controlroom/internal/checkin"
 	"integration-project-ehb/controlroom/internal/cr_rabbitmq"
 
 	"integration-project-ehb/controlroom/internal/company"
@@ -257,6 +257,8 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 			go cr_rabbitmq.Consume(cfg, msgs, ctx, company.ProcessCompany)
 		case config.USER_ACK:
 			go cr_rabbitmq.Consume(cfg, msgs, ctx, userack.ProcessControlroomAck)
+		case config.CHECK_IN:
+			go cr_rabbitmq.Consume(cfg, msgs, ctx, checkin.ProcessCheckin)
 		}
 		logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("%s consumer started (qos: %d)", def.Queue.Name, def.Qos)))
 	}
@@ -287,13 +289,23 @@ func main() {
 
 	client, err := elasticsearch.NewClient(config.ElasticConfig)
 	if err != nil {
-		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("elasticsearch client config: %v", err)))
+
+		{
+			logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("elasticsearch client config: %v", err)))
+			fmt.Fprintf(os.Stderr, "elasticsearch client config: %v\n", err)
+		}
+
 		os.Exit(5)
 	}
 
 	res, err := client.Info()
 	if err != nil {
-		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("elasticsearch connect: %v", err)))
+
+		{
+			fmt.Fprintf(os.Stderr, "elasticsearch connect: %v", err)
+			logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("elasticsearch connect: %v", err)))
+		}
+
 		os.Exit(6)
 	}
 	res.Body.Close()

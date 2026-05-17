@@ -1,4 +1,5 @@
-package main
+// TODO(nasr): think about this later
+package summary
 
 import (
 	"bytes"
@@ -15,7 +16,7 @@ import (
 	"github.com/joho/godotenv"
 )
 
-func main() {
+func Generate() {
 	// 1. Laad .env bestand
 	if err := godotenv.Load(); err != nil {
 		log.Println("Geen .env bestand gevonden, we gebruiken environment variables.")
