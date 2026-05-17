@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-
 	"os"
 	"strings"
 	"time"
@@ -41,7 +40,7 @@ type Hit struct {
 	Source map[string]any `json:"_source"`
 }
 
-// NOTE(nasr): mcp package takes network request as type any so we map them to a stirng here
+// NOTE(nasr): mcp package takes network request as type any so we map them to a string here.
 // parseArguments extracts the arguments map from a CallToolRequest.
 func parseArguments(req mcp.CallToolRequest) map[string]any {
 	m, _ := req.Params.Arguments.(map[string]any)
@@ -62,7 +61,6 @@ func formatDocs(docs []map[string]any) string {
 }
 
 func elasticQuery(index string, query any, size int, client *elasticsearch.Client) ([]map[string]any, error) {
-
 	body := SearchRequest{
 		Size: size,
 		Sort: []map[string]map[string]string{
@@ -82,7 +80,6 @@ func elasticQuery(index string, query any, size int, client *elasticsearch.Clien
 		client.Search.WithBody(&buf),
 		client.Search.WithTrackTotalHits(true),
 	)
-
 	if err != nil {
 		return nil, fmt.Errorf("search request: %w", err)
 	}
@@ -93,17 +90,14 @@ func elasticQuery(index string, query any, size int, client *elasticsearch.Clien
 	}
 
 	var result ResultResponse
-
 	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
 		return nil, fmt.Errorf("decode response: %w", err)
 	}
 
 	docs := make([]map[string]any, 0, len(result.Hits.Hits))
-
 	for _, h := range result.Hits.Hits {
 		docs = append(docs, h.Source)
 	}
-
 	return docs, nil
 }
 
@@ -123,6 +117,33 @@ func BuildFetchLogsQuery(service, gte, lte string) map[string]any {
 	}
 }
 
+// newGithubConfig builds a GithubConfig from environment variables.
+func newGithubConfig() cr_github.GithubConfig {
+	return cr_github.GithubConfig{
+		HTTP:  &http.Client{},
+		Token: os.Getenv("GITHUB_TOKEN"),
+		Org:   os.Getenv("ORG"),
+	}
+}
+
+// resolveRepo fetches the org's repos and returns the repo name for the given
+// service key. The lookup is case-insensitive. Returns an error tool result
+// when the service is unknown.
+func resolveRepo(ctx context.Context, config *cr_github.GithubConfig, service string) (string, *mcp.CallToolResult, error) {
+	serviceRepos, err := cr_github.FetchRepos(ctx, config)
+	if err != nil {
+		logger.Log(logger.NewMessage(logger.ERROR, logger.MCP, "github FetchRepos failed"))
+		return "", mcp.NewToolResultError(fmt.Sprintf("github config error: %v", err)), err
+	}
+
+	repo, ok := serviceRepos[strings.ToLower(strings.TrimSpace(service))]
+	if !ok {
+		msg := fmt.Sprintf("unknown service '%s'", service)
+		return "", mcp.NewToolResultError(msg), fmt.Errorf("error %s", msg)
+	}
+	return repo, nil, nil
+}
+
 func buildServer(client *elasticsearch.Client) *server.MCPServer {
 	s := server.NewMCPServer(CR_MCP_NAME, CR_MCP_VERSION, server.WithToolCapabilities(false), server.WithRecovery())
 
@@ -131,28 +152,25 @@ func buildServer(client *elasticsearch.Client) *server.MCPServer {
 		mcp.WithReadOnlyHintAnnotation(true),
 		mcp.WithString("query",
 			mcp.Required(),
-			mcp.Description("query string to filter error logs"),
+			mcp.Description("Lucene query string to filter error logs"),
 		),
 		mcp.WithNumber("limit",
 			mcp.Description("Max number of results to return (default 20)"),
 		),
 	)
-
 	s.AddTool(errorTool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-
-		arguments := parseArguments(req)
+		args := parseArguments(req)
 		limit := 20
 
-		query, ok := arguments["query"].(string)
+		query, ok := args["query"].(string)
 		if !ok || strings.TrimSpace(query) == "" {
 			return mcp.NewToolResultError("'query' must be a non-empty string"), nil
 		}
-		if raw, ok := arguments["limit"].(float64); ok && raw > 0 {
+		if raw, ok := args["limit"].(float64); ok && raw > 0 {
 			limit = int(raw)
 		}
 
 		docs, err := elasticQuery("controlroom-logs", luceneQuery(query), limit, client)
-
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Elasticsearch error: %v", err)), nil
 		}
@@ -170,18 +188,19 @@ func buildServer(client *elasticsearch.Client) *server.MCPServer {
 		),
 	)
 	s.AddTool(heartbeatTool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-
-		arguments := parseArguments(req)
+		args := parseArguments(req)
 		limit := 10
 
-		service, _ := arguments["service"].(string)
-		if raw, ok := arguments["limit"].(float64); ok && raw > 0 {
+		service, _ := args["service"].(string)
+		if raw, ok := args["limit"].(float64); ok && raw > 0 {
 			limit = int(raw)
 		}
+
 		query := "*"
 		if strings.TrimSpace(service) != "" {
-			query = fmt.Sprintf("service: %s", service)
+			query = fmt.Sprintf("service:%s", service)
 		}
+
 		docs, err := elasticQuery("heartbeats", luceneQuery(query), limit, client)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Elasticsearch error: %v", err)), nil
@@ -199,20 +218,20 @@ func buildServer(client *elasticsearch.Client) *server.MCPServer {
 			mcp.Description("Max number of results to return (default 15)"),
 		),
 	)
-
 	s.AddTool(statusTool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-
-		arguments := parseArguments(req)
+		args := parseArguments(req)
 		limit := 15
 
-		status, _ := arguments["status"].(string)
-		if raw, ok := arguments["limit"].(float64); ok && raw > 0 {
+		status, _ := args["status"].(string)
+		if raw, ok := args["limit"].(float64); ok && raw > 0 {
 			limit = int(raw)
 		}
+
 		query := "*"
 		if strings.TrimSpace(status) != "" {
 			query = fmt.Sprintf("status:%s", status)
 		}
+
 		docs, err := elasticQuery("statuscheck", luceneQuery(query), limit, client)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Elasticsearch error: %v", err)), nil
@@ -235,9 +254,9 @@ func buildServer(client *elasticsearch.Client) *server.MCPServer {
 			mcp.Description("Total window width in seconds (default 360 = 5min before + 1min after since)"),
 		),
 	)
-
 	s.AddTool(fetchLogsTool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		args := parseArguments(req)
+
 		service, _ := args["service"].(string)
 		since, _ := args["since"].(string)
 		if strings.TrimSpace(service) == "" || strings.TrimSpace(since) == "" {
@@ -264,12 +283,6 @@ func buildServer(client *elasticsearch.Client) *server.MCPServer {
 		return mcp.NewToolResultText(formatDocs(docs)), nil
 	})
 
-	config := cr_github.GithubConfig{
-		HTTP:  &http.Client{},
-		Token: os.Getenv("GITHUB_TOKEN"),
-		Org:   os.Getenv("org"),
-	}
-
 	fetchDeploysTool := mcp.NewTool("fetch_recent_deploys",
 		mcp.WithDescription("Fetch the N most recent CD-workflow runs for a service via the GitHub Actions Runs API. Returns head_sha, created_at, conclusion, workflow_name, html_url per run, sorted by created_at desc."),
 		mcp.WithReadOnlyHintAnnotation(true),
@@ -281,25 +294,23 @@ func buildServer(client *elasticsearch.Client) *server.MCPServer {
 			mcp.Description("Max runs to return (default 5, max 30)"),
 		),
 	)
-
 	s.AddTool(fetchDeploysTool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		args := parseArguments(req)
+
 		service, _ := args["service"].(string)
-
-		ServiceRepo, err := cr_github.FetchRepos(ctx, &config)
-
-		if err != nil {
-			logger.Log(logger.NewMessage(logger.ERROR, logger.MCP, "there is an issue with the configuration of the github client"))
-		}
-
-		repo, ok := ServiceRepo[strings.ToLower(strings.TrimSpace(service))]
-		if !ok {
-			return mcp.NewToolResultError(fmt.Sprintf("unknown service '%s'", service)), nil
+		if strings.TrimSpace(service) == "" {
+			return mcp.NewToolResultError("'service' must be non-empty"), nil
 		}
 
 		limit := 5
 		if raw, ok := args["limit"].(float64); ok && raw > 0 {
 			limit = int(raw)
+		}
+
+		config := newGithubConfig()
+		repo, errResult, err := resolveRepo(ctx, &config, service)
+		if err != nil {
+			return errResult, nil
 		}
 
 		runs, err := cr_github.FetchRecentRuns(ctx, &config, repo, limit)
@@ -315,6 +326,125 @@ func buildServer(client *elasticsearch.Client) *server.MCPServer {
 				"conclusion":    r.Conclusion,
 				"workflow_name": r.WorkflowName,
 				"html_url":      r.HTMLURL,
+			}
+		}
+		return mcp.NewToolResultText(formatDocs(docs)), nil
+	})
+
+	fetchCommitsTool := mcp.NewTool("fetch_recent_commits",
+		mcp.WithDescription("Fetch the N most recent commits for a service repository from GitHub."),
+		mcp.WithReadOnlyHintAnnotation(true),
+		mcp.WithString("service",
+			mcp.Required(),
+			mcp.Description("Service name (kassa, crm, controlroom, frontend, mailing, facturatie, planning, iot, mcp-master)"),
+		),
+		mcp.WithNumber("limit",
+			mcp.Description("Max commits to return (default 10, max 100)"),
+		),
+	)
+	s.AddTool(fetchCommitsTool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := parseArguments(req)
+
+		service, _ := args["service"].(string)
+		if strings.TrimSpace(service) == "" {
+			return mcp.NewToolResultError("'service' must be non-empty"), nil
+		}
+
+		limit := 10
+		if raw, ok := args["limit"].(float64); ok && raw > 0 {
+			limit = int(raw)
+		}
+
+		config := newGithubConfig()
+		repo, errResult, err := resolveRepo(ctx, &config, service)
+		if err != nil {
+			return errResult, nil
+		}
+
+		commits, err := cr_github.FetchRecentCommits(ctx, &config, repo, limit)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("github query failed: %v", err)), nil
+		}
+
+		docs := make([]map[string]any, 0, len(commits))
+		for _, c := range commits {
+			entry := map[string]any{}
+
+			if sha, ok := c["sha"].(string); ok {
+				entry["sha"] = sha
+			}
+			if commit, ok := c["commit"].(map[string]any); ok {
+				if msg, ok := commit["message"].(string); ok {
+					// Trim to first line only — body can be huge.
+					entry["message"] = strings.SplitN(msg, "\n", 2)[0]
+				}
+				if author, ok := commit["author"].(map[string]any); ok {
+					entry["author"] = author["name"]
+					entry["date"] = author["date"]
+				}
+			}
+			docs = append(docs, entry)
+		}
+
+		return mcp.NewToolResultText(formatDocs(docs)), nil
+	})
+
+	// NOTE(nasr): fetch_blob lets the LLM retrieve file contents by SHA so it
+	// can read source code without needing a full tree walk. Pass the owner and
+	// repo explicitly because blob SHAs are repo-scoped and service→repo
+	// mapping alone is ambiguous when cross-repo reads are needed.
+	fetchBlobTool := mcp.NewTool("fetch_blob",
+		mcp.WithDescription("Fetch one or more files from GitHub by their Git blob SHA. Returns content and encoding (base64 or utf-8) per blob."),
+		mcp.WithReadOnlyHintAnnotation(true),
+		mcp.WithString("owner",
+			mcp.Required(),
+			mcp.Description("GitHub repository owner (user or organisation)"),
+		),
+		mcp.WithString("repo",
+			mcp.Required(),
+			mcp.Description("Repository name"),
+		),
+		mcp.WithString("shas",
+			mcp.Required(),
+			mcp.Description("Comma-separated list of blob SHAs to fetch"),
+		),
+	)
+	s.AddTool(fetchBlobTool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := parseArguments(req)
+
+		owner, _ := args["owner"].(string)
+		repo, _ := args["repo"].(string)
+		shaRaw, _ := args["shas"].(string)
+
+		if strings.TrimSpace(owner) == "" || strings.TrimSpace(repo) == "" {
+			return mcp.NewToolResultError("'owner' and 'repo' must be non-empty"), nil
+		}
+		if strings.TrimSpace(shaRaw) == "" {
+			return mcp.NewToolResultError("'shas' must be a non-empty comma-separated list"), nil
+		}
+
+		shas := make([]string, 0)
+		for s := range strings.SplitSeq(shaRaw, ",") {
+			if trimmed := strings.TrimSpace(s); trimmed != "" {
+				shas = append(shas, trimmed)
+			}
+		}
+		if len(shas) == 0 {
+			return mcp.NewToolResultError("no valid SHAs found in 'shas'"), nil
+		}
+
+		config := newGithubConfig()
+		blobs, err := cr_github.GetBlob(ctx, &config, owner, repo, shas...)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("github blob fetch failed: %v", err)), nil
+		}
+
+		docs := make([]map[string]any, len(blobs))
+		for i, b := range blobs {
+			docs[i] = map[string]any{
+				"sha":      b.FileSHA,
+				"encoding": b.Encoding,
+				"content":  b.Content,
 			}
 		}
 		return mcp.NewToolResultText(formatDocs(docs)), nil
