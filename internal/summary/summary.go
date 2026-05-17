@@ -269,7 +269,7 @@ func generateHeartbeatSection(pdf *fpdf.Fpdf, es *elasticsearch.Client) {
 	query := `{
 		"size": 0,
 		"query": { "range": { "timestamp": { "gte": "now-24h" } } },
-		"aggs": { "services": { "terms": { "field": "serviceId.keyword" } } }
+		"aggs": { "services": { "terms": { "field": "service_id.keyword" } } }
 	}`
 
 	var result map[string]any

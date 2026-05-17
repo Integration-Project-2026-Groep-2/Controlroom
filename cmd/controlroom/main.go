@@ -293,7 +293,6 @@ func main() {
 
 	res, err := client.Info()
 	if err != nil {
-		log.Printf("error here: %v\n", err)
 		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("elasticsearch connect: %v", err)))
 		os.Exit(6)
 	}
