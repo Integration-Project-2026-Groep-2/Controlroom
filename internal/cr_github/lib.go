@@ -38,7 +38,14 @@ type Org struct {
 	URL   string `json:"url"`
 }
 
-// TODO(nasr): i think a response is the correct name for this but we can always refactor this in the future
+// NOTE(nasr): fields must be exported for json.Decoder to populate them.
+type Blob struct {
+	FileSHA  string `json:"sha"`
+	Content  string `json:"content"`
+	Encoding string `json:"encoding"`
+}
+
+// PRResponse carries the fields needed to open a pull request.
 type PRResponse struct {
 	Owner string
 	Repo  string
@@ -48,8 +55,7 @@ type PRResponse struct {
 	Base  string
 }
 
-// note(nasr): something we do a lot and like luca once said. only write a function for something
-// if it's something you do more than once
+// addHeaders attaches the standard GitHub API headers to a request.
 func addHeaders(req *http.Request, token string) {
 	req.Header.Set("Accept", "application/vnd.github+json")
 	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
@@ -58,13 +64,8 @@ func addHeaders(req *http.Request, token string) {
 	}
 }
 
-// note(nasr): disabling this function but also keeping it because it could prove usefull in the future
-// we have one organization but if we ever decide to seperate this tool form this service
-// it could be interesting to retrieve all of the orginazations a users has or somethign
-// and based on that perform the other operations
-// just thinking. well now that we are here. doing this not so cool work on mcp servers, ai, rag, etc.
-// it did allow me to discover the existing tools and software further. Github is something very widely used.
-// not really a big good thing but it does allow you to do some interesting and fun stuff with it.
+// note(nasr): disabled but kept — could be useful if this package is ever
+// extracted into its own service that needs to discover organisations.
 func _(ctx context.Context, client *GithubConfig) (map[string]string, error) {
 	url := fmt.Sprintf("%s/user/orgs", base)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -95,8 +96,8 @@ func _(ctx context.Context, client *GithubConfig) (map[string]string, error) {
 	return result, nil
 }
 
-// FetchRepos fills the configuration repos with the fetched repos but also returns the repos so we can use them
-// this will probably will piss a lot of people off because it's ugyly but it works so leave me alone
+// FetchRepos retrieves all repositories for the configured organisation and
+// returns a name→URL map. It also populates config.Repos as a side effect.
 func FetchRepos(ctx context.Context, config *GithubConfig) (map[string]string, error) {
 	u := fmt.Sprintf("%s/orgs/%s/repos?per_page=100", base, config.Org)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
@@ -125,7 +126,6 @@ func FetchRepos(ctx context.Context, config *GithubConfig) (map[string]string, e
 		result[repo.Name] = repo.URL
 	}
 
-	// note(nasr): extra side effect
 	config.Repos = result
 	return result, nil
 }
@@ -143,8 +143,6 @@ func FetchRecentRuns(ctx context.Context, config *GithubConfig, repo string, lim
 		return nil, err
 	}
 
-	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
 	addHeaders(req, config.Token)
 
 	resp, err := config.HTTP.Do(req)
@@ -167,8 +165,7 @@ func FetchRecentRuns(ctx context.Context, config *GithubConfig, repo string, lim
 	return envelope.WorkflowRuns, nil
 }
 
-// NOTE(nasr): all good and well but how does an llm model take a look at the code and take in the contex properly... im confused on that part
-// - make a pull request
+// RequestChanges opens a pull request on the given repo.
 func RequestChanges(ctx context.Context, config *GithubConfig, pr PRResponse) (map[string]any, error) {
 	u := fmt.Sprintf("%s/repos/%s/%s/pulls", base, pr.Owner, pr.Repo)
 
@@ -208,14 +205,14 @@ func RequestChanges(ctx context.Context, config *GithubConfig, pr PRResponse) (m
 	return result, nil
 }
 
-// FetchRecentCommits retrieves recent commits for a repo
+// FetchRecentCommits retrieves the N most recent commits on the default branch.
 func FetchRecentCommits(ctx context.Context, config *GithubConfig, repo string, limit int) ([]map[string]any, error) {
 	if limit <= 0 || limit > 100 {
 		limit = 10
 	}
 
-	url := fmt.Sprintf("%s/repos/%s/%s/commits?per_page=%d", base, config.Org, repo, limit)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	u := fmt.Sprintf("%s/repos/%s/%s/commits?per_page=%d", base, config.Org, repo, limit)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -239,7 +236,6 @@ func FetchRecentCommits(ctx context.Context, config *GithubConfig, repo string, 
 	return commits, nil
 }
 
-// FetchPRs retrieves pull requests (open or closed)
 func FetchPRs(ctx context.Context, config *GithubConfig, repo, state string, limit int) ([]map[string]any, error) {
 	if state != "open" && state != "closed" && state != "all" {
 		state = "open"
@@ -273,16 +269,6 @@ func FetchPRs(ctx context.Context, config *GithubConfig, repo, state string, lim
 	return prs, nil
 }
 
-type Blob struct {
-	owner    string
-	repo     string
-	file_sha string
-	content  string
-	encoding string
-}
-
-//- file handlers, big large object files thing. pass the hash get the file
-//- pass the content make the file
 func GetBlob(ctx context.Context, config *GithubConfig, owner, repo string, fileSHAs ...string) ([]Blob, error) {
 	if len(fileSHAs) == 0 {
 		return nil, fmt.Errorf("no file SHAs provided")
@@ -304,7 +290,7 @@ func GetBlob(ctx context.Context, config *GithubConfig, owner, repo string, file
 		defer resp.Body.Close()
 
 		if resp.StatusCode >= 400 {
-			return nil, fmt.Errorf("get blob: %s", resp.Status)
+			return nil, fmt.Errorf("get blob %s: %s", sha, resp.Status)
 		}
 
 		var blob Blob
@@ -353,4 +339,3 @@ func CreateBlob(ctx context.Context, config *GithubConfig, owner, repo, content 
 
 	return blob, nil
 }
-
