@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/elastic/go-elasticsearch/v9"
@@ -22,26 +23,27 @@ const (
 
 func getTodayServices(es *elasticsearch.Client) ([]string, error) {
 	query := `{
-        "size": 0,
-        "query": {
-            "range": {
-                "timestamp": {
-                    "gte": "now/d"
-                }
-            }
-        },
-        "aggs": {
-            "services": {
-                "terms": {
-                    "field": "service.keyword",
-                    "size": 50
-                }
-            }
-        }
-    }`
+		"size": 0,
+		"query": {
+			"range": {
+				"timestamp": {
+					"gte": "now/d",
+					"time_zone": "Europe/Brussels"
+				}
+			}
+		},
+		"aggs": {
+			"services": {
+				"terms": {
+					"field": "service.keyword",
+					"size": 50
+				}
+			}
+		}
+	}`
 
 	res, err := es.Search(
-		es.Search.WithIndex("controlroom-logs"),
+		es.Search.WithIndex("controlroom-logs*"),
 		es.Search.WithBody(bytes.NewReader([]byte(query))),
 	)
 	if err != nil {
@@ -222,6 +224,48 @@ func findLensByTitle(serviceName string) (string, error) {
 	return "", nil
 }
 
+func getAllLensTitles() (map[string]string, error) {
+	reqURL := fmt.Sprintf("%s/api/saved_objects/_find?type=lens&per_page=1000", KibanaURL)
+	req, err := http.NewRequest("GET", reqURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("kbn-xsrf", KbnXsrfToken)
+	if u := os.Getenv("KIBANA_USERNAME"); u != "" {
+		req.SetBasicAuth(u, os.Getenv("KIBANA_PASSWORD"))
+	}
+
+	client := http.DefaultClient
+	res, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("kibana get all lenses failed: %s", res.Status)
+	}
+
+	var found map[string]any
+	if err := json.NewDecoder(res.Body).Decode(&found); err != nil {
+		return nil, fmt.Errorf("decode all lenses response: %w", err)
+	}
+
+	titles := make(map[string]string)
+	if so, ok := found["saved_objects"].([]any); ok {
+		for _, obj := range so {
+			item := obj.(map[string]any)
+			id, idOk := item["id"].(string)
+			if attrs, ok := item["attributes"].(map[string]any); ok && idOk {
+				if title, ok := attrs["title"].(string); ok {
+					titles[id] = title
+				}
+			}
+		}
+	}
+	return titles, nil
+}
+
 func panelExists(panels []map[string]any, id string) bool {
 	for _, p := range panels {
 		if t, ok := p["type"].(string); ok && t == "lens" {
@@ -355,9 +399,7 @@ func updateLensSavedObject(id string, serviceName string) (string, error) {
 
 // De structuur voor een Lens Visualisatie (vereenvoudigd)
 func createLensPayload(serviceName string) map[string]interface{} {
-	// De exacte KQL filter string die Kibana native begrijpt
 	kqlQuery := fmt.Sprintf(`service.keyword: "%s" and not (data.keyword: "heartbeat" and (level.keyword: "INFO" or level.keyword: "DEBUG"))`, serviceName)
-
 	return map[string]interface{}{
 		"type": "lens",
 		"attributes": map[string]interface{}{
@@ -368,13 +410,33 @@ func createLensPayload(serviceName string) map[string]interface{} {
 					"formBased": map[string]interface{}{
 						"layers": map[string]interface{}{
 							"layer1": map[string]interface{}{
-								"columnOrder": []string{"col_timestamp", "col_level", "col_service", "col_data", "col_count"},
+								"columnOrder": []string{"col_timestamp", "col_level", "col_data", "col_count"},
 								"columns": map[string]interface{}{
-									"col_timestamp": map[string]interface{}{"label": "timestamp", "dataType": "date", "operationType": "date_histogram", "sourceField": "timestamp", "isBucketed": true, "params": map[string]interface{}{"interval": "auto", "includeEmptyRows": false}},
-									"col_level":     map[string]interface{}{"label": "Severity", "dataType": "string", "operationType": "terms", "sourceField": "level.keyword", "isBucketed": true, "params": map[string]interface{}{"size": 6, "orderBy": map[string]interface{}{"type": "column", "columnId": "col_count"}, "orderDirection": "desc"}},
-									"col_service":   map[string]interface{}{"label": "Service", "dataType": "string", "operationType": "terms", "sourceField": "service.keyword", "isBucketed": true, "params": map[string]interface{}{"size": 100, "orderBy": map[string]interface{}{"type": "column", "columnId": "col_count"}, "orderDirection": "desc"}},
-									"col_data":      map[string]interface{}{"label": "Data", "dataType": "string", "operationType": "terms", "sourceField": "data.keyword", "isBucketed": true, "params": map[string]interface{}{"size": 100, "orderBy": map[string]interface{}{"type": "column", "columnId": "col_count"}, "orderDirection": "desc"}},
-									"col_count":     map[string]interface{}{"label": "Count of records", "dataType": "number", "operationType": "count", "isBucketed": false, "sourceField": "___records___", "params": map[string]interface{}{"hidden": true}},
+									"col_timestamp": map[string]interface{}{
+										"label": "Timestamp", "customLabel": true,
+										"dataType": "date", "operationType": "date_histogram",
+										"sourceField": "timestamp", "isBucketed": true,
+										"params": map[string]interface{}{"interval": "auto", "includeEmptyRows": false},
+									},
+									"col_level": map[string]interface{}{
+										"label": "Severity", "customLabel": true,
+										"dataType": "string", "operationType": "terms",
+										"sourceField": "level.keyword", "isBucketed": true,
+										"params": map[string]interface{}{"size": 6, "orderBy": map[string]interface{}{"type": "column", "columnId": "col_count"}, "orderDirection": "desc"},
+									},
+									"col_data": map[string]interface{}{
+										"label": "Data", "customLabel": true,
+										"dataType": "string", "operationType": "terms",
+										"sourceField": "data.keyword", "isBucketed": true,
+										"params": map[string]interface{}{"size": 100, "orderBy": map[string]interface{}{"type": "column", "columnId": "col_count"}, "orderDirection": "desc"},
+									},
+									"col_count": map[string]interface{}{
+										"label":    "Count of records",
+										"dataType": "number", "operationType": "count",
+										"isBucketed": false, "sourceField": "___records___",
+										// Keep the same params as the working version
+										"params": map[string]interface{}{"emptyAsNull": true},
+									},
 								},
 							},
 						},
@@ -386,12 +448,11 @@ func createLensPayload(serviceName string) map[string]interface{} {
 					"columns": []map[string]interface{}{
 						{"columnId": "col_timestamp"},
 						{"columnId": "col_level"},
-						{"columnId": "col_service"},
 						{"columnId": "col_data"},
-						{"columnId": "col_count"},
+						// Keep col_count here but mark it hidden — this is the correct way
+						{"columnId": "col_count", "hidden": true},
 					},
 				},
-				// HIER ZIT DE FIX: Geen complexe arrays in filters[], maar gewoon de native Kibana zoekbalk (kuery) invullen
 				"query": map[string]interface{}{
 					"query":    kqlQuery,
 					"language": "kuery",
@@ -409,6 +470,55 @@ func createLensPayload(serviceName string) map[string]interface{} {
 	}
 }
 
+func getPanelTitle(p map[string]any, refs []map[string]any, lensTitles map[string]string) string {
+	// 1. Check via de verborgen ID referentie
+	pID := resolvePanelLensID(p, refs)
+	if title, exists := lensTitles[pID]; exists && title != "" {
+		return title
+	}
+	// 2. Check of de titel direct in het paneel is opgeslagen (Inline)
+	if ec, ok := p["embeddableConfig"].(map[string]any); ok {
+		if attrs, ok := ec["attributes"].(map[string]any); ok {
+			if title, ok := attrs["title"].(string); ok && title != "" {
+				return title
+			}
+		}
+	}
+	return ""
+}
+
+func resolvePanelLensID(p map[string]any, refs []map[string]any) string {
+	// 1. Als het script hem net heeft aangemaakt (nog niet gesaved in de UI)
+	if id, ok := p["id"].(string); ok && id != "" {
+		return id
+	}
+
+	// 2. Kibana 8.x logica: De reference heet "<panelIndex>:savedObjectRef"
+	if panelIndex, ok := p["panelIndex"].(string); ok {
+		expectedRefName := panelIndex + ":savedObjectRef"
+		for _, r := range refs {
+			if rName, ok := r["name"].(string); ok && rName == expectedRefName {
+				if id, ok := r["id"].(string); ok {
+					return id
+				}
+			}
+		}
+	}
+
+	// 3. Fallback voor oudere Kibana versies (voor de zekerheid)
+	if refName, ok := p["panelRefName"].(string); ok && refName != "" {
+		for _, r := range refs {
+			if rName, ok := r["name"].(string); ok && rName == refName {
+				if id, ok := r["id"].(string); ok {
+					return id
+				}
+			}
+		}
+	}
+
+	return ""
+}
+
 func syncDashboard() {
 	es, err := newESClient()
 	if err != nil {
@@ -422,23 +532,82 @@ func syncDashboard() {
 		return
 	}
 
-	if len(services) == 0 {
-		fmt.Println("Geen service-waarden gevonden voor vandaag.")
-		return
-	}
-
-	// fetch current dashboard once (haalt nu ook de refs op)
+	// Haal het huidige dashboard op
 	attrs, panels, refs, err := getDashboardAttributes()
 	if err != nil {
 		fmt.Printf("Fout bij ophalen dashboard attributes: %v\n", err)
 		return
 	}
 
+	// NIEUW: Haal alle titels op van alle Lenses in Kibana
+	lensTitles, err := getAllLensTitles()
+	if err != nil {
+		fmt.Printf("Fout bij ophalen Lens titels: %v\n", err)
+		return
+	}
+
 	changed := false
 
-	// Zoek de onderste rand van het dashboard (maxY)
-	maxY := 0
+	// 1. Verzamel de Lens ID's van ALLE services die VANDAAG actief zijn
+	activeLensIDs := make(map[string]string)
+	for _, serviceName := range services {
+		lensID, err := findLensByTitle(serviceName)
+		if err != nil {
+			continue
+		}
+		if lensID == "" {
+			lensID, err = createLensSavedObject(serviceName)
+			if err == nil {
+				fmt.Printf("Aangemaakte Lens %s voor service %s\n", lensID, serviceName)
+			}
+		} else {
+			lensID, err = updateLensSavedObject(lensID, serviceName)
+			if err == nil {
+				fmt.Printf("Lens %s bijgewerkt voor service %s\n", lensID, serviceName)
+			}
+		}
+		if lensID != "" {
+			activeLensIDs[serviceName] = lensID
+		}
+	}
+
+	// 2. Filter bestaande panelen (De VEILIGE Garbage Collection)
+	var keptPanels []map[string]any
+
+	// Maak een lijstje van actieve service namen voor de inline-check
+	activeServiceNames := make(map[string]bool)
+	for _, s := range services {
+		activeServiceNames[s] = true
+	}
+
 	for _, p := range panels {
+		pType, _ := p["type"].(string)
+		if pType == "lens" {
+			lensTitle := getPanelTitle(p, refs, lensTitles)
+
+			if strings.HasPrefix(lensTitle, "Logs - ") {
+				// Knip "Logs - " eraf om de pure service naam te krijgen
+				serviceName := strings.TrimPrefix(lensTitle, "Logs - ")
+
+				// Heeft deze service vandaag logs gestuurd?
+				if activeServiceNames[serviceName] {
+					keptPanels = append(keptPanels, p)
+				} else {
+					fmt.Printf("Verwijderd: inactief paneel (titel: '%s')\n", lensTitle)
+					changed = true
+				}
+			} else {
+				// VASTE VISUALISATIE
+				keptPanels = append(keptPanels, p)
+			}
+		} else {
+			keptPanels = append(keptPanels, p)
+		}
+	}
+
+	// 3. Bereken de nieuwe start-hoogte (maxY)
+	maxY := 0
+	for _, p := range keptPanels {
 		if gridData, ok := p["gridData"].(map[string]any); ok {
 			if yVal, ok := gridData["y"].(float64); ok {
 				if hVal, ok := gridData["h"].(float64); ok {
@@ -450,69 +619,60 @@ func syncDashboard() {
 		}
 	}
 
-	for _, serviceName := range services {
-		// try to find existing Lens saved object by title
-		lensID, err := findLensByTitle(serviceName)
-		if err != nil {
-			fmt.Printf("Fout bij zoeken naar bestaande Lens voor %s: %v\n", serviceName, err)
-			continue
+	// 4. Voeg panelen toe met een UNIEKE panelIndex
+	for serviceName, lensID := range activeLensIDs {
+		// Check of deze lensID al ergens op het dashboard staat
+		exists := false
+		for _, p := range keptPanels {
+			if resolvePanelLensID(p, refs) == lensID {
+				exists = true
+				break
+			}
 		}
 
-		if lensID == "" {
-			// create new Lens
-			lensID, err = createLensSavedObject(serviceName)
-			if err != nil {
-				fmt.Printf("Fout bij aanmaken van Lens voor %s: %v\n", serviceName, err)
-				continue
-			}
-			fmt.Printf("Aangemaakte Lens %s voor service %s\n", lensID, serviceName)
-		} else {
-			lensID, err = updateLensSavedObject(lensID, serviceName)
-			if err != nil {
-				fmt.Printf("Fout bij updaten van bestaande Lens voor %s: %v\n", serviceName, err)
-				continue
-			}
-			fmt.Printf("Lens %s bijgewerkt voor service %s\n", lensID, serviceName)
-		}
+		if !exists {
+			// FIX: Genereer een onmogelijke unieke ID om Kibana reference botsingen te voorkomen!
+			uniqueIndex := fmt.Sprintf("panel_%d", time.Now().UnixNano())
 
-		// HIER IS DE FIX: Enkel nog de slimme check gebruiken!
-		if !dashboardContainsLens(panels, refs, lensID) {
 			newPanel := map[string]any{
-				"panelIndex": fmt.Sprintf("%d", len(panels)+1),
+				"panelIndex": uniqueIndex,
 				"embeddableConfig": map[string]any{
 					"enhancements": map[string]any{"dynamicActions": map[string]any{"events": []any{}}},
 				},
-				// Plaats op volle breedte op de Y-coördinaat 'maxY'
-				"gridData": map[string]any{"x": 0, "y": maxY, "w": 48, "h": 15},
+				// We geven de unieke index ook mee aan "i" in de gridData
+				"gridData": map[string]any{"x": 0, "y": maxY, "w": 48, "h": 15, "i": uniqueIndex},
 				"version":  1,
 				"type":     "lens",
 				"id":       lensID,
 			}
-			panels = append(panels, newPanel)
+			keptPanels = append(keptPanels, newPanel)
 			changed = true
-			maxY += 15 // Duw de maxY naar beneden voor een eventuele volgende service
-			fmt.Printf("Panel toegevoegd voor service %s (lens %s)\n", serviceName, lensID)
-		} else {
-			fmt.Printf("Panel staat al op het dashboard voor service %s\n", serviceName)
+			maxY += 15
+			fmt.Printf("Toegevoegd: nieuw paneel voor service %s\n", serviceName)
 		}
 	}
 
+	// 5. Logica als er middernacht is gepasseerd
+	if len(services) == 0 && len(panels) > len(keptPanels) {
+		fmt.Println("Geen services actief vandaag. Alle tabellen zijn gewist (vaste panelen behouden).")
+	}
+
+	// 6. Sla het dashboard op als de 'keptPanels' lijst afwijkt
 	if changed {
-		updatedPanelsBytes, err := json.Marshal(panels)
+		updatedPanelsBytes, err := json.Marshal(keptPanels)
 		if err != nil {
 			fmt.Printf("Fout bij serialiseren panelsJSON: %v\n", err)
 			return
 		}
 		attrs["panelsJSON"] = string(updatedPanelsBytes)
 
-		// HIER IS DE FIX: refs netjes meegeven aan de put functie
 		if err := putDashboardAttributes(attrs, refs); err != nil {
 			fmt.Printf("Fout bij wegschrijven dashboard: %v\n", err)
 			return
 		}
-		fmt.Println("Dashboard panels bijgewerkt.")
-	} else {
-		fmt.Println("Geen wijzigingen in dashboard panels.")
+		fmt.Println("Dashboard panels succesvol bijgewerkt (opgeruimd + toegevoegd).")
+	} else if len(services) > 0 {
+		fmt.Println("Geen wijzigingen in dashboard panels (alles is up-to-date).")
 	}
 
 	fmt.Println("Dashboard sync voltooid om:", time.Now().Format("15:04:05"))
