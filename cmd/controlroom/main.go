@@ -49,7 +49,7 @@ func setup(ch *amqp.Channel) error {
 	}
 
 	if err := ch.ExchangeDeclare("controlroom.dlx", "direct", true, false, false, false, nil); err != nil {
-		logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, fmt.Sprintf("failed to declare dlx exchange: %v", err)))
+		logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, fmt.Sprintf("ailed to declare dlx exchange: %v", err)))
 		return fmt.Errorf("dlx: %w", err)
 	}
 
@@ -147,92 +147,23 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 			logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("failed to open channel for %s: %v", def.Queue.Name, err)))
 			return fmt.Errorf("channel for %s: %w", def.Queue.Name, err)
 		}
-		defer ch.Close()
+		// defer ch.Close()
 
 		msgs, err := ch.Consume(def.Queue.Name, fmt.Sprintf("controlroom-%d", os.Getpid()), false, false, false, false, nil)
-
 		if err != nil {
 			logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("failed to setup consumer for %s: %v", def.Queue.Name, err)))
 			return fmt.Errorf("setup %s: %w", def.Queue.Name, err)
 		}
 
-		if err := ch.Qos(def.Qos, 0, false); err != nil {
-			logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("failed to set QoS for %s: %v", def.Queue.Name, err)))
-			return fmt.Errorf("qos %s: %w", def.Queue.Name, err)
-		}
+		//		if err := ch.Qos(def.Qos, 0, false); err != nil {
+		//			logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("failed to set QoS for %s: %v", def.Queue.Name, err)))
+		//			return fmt.Errorf("qos %s: %w", def.Queue.Name, err)
+		//		}
 
 		cfg := &cr_rabbitmq.ConsumerConfig{
 			Client:  client,
 			DLQCh:   dlqCh,
 			DLQName: def.DLQName,
-		}
-
-		//- setup rabbitmq heartbeat
-		//- publish a heartbeat and consume it
-		//- we are sending it with the service name RMQ
-		//- by doing this we also do a e2e test of the complete communication
-		//- every second
-		go func() {
-			ticker := time.NewTicker(time.Second)
-			defer ticker.Stop()
-			for {
-				select {
-				case <-ticker.C:
-					cr_rabbitmq.PublishHeartbeat(ch)
-				case <-ctx.Done():
-					return
-				}
-			}
-		}()
-
-		//- watchdog stuff
-		{
-			wdch, err := conn.Channel()
-			if err != nil {
-				logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("watchdog publish channel: %v", err)))
-			} else {
-				defer wdch.Close()
-				watchdog.SetPubChannel(wdch)
-				defer watchdog.SetPubChannel(nil)
-			}
-
-			if watchdog.TeamsWebhook == "" {
-				logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, "CRITICAL: TEAMS_WEBHOOK_URL is niet ingesteld in de environment!"))
-			} else {
-				// note(nasr): fix nil pointer dereference when env variable is empty
-				for _, svc := range watchdog.Services {
-					watchdog.ServiceState[svc] = true
-				}
-
-				//- note(nasr): inlining of the previous process alert queues function
-				go func() {
-					for message := range watchdog.WatchdogQueue {
-						watchdog.AlertTeams(message)
-						time.Sleep(6 * time.Second)
-					}
-
-				}()
-
-				//- deprecated now
-				//- the content below is age restricted
-				//- only read this if the user is older then 65
-				//- because this code is handwritten :)
-				//- go watchdog.ProcessAlertQueue()
-
-				//-
-				go func() {
-					ticker := time.NewTicker(5 * time.Second)
-					defer ticker.Stop()
-					for {
-						select {
-						case <-ticker.C:
-							watchdog.RunWatchdog(client, ctx, wdch)
-						case <-ctx.Done():
-							return
-						}
-					}
-				}()
-			}
 		}
 
 		switch def.Type {
@@ -263,6 +194,85 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 		logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("%s consumer started (qos: %d)", def.Queue.Name, def.Qos)))
 	}
 
+
+	// TODO(nasr): fix the channel thing
+
+
+	//- setup rabbitmq heartbeat
+	//- publish a heartbeat and consume it
+	//- we are sending it with the service name RMQ
+	//- by doing this we also do a e2e test of the complete communication
+	//- every second
+
+
+	go func() {
+		hbPubCh, err := conn.Channel()
+		if err != nil {
+//			logger.Log(logger.NewMessage(config.CONTROLROOM, ))
+
+		}
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				cr_rabbitmq.PublishHeartbeat(hbPubCh)
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	//- watchdog stuff
+	{
+		wdch, err := conn.Channel()
+		if err != nil {
+			logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("watchdog publish channel: %v", err)))
+		} else {
+			defer wdch.Close()
+			watchdog.SetPubChannel(wdch)
+			defer watchdog.SetPubChannel(nil)
+		}
+
+		if watchdog.TeamsWebhook == "" {
+			logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, "CRITICAL: TEAMS_WEBHOOK_URL is niet ingesteld in de environment!"))
+		} else {
+			// note(nasr): fix nil pointer dereference when env variable is empty
+			for _, svc := range watchdog.Services {
+				watchdog.ServiceState[svc] = true
+			}
+
+			//- note(nasr): inlining of the previous process alert queues function
+			go func() {
+				for message := range watchdog.WatchdogQueue {
+					watchdog.AlertTeams(message)
+					time.Sleep(6 * time.Second)
+				}
+
+			}()
+
+			//- deprecated now
+			//- the content below is age restricted
+			//- only read this if the user is older then 65
+			//- because this code is handwritten :)
+			//- go watchdog.ProcessAlertQueue()
+
+			//-
+			go func() {
+				ticker := time.NewTicker(5 * time.Second)
+				defer ticker.Stop()
+				for {
+					select {
+					case <-ticker.C:
+						watchdog.RunWatchdog(client, ctx, wdch)
+					case <-ctx.Done():
+						return
+					}
+				}
+			}()
+		}
+	}
+
 	logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, "all consumers running, waiting for messages"))
 
 	select {
@@ -289,12 +299,10 @@ func main() {
 
 	client, err := elasticsearch.NewClient(config.ElasticConfig)
 	if err != nil {
-
 		{
 			logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("elasticsearch client config: %v", err)))
 			fmt.Fprintf(os.Stderr, "elasticsearch client config: %v\n", err)
 		}
-
 		os.Exit(5)
 	}
 
@@ -339,6 +347,7 @@ func main() {
 
 	//- gathering k8 resources. imrpovement over statuschecks. provide more accurate information
 	//- because the services are running containerized
+	//- if this doesn't work it should fail without breaking the rest
 	{
 		go func() {
 			ticker := time.NewTicker(5 * time.Second)
