@@ -110,6 +110,7 @@ func Consume(cfg *ConsumerConfig, msgs <-chan amqp.Delivery, ctx context.Context
 	for {
 		select {
 		case <-ctx.Done():
+			logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, fmt.Sprintf("channel done")))
 			return
 		case msg, ok := <-msgs:
 			if !ok {
