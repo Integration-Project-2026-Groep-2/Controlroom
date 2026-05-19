@@ -14,6 +14,7 @@ const (
 
 	WARNING_EVENT
 	ERROR_EVENT
+	SUMMARY_EVENT
 )
 
 const (
@@ -62,5 +63,11 @@ var Producer = map[cr_producer_events_t]ProducerDef{
 		Type:     RMQ,
 		Exchange: cr_rabbitmq.ExchangeInfo{Name: "heartbeat.direct", Kind: "direct", Durable: true},
 		Key:      cr_rabbitmq.BindingInfo{Key: "routing.heartbeat"},
+	},
+
+	SUMMARY_EVENT: {
+		Type: CONTROLROOM,
+		Exchange: cr_rabbitmq.ExchangeInfo{Name: "news.topic", Kind: "direct", Durable: true},
+		Key:      cr_rabbitmq.BindingInfo{Key: "news.summary"},
 	},
 }
