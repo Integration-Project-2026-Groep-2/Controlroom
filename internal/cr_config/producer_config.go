@@ -66,7 +66,7 @@ var Producer = map[cr_producer_events_t]ProducerDef{
 	},
 
 	SUMMARY_EVENT: {
-		Type: CONTROLROOM,
+		Type:     CONTROLROOM,
 		Exchange: cr_rabbitmq.ExchangeInfo{Name: "news.topic", Kind: "direct", Durable: true},
 		Key:      cr_rabbitmq.BindingInfo{Key: "news.summary"},
 	},

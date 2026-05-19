@@ -1,4 +1,4 @@
-package user
+package company
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"integration-project-ehb/controlroom/pkg/logger"
 )
 
-func QueryTotalSignedUpUsers(ctx context.Context, es *elasticsearch.Client) (*esapi.Response, error) {
+func QueryTotalSignedUpCompanies(ctx context.Context, es *elasticsearch.Client) (*esapi.Response, error) {
 	res, err := es.Count(
 		es.Count.WithContext(ctx),
 		es.Count.WithIndex("users"),

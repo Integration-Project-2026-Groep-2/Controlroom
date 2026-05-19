@@ -20,12 +20,12 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-func Generate( ctx context.Context, el *elasticsearch.Client, ch *amqp.Channel) {
+func Generate(ctx context.Context, el *elasticsearch.Client, ch *amqp.Channel) {
 
 	var buf bytes.Buffer
 	var body gen.Summary
 
-	resp, err :=  user.QueryTotalSignedUpUsers(ctx, el)
+	resp, err := user.QueryTotalSignedUpUsers(ctx, el)
 	// PRANK
 	if err != nil {
 		logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, "failed to query total amount of users, HAHAHAH NOT GIVING YOU THE ERROR GET PRANKED"))
@@ -40,7 +40,7 @@ func Generate( ctx context.Context, el *elasticsearch.Client, ch *amqp.Channel) 
 
 	// Decode the JSON body into our struct
 	if err := json.NewDecoder(resp.Body).Decode(&countResult); err != nil {
-		logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, fmt.Sprintf("failed to decode the json response from elastic", err)))
+		logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, fmt.Sprintf("failed to decode the json response from elastic, error: %v", err)))
 		return
 	}
 
@@ -53,7 +53,7 @@ func Generate( ctx context.Context, el *elasticsearch.Client, ch *amqp.Channel) 
 
 	// Decode the JSON body into our struct
 	if err := json.NewDecoder(resp.Body).Decode(&countResult); err != nil {
-		logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, fmt.Sprintf("failed to decode the json response from elastic", err)))
+		logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, fmt.Sprintf("failed to decode the json response from elastic, error: %v", err)))
 		return
 	}
 
@@ -62,7 +62,6 @@ func Generate( ctx context.Context, el *elasticsearch.Client, ch *amqp.Channel) 
 		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("failed to encode to xml: %v", err)))
 		return
 	}
-
 
 	if err := enc.Flush(); err != nil {
 		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("failed to encode to xml, (flush thing): %v", err)))
@@ -82,5 +81,3 @@ func Generate( ctx context.Context, el *elasticsearch.Client, ch *amqp.Channel) 
 		logger.Log(logger.NewMessage(logger.WARN, logger.WATCHDOG, fmt.Sprintf("publish heartbeat event failed: %v", err)))
 	}
 }
-
-
