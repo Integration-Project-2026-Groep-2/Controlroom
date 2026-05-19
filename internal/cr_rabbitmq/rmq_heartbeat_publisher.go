@@ -9,6 +9,7 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
+// this acts as the heartbeat for testing rabbitmq
 func PublishHeartbeat(channel *amqp.Channel) error {
 
 	hb := gen.Heartbeat{

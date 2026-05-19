@@ -14,6 +14,7 @@ const (
 	COMPANY
 	USER_ACK
 	CHECK_IN
+	PRODUCE_SUMMARY_ORDER
 )
 
 type ConsumerDef struct {
@@ -90,4 +91,17 @@ var ConsumerDefinitions = []ConsumerDef{
 		Qos:      1,
 		Passive:  false,
 	},
+
+	{
+		Type:     PRODUCE_SUMMARY_ORDER,
+		Exchange: cr_rabbitmq.ExchangeInfo{Name: "news.topic", Kind: "topic", Durable: true},
+		Queue:    cr_rabbitmq.QueueInfo{Name: "controlroom.news.summary", Durable: true},
+		Binding:  cr_rabbitmq.BindingInfo{Key: "routing.news.summary.order"},
+		DLQName:  "controlroom.news.summary.dlq",
+		Qos:      1,
+		Passive:  false,
+	},
+
+
+
 }
