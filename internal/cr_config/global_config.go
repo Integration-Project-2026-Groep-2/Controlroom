@@ -24,3 +24,5 @@ var Services = [6]string{
 	"PLANNING",
 	"KASSA",
 }
+
+var Hostname string

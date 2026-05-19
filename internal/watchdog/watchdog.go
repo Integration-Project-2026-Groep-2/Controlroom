@@ -150,14 +150,14 @@ func RunWatchdog(es *elasticsearch.Client, ctx context.Context, ch *amqp.Channel
 
 					if isCurrentlyOnline && !wasOnline {
 						ServiceState[svc] = true
-						logger.Log(logger.NewMessage(logger.INFO, logger.WATCHDOG, fmt.Sprintf("%s is ONLINE!", svc)))
+						logger.Log(logger.NewMessage(logger.INFO, logger.WATCHDOG, fmt.Sprintf("%s is ONLINE! Reported by [%s]", svc, config.Hostname)))
 
 						publishHb(svc, count, true, Info, HeartbeatOnline)
-						WatchdogQueue <- fmt.Sprintf("**RESOLVED:** Service **%s** is back online!", svc)
+						WatchdogQueue <- fmt.Sprintf("**RESOLVED:** Service **%s** is back online! Reported by [%s]", svc, config.Hostname)
 
 					} else if !isCurrentlyOnline && wasOnline {
 						ServiceState[svc] = false
-						logger.Log(logger.NewMessage(logger.WARN, logger.WATCHDOG, fmt.Sprintf("%s is OFFLINE!", svc)))
+						logger.Log(logger.NewMessage(logger.WARN, logger.WATCHDOG, fmt.Sprintf("%s is OFFLINE! Reported by [%s]", svc, config.Hostname)))
 
 						publishHb(svc, count, false, Critical, HeartbeatFailed)
 						WatchdogQueue <- fmt.Sprintf("**CRITICAL:** Service **%s** is down! (Heartbeats in last 60s: %v)", svc, count)

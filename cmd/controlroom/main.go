@@ -30,6 +30,16 @@ import (
 
 func setup(ch *amqp.Channel) error {
 
+	// refactor, sometimes we send teams messages from differnet hosts and we kind of don't know
+	// if what we're testing is good or not. this is the solution i think
+	{
+		var err error
+		config.Hostname, err = os.Hostname()
+		if err != nil {
+			config.Hostname = "localhost"
+		}
+	}
+
 	logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, "declaring exchanges"))
 
 	for _, def := range config.ConsumerDefinitions {
@@ -194,9 +204,7 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 		logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("%s consumer started (qos: %d)", def.Queue.Name, def.Qos)))
 	}
 
-
 	// TODO(nasr): fix the channel thing
-
 
 	//- setup rabbitmq heartbeat
 	//- publish a heartbeat and consume it
@@ -204,11 +212,10 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 	//- by doing this we also do a e2e test of the complete communication
 	//- every second
 
-
 	go func() {
 		hbPubCh, err := conn.Channel()
 		if err != nil {
-//			logger.Log(logger.NewMessage(config.CONTROLROOM, ))
+			//			logger.Log(logger.NewMessage(config.CONTROLROOM, ))
 
 		}
 		ticker := time.NewTicker(time.Second)
