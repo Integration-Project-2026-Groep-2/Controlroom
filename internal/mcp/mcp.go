@@ -523,7 +523,7 @@ func buildServer(client *elasticsearch.Client) *server.MCPServer {
 			return mcp.NewToolResultError(fmt.Sprintf("failed to create pull request: %v", err)), nil
 		}
 
-		return mcp.NewToolResultText(fmt.Sprintf("Pull request created successfully:\n%s", formatResult(result))), nil
+		return mcp.NewToolResultText(fmt.Sprintf("Pull request created successfully:\n%s", result)), nil
 	})
 
 	return s
