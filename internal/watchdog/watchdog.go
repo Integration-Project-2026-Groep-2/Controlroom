@@ -21,7 +21,7 @@ const errors_threshold = 5
 const warnings_threshold = 5
 
 func RunWatchdog(es *elasticsearch.Client, ctx context.Context, ch *amqp.Channel) {
-	tiktak := time.NewTicker(5 * time.Second)
+	tiktak := time.NewTicker(3600 * time.Second)
 	defer tiktak.Stop()
 
 	for {
