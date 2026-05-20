@@ -1,4 +1,4 @@
-package main
+package dashboard_sync
 
 import (
 	"bytes"
@@ -678,7 +678,7 @@ func syncDashboard() {
 	fmt.Println("Dashboard sync voltooid om:", time.Now().Format("15:04:05"))
 }
 
-func main() {
+func InitDashboardSync() {
 	// load .env for local development (optional)
 	_ = godotenv.Load(".env", "cmd/dashboard-sync/.env")
 
