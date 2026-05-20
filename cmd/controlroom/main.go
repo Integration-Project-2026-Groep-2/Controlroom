@@ -378,7 +378,7 @@ func main() {
 
 	// dynamic dashboards go go go
 	{
-		go dashboard_sync.InitDashboardSync()
+		go dashboard_sync.InitDashboardSync(client)
 	}
 
 	const (

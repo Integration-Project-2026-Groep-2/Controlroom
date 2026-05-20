@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/elastic/go-elasticsearch/v9"
@@ -26,3 +27,9 @@ var Services = [6]string{
 }
 
 var Hostname string
+
+var KbnXsrfToken = "true"
+
+var KibanaURL 	= fmt.Sprintf("%s:%s", os.Getenv("http://localhost"), os.Getenv("PORT_KIBANA"))
+var DashboardID = os.Getenv("DASHBOARD_ID")
+var DataViewId  = os.Getenv("DATAVIEW_ID")

@@ -10,16 +10,11 @@ import (
 	"strings"
 	"time"
 
+	"integration-project-ehb/controlroom/internal/cr_config"
+
 	"github.com/elastic/go-elasticsearch/v9"
-	"github.com/joho/godotenv"
 )
 
-const (
-	KibanaURL    = "http://localhost:5601"
-	DashboardID  = "7a16d71e-4b38-488f-9e69-7165e1742d27"
-	DataViewID   = "9a15b50a-940c-4b0e-927d-9499ca1bf8c0"
-	KbnXsrfToken = "true" // Verplicht voor Kibana API
-)
 
 func getTodayServices(es *elasticsearch.Client) ([]string, error) {
 	query := `{
@@ -76,11 +71,11 @@ func getTodayServices(es *elasticsearch.Client) ([]string, error) {
 }
 
 func getDashboardAttributes() (map[string]any, []map[string]any, []map[string]any, error) {
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/saved_objects/dashboard/%s", KibanaURL, DashboardID), nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/saved_objects/dashboard/%s", config.KibanaURL, config.DashboardID), nil)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	req.Header.Set("kbn-xsrf", KbnXsrfToken)
+	req.Header.Set("kbn-xsrf", config.KbnXsrfToken)
 	if u := os.Getenv("KIBANA_USERNAME"); u != "" {
 		req.SetBasicAuth(u, os.Getenv("KIBANA_PASSWORD"))
 	}
@@ -156,11 +151,11 @@ func putDashboardAttributes(attributes map[string]any, references []map[string]a
 		return fmt.Errorf("marshal dashboard update body: %w", err)
 	}
 
-	putReq, err := http.NewRequest("PUT", fmt.Sprintf("%s/api/saved_objects/dashboard/%s", KibanaURL, DashboardID), bytes.NewReader(bodyBytes))
+	putReq, err := http.NewRequest("PUT", fmt.Sprintf("%s/api/saved_objects/dashboard/%s", config.KibanaURL, config.DashboardID), bytes.NewReader(bodyBytes))
 	if err != nil {
 		return err
 	}
-	putReq.Header.Set("kbn-xsrf", KbnXsrfToken)
+	putReq.Header.Set("kbn-xsrf", config.KbnXsrfToken)
 	putReq.Header.Set("Content-Type", "application/json")
 	if u := os.Getenv("KIBANA_USERNAME"); u != "" {
 		putReq.SetBasicAuth(u, os.Getenv("KIBANA_PASSWORD"))
@@ -183,13 +178,13 @@ func findLensByTitle(serviceName string) (string, error) {
 	targetTitle := fmt.Sprintf("Logs - %s", serviceName)
 	// Zet het in aanhalingstekens voor een exact phrase match
 	q := url.QueryEscape(fmt.Sprintf(`"%s"`, targetTitle))
-	reqURL := fmt.Sprintf("%s/api/saved_objects/_find?type=lens&search_fields=title&search=%s", KibanaURL, q)
+	reqURL := fmt.Sprintf("%s/api/saved_objects/_find?type=lens&search_fields=title&search=%s", config.KibanaURL, q)
 
 	req, err := http.NewRequest("GET", reqURL, nil)
 	if err != nil {
 		return "", err
 	}
-	req.Header.Set("kbn-xsrf", KbnXsrfToken)
+	req.Header.Set("kbn-xsrf", config.KbnXsrfToken)
 	if u := os.Getenv("KIBANA_USERNAME"); u != "" {
 		req.SetBasicAuth(u, os.Getenv("KIBANA_PASSWORD"))
 	}
@@ -225,12 +220,12 @@ func findLensByTitle(serviceName string) (string, error) {
 }
 
 func getAllLensTitles() (map[string]string, error) {
-	reqURL := fmt.Sprintf("%s/api/saved_objects/_find?type=lens&per_page=1000", KibanaURL)
+	reqURL := fmt.Sprintf("%s/api/saved_objects/_find?type=lens&per_page=1000", config.KibanaURL)
 	req, err := http.NewRequest("GET", reqURL, nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("kbn-xsrf", KbnXsrfToken)
+	req.Header.Set("kbn-xsrf", config.KbnXsrfToken)
 	if u := os.Getenv("KIBANA_USERNAME"); u != "" {
 		req.SetBasicAuth(u, os.Getenv("KIBANA_PASSWORD"))
 	}
@@ -288,15 +283,6 @@ func findPanelIndexByTitle(panels []map[string]any, title string) int {
 	return -1
 }
 
-func newESClient() (*elasticsearch.Client, error) {
-	cfg := elasticsearch.Config{
-		Addresses: []string{os.Getenv("ELASTICSEARCH_URL")},
-		Username:  os.Getenv("CONTROLROOM_ES_USER"),
-		Password:  os.Getenv("CONTROLROOM_ES_PASS"),
-	}
-	return elasticsearch.NewClient(cfg)
-}
-
 func createLensSavedObject(serviceName string) (string, error) {
 	payload := createLensPayload(serviceName)
 	body := map[string]any{
@@ -311,13 +297,13 @@ func createLensSavedObject(serviceName string) (string, error) {
 
 	req, err := http.NewRequest(
 		"POST",
-		fmt.Sprintf("%s/api/saved_objects/lens", KibanaURL),
+		fmt.Sprintf("%s/api/saved_objects/lens", config.KibanaURL),
 		bytes.NewReader(bodyBytes),
 	)
 	if err != nil {
 		return "", err
 	}
-	req.Header.Set("kbn-xsrf", KbnXsrfToken)
+	req.Header.Set("kbn-xsrf", config.KbnXsrfToken)
 	req.Header.Set("Content-Type", "application/json")
 	if u := os.Getenv("KIBANA_USERNAME"); u != "" {
 		req.SetBasicAuth(u, os.Getenv("KIBANA_PASSWORD"))
@@ -361,13 +347,13 @@ func updateLensSavedObject(id string, serviceName string) (string, error) {
 
 	req, err := http.NewRequest(
 		"PUT",
-		fmt.Sprintf("%s/api/saved_objects/lens/%s", KibanaURL, id),
+		fmt.Sprintf("%s/api/saved_objects/lens/%s", config.KibanaURL, id),
 		bytes.NewReader(bodyBytes),
 	)
 	if err != nil {
 		return "", err
 	}
-	req.Header.Set("kbn-xsrf", KbnXsrfToken)
+	req.Header.Set("kbn-xsrf", config.KbnXsrfToken)
 	req.Header.Set("Content-Type", "application/json")
 	if u := os.Getenv("KIBANA_USERNAME"); u != "" {
 		req.SetBasicAuth(u, os.Getenv("KIBANA_PASSWORD"))
@@ -464,7 +450,7 @@ func createLensPayload(serviceName string) map[string]any {
 			{
 				"name": "indexpattern-datasource-layer-layer1",
 				"type": "index-pattern",
-				"id":   DataViewID,
+				"id":   config.DataViewId,
 			},
 		},
 	}
@@ -519,12 +505,7 @@ func resolvePanelLensID(p map[string]any, refs []map[string]any) string {
 	return ""
 }
 
-func syncDashboard() {
-	es, err := newESClient()
-	if err != nil {
-		fmt.Printf("Fout bij maken van Elasticsearch client: %v\n", err)
-		return
-	}
+func syncDashboard(es *elasticsearch.Client) {
 
 	services, err := getTodayServices(es)
 	if err != nil {
@@ -678,16 +659,13 @@ func syncDashboard() {
 	fmt.Println("Dashboard sync voltooid om:", time.Now().Format("15:04:05"))
 }
 
-func InitDashboardSync() {
-	// load .env for local development (optional)
-	_ = godotenv.Load(".env", "cmd/dashboard-sync/.env")
-
+func InitDashboardSync(client *elasticsearch.Client) {
 	if os.Getenv("KIBANA_USERNAME") == "" {
 		fmt.Println("Warning: KIBANA_USERNAME not set. Kibana auth will be disabled.")
 	}
 
 	ticker := time.NewTicker(5 * time.Second)
 	for range ticker.C {
-		syncDashboard()
+		syncDashboard(client)
 	}
 }
