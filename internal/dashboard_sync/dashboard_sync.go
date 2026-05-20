@@ -398,54 +398,54 @@ func updateLensSavedObject(id string, serviceName string) (string, error) {
 }
 
 // De structuur voor een Lens Visualisatie (vereenvoudigd)
-func createLensPayload(serviceName string) map[string]interface{} {
+func createLensPayload(serviceName string) map[string]any {
 	kqlQuery := fmt.Sprintf(`service.keyword: "%s" and not (data.keyword: "heartbeat" and (level.keyword: "INFO" or level.keyword: "DEBUG"))`, serviceName)
-	return map[string]interface{}{
+	return map[string]any{
 		"type": "lens",
-		"attributes": map[string]interface{}{
+		"attributes": map[string]any{
 			"title":             "Logs - " + serviceName,
 			"visualizationType": "lnsDatatable",
-			"state": map[string]interface{}{
-				"datasourceStates": map[string]interface{}{
-					"formBased": map[string]interface{}{
-						"layers": map[string]interface{}{
-							"layer1": map[string]interface{}{
+			"state": map[string]any{
+				"datasourceStates": map[string]any{
+					"formBased": map[string]any{
+						"layers": map[string]any{
+							"layer1": map[string]any{
 								"columnOrder": []string{"col_timestamp", "col_level", "col_data", "col_count"},
-								"columns": map[string]interface{}{
-									"col_timestamp": map[string]interface{}{
+								"columns": map[string]any{
+									"col_timestamp": map[string]any{
 										"label": "Timestamp", "customLabel": true,
 										"dataType": "date", "operationType": "date_histogram",
 										"sourceField": "timestamp", "isBucketed": true,
-										"params": map[string]interface{}{"interval": "auto", "includeEmptyRows": false},
+										"params": map[string]any{"interval": "auto", "includeEmptyRows": false},
 									},
-									"col_level": map[string]interface{}{
+									"col_level": map[string]any{
 										"label": "Severity", "customLabel": true,
 										"dataType": "string", "operationType": "terms",
 										"sourceField": "level.keyword", "isBucketed": true,
-										"params": map[string]interface{}{"size": 6, "orderBy": map[string]interface{}{"type": "column", "columnId": "col_count"}, "orderDirection": "desc"},
+										"params": map[string]any{"size": 6, "orderBy": map[string]any{"type": "column", "columnId": "col_count"}, "orderDirection": "desc"},
 									},
-									"col_data": map[string]interface{}{
+									"col_data": map[string]any{
 										"label": "Data", "customLabel": true,
 										"dataType": "string", "operationType": "terms",
 										"sourceField": "data.keyword", "isBucketed": true,
-										"params": map[string]interface{}{"size": 100, "orderBy": map[string]interface{}{"type": "column", "columnId": "col_count"}, "orderDirection": "desc"},
+										"params": map[string]any{"size": 100, "orderBy": map[string]any{"type": "column", "columnId": "col_count"}, "orderDirection": "desc"},
 									},
-									"col_count": map[string]interface{}{
+									"col_count": map[string]any{
 										"label":    "Count of records",
 										"dataType": "number", "operationType": "count",
 										"isBucketed": false, "sourceField": "___records___",
 										// Keep the same params as the working version
-										"params": map[string]interface{}{"emptyAsNull": true},
+										"params": map[string]any{"emptyAsNull": true},
 									},
 								},
 							},
 						},
 					},
 				},
-				"visualization": map[string]interface{}{
+				"visualization": map[string]any{
 					"layerId":   "layer1",
 					"layerType": "data",
-					"columns": []map[string]interface{}{
+					"columns": []map[string]any{
 						{"columnId": "col_timestamp"},
 						{"columnId": "col_level"},
 						{"columnId": "col_data"},
@@ -453,14 +453,14 @@ func createLensPayload(serviceName string) map[string]interface{} {
 						{"columnId": "col_count", "hidden": true},
 					},
 				},
-				"query": map[string]interface{}{
+				"query": map[string]any{
 					"query":    kqlQuery,
 					"language": "kuery",
 				},
-				"filters": []interface{}{},
+				"filters": []any{},
 			},
 		},
-		"references": []map[string]interface{}{
+		"references": []map[string]any{
 			{
 				"name": "indexpattern-datasource-layer-layer1",
 				"type": "index-pattern",
@@ -585,9 +585,9 @@ func syncDashboard() {
 		if pType == "lens" {
 			lensTitle := getPanelTitle(p, refs, lensTitles)
 
-			if strings.HasPrefix(lensTitle, "Logs - ") {
+			if after, ok := strings.CutPrefix(lensTitle, "Logs - "); ok {
 				// Knip "Logs - " eraf om de pure service naam te krijgen
-				serviceName := strings.TrimPrefix(lensTitle, "Logs - ")
+				serviceName := after
 
 				// Heeft deze service vandaag logs gestuurd?
 				if activeServiceNames[serviceName] {

@@ -101,7 +101,4 @@ var ConsumerDefinitions = []ConsumerDef{
 		Qos:      1,
 		Passive:  false,
 	},
-
-
-
 }
