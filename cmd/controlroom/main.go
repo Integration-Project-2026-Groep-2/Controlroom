@@ -14,12 +14,12 @@ import (
 
 	"integration-project-ehb/controlroom/internal/checkin"
 	"integration-project-ehb/controlroom/internal/cr_rabbitmq"
+	"integration-project-ehb/controlroom/internal/dashboard_sync"
 
 	"integration-project-ehb/controlroom/internal/company"
 	"integration-project-ehb/controlroom/internal/cr_config"
 	"integration-project-ehb/controlroom/internal/cr_logger"
-	"integration-project-ehb/controlroom/internal/heartbeat"
-	"integration-project-ehb/controlroom/internal/k8retriever"
+	"integration-project-ehb/controlroom/internal/heartbeat" "integration-project-ehb/controlroom/internal/k8retriever"
 	"integration-project-ehb/controlroom/internal/mcp"
 	"integration-project-ehb/controlroom/internal/statuscheck"
 	"integration-project-ehb/controlroom/internal/user"
@@ -373,6 +373,11 @@ func main() {
 				}
 			}
 		}()
+	}
+
+	// dynamic dashboards go go go
+	{
+		go dashboard_sync.InitDashboardSync()
 	}
 
 	const (
