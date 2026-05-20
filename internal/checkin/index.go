@@ -41,7 +41,7 @@ func indexCheckIn(es *elasticsearch.Client, ctx context.Context, ci *gen.CheckIn
 		Index:      "checkins",
 		DocumentID: fmt.Sprintf("%s-%d", ci.Id, ci.Timestamp.Unix()),
 		Body:       bytes.NewReader(jsonData),
-		Refresh:    "true",
+		Refresh:    "wait_for",
 	}
 
 	res, err := req.Do(ctx, es)
