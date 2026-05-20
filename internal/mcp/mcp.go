@@ -450,6 +450,82 @@ func buildServer(client *elasticsearch.Client) *server.MCPServer {
 		return mcp.NewToolResultText(formatDocs(docs)), nil
 	})
 
+	requestChangesTool := mcp.NewTool("request_changes",
+		mcp.WithDescription("make a pull request"),
+		mcp.WithReadOnlyHintAnnotation(false), // true for read-only; this mutates
+		mcp.WithString("owner",
+			mcp.Required(),
+			mcp.Description("the owner of the repository"),
+		),
+		mcp.WithString("repo",
+			mcp.Required(),
+			mcp.Description("the repository name"),
+		),
+		mcp.WithString("title",
+			mcp.Required(),
+			mcp.Description("the title of the pull request"),
+		),
+		mcp.WithString("body",
+			mcp.Required(),
+			mcp.Description("the body of the pull request containing the information about the PR"),
+		),
+		mcp.WithString("head",
+			mcp.Required(),
+			mcp.Description("the head branch (e.g., 'feature-branch')"),
+		),
+		mcp.WithString("base",
+			mcp.Required(),
+			mcp.Description("the base branch (e.g., 'main')"),
+		),
+	)
+
+	s.AddTool(requestChangesTool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := parseArguments(req)
+		owner, _ := args["owner"].(string)
+		repo, _ := args["repo"].(string)
+		title, _ := args["title"].(string)
+		body, _ := args["body"].(string)
+		head, _ := args["head"].(string)
+		base, _ := args["base"].(string)
+
+		// error handling
+		{
+			if strings.TrimSpace(owner) == "" {
+				return mcp.NewToolResultError("'owner' must be non-empty"), nil
+			}
+			if strings.TrimSpace(repo) == "" {
+				return mcp.NewToolResultError("'repo' must be non-empty"), nil
+			}
+			if strings.TrimSpace(title) == "" {
+				return mcp.NewToolResultError("'title' must be non-empty"), nil
+			}
+			if strings.TrimSpace(body) == "" {
+				return mcp.NewToolResultError("'body' must be non-empty"), nil
+			}
+			if strings.TrimSpace(head) == "" {
+				return mcp.NewToolResultError("'head' must be non-empty"), nil
+			}
+			if strings.TrimSpace(base) == "" {
+				return mcp.NewToolResultError("'base' must be non-empty"), nil
+			}
+		}
+
+		config := newGithubConfig()
+		result, err := cr_github.RequestChanges(ctx, &config, cr_github.PRResponse{
+			Owner: owner,
+			Repo:  repo,
+			Title: title,
+			Body:  body,
+			Head:  head,
+			Base:  base,
+		})
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create pull request: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(fmt.Sprintf("Pull request created successfully:\n%s", formatResult(result))), nil
+	})
+
 	return s
 }
 
