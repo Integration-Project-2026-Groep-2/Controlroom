@@ -57,7 +57,14 @@ func GetPods(ctx context.Context) ([]PodInfo, error) {
 		return nil, fmt.Errorf("failed to create clientset: %w", err)
 	}
 
-	pods, err := clientset.CoreV1().Pods("").List(ctx, metav1.ListOptions{})
+	namespace, err := clientset.CoreV1().
+		Namespaces().
+		Get(ctx, "default", metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get namespace: %w", err)
+	}
+
+	pods, err := clientset.CoreV1().Pods(namespace.GetNamespace()).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list pods: %w", err)
 	}
