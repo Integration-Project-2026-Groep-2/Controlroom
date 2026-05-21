@@ -30,7 +30,7 @@ services:
     networks:
       - controlroom-network
     healthcheck:
-      test: ["CMD-SHELL", "curl -s -u elastic:$${ELASTIC_PASSWORD} http://localhost:9200/_cluster/health | grep -q '\"status\":\"green\\|yellow\"'"]
+      test: [ "CMD-SHELL", "curl -s -u elastic:$${ELASTIC_PASSWORD} http://localhost:9200/_cluster/health | grep -q '\"status\":\"green\\|yellow\"'" ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -57,42 +57,47 @@ services:
       context: ../../
       dockerfile: Dockerfile
     container_name: controlroom
+    depends_on:
+      - kibana
     environment:
       - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@${RABBITMQ_HOST}:5672/
       - RABBITMQ_HOST=${RABBITMQ_HOST}
-      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - ELASTICSEARCH_URL=${ELASTICSEARCH_URL}
+      - PORT_KIBANA=${PORT_KIBANA}
       - CONTROLROOM_ES_USER=${CONTROLROOM_ES_USER}
       - CONTROLROOM_ES_PASS=${CONTROLROOM_ES_PASS}
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
       - TEAMS_WEBHOOK_URL=${TEAMS_WEBHOOK_URL}
       - MONITORED_SERVICES=${MONITORED_SERVICES}
+      - KIBANA_URL=http://kibana
+      - KIBANA_USERNAME=${KIBANA_USERNAME}
+      - KIBANA_PASSWORD=${KIBANA_PASSWORD}
+      - DASHBOARD_LOGS_ID=${DASHBOARD_LOGS_ID}
+      - DATAVIEW_LOGS_ID=${DATAVIEW_LOGS_ID}
+      - DASHBOARD_HEARTBEATS_ID=${DASHBOARD_HEARTBEATS_ID}
+      - DATAVIEW_HEARTBEATS_ID=${DATAVIEW_HEARTBEATS_ID}
       - MCP_PORT=5555
-      - MCP_URL=http://controlroom
+      - MCP_URL=${MCP_BASE_URL}:5555
     ports:
       - "5555:5555"
     networks:
       - controlroom-network
     restart: unless-stopped
-    
-  # Used for logger tests. 
-  # Will not be activated at docker-compose up -d
-  # Activated with docker compose run --rm test-logger, and will be deleted after the test
-  #Used for the simple reason that I cannot get it to work outside the controlroom-network
+
+  # Used for logger tests.
   test-logger:
     image: golang:1.26.1-alpine
     profiles:
       - debug
     working_dir: /app
     volumes:
-      # We mount the whole project so the Go compiler can find 
-      # the "internal" and "pkg" folders required by your test imports
       - ../..:/app
     environment:
-      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - ELASTICSEARCH_URL=${ELASTICSEARCH_URL}
       - CONTROLROOM_ES_USER=${CONTROLROOM_ES_USER}
       - CONTROLROOM_ES_PASS=${CONTROLROOM_ES_PASS}
-    # We target ONLY the test main.go
     command: go run /app/cmd/test_logger/
-    networks: 
+    networks:
       - controlroom-network
 
 networks:

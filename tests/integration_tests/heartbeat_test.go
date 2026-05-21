@@ -43,7 +43,7 @@ var heartbeatServices = []gen.HeartbeatDoc{
 		Indexed:   time.Now().UTC(),
 	},
 	{
-		ServiceId: "kassa",
+		ServiceId: "chackamaka",
 		Timestamp: time.Now().UTC(),
 		Indexed:   time.Now().UTC(),
 	},

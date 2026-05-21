@@ -1,7 +1,6 @@
 package integration_tests
 
 import (
-	"log"
 	"testing"
 
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -12,16 +11,14 @@ const (
 )
 
 func SetupAMPConnection(t *testing.T, adress string) *amqp.Connection {
+	t.Helper()
 
-	conn, err := amqp.Dial(URL)
-
-	if err == nil {
-		return conn
+	conn, err := amqp.Dial(adress)
+	if err != nil {
+		t.Fatalf("failed to connect to rabbitmq: %v", err)
 	}
 
-	conn.Close()
-	log.Fatal("Failed to connect to rabbitmq")
-	return nil
+	return conn
 }
 
 func SetupTestsChannel(t *testing.T, conn *amqp.Connection) *amqp.Channel {
