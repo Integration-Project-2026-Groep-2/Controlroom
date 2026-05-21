@@ -30,6 +30,8 @@ var Hostname string
 
 var KbnXsrfToken = "true"
 
-var KibanaURL 	= fmt.Sprintf("%s:%s", os.Getenv("http://localhost"), os.Getenv("PORT_KIBANA"))
+var KibanaURL = fmt.Sprintf("%s:%s", os.Getenv("http://localhost"), os.Getenv("PORT_KIBANA"))
 var DashboardID = os.Getenv("DASHBOARD_ID")
-var DataViewId  = os.Getenv("DATAVIEW_ID")
+var DataViewId = os.Getenv("DATAVIEW_ID")
+var KibanaUserName = os.Getenv("KIBANA_USERNAME")
+var KibanaPassword = os.Getenv("KIBANA_PASSWORD")
