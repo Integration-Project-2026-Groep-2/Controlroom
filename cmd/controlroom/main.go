@@ -359,7 +359,6 @@ func main() {
 					err := k8retriever.ProcessK8sData(client)
 					if err != nil {
 						logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, fmt.Sprintf("controlroom: failed to gather Kubernetes resources: %v", err)))
-						return
 					}
 				case <-ctx.Done():
 					return
@@ -370,7 +369,7 @@ func main() {
 	}
 
 	if true {
-	// dynamic dashboards go go go
+		// dynamic dashboards go go go
 		{
 			go func() {
 				if config.KibanaConfig.DashboardUser == "" {
