@@ -48,14 +48,18 @@ var Producer = map[cr_producer_events_t]ProducerDef{
 		Type:     WATCHDOG,
 		Exchange: cr_rabbitmq.ExchangeInfo{Name: "news.topic", Kind: "topic"},
 		Key:      cr_rabbitmq.BindingInfo{Key: "news.warning"},
-		Queue:    cr_rabbitmq.QueueInfo{Name: "mailing.news.warning", Durable: true},
 	},
 
 	ERROR_EVENT: {
 		Type:     WATCHDOG,
 		Exchange: cr_rabbitmq.ExchangeInfo{Name: "news.topic", Kind: "topic"},
 		Key:      cr_rabbitmq.BindingInfo{Key: "news.error"},
-		Queue:    cr_rabbitmq.QueueInfo{Name: "mailing.news.error"},
+	},
+
+	SUMMARY_EVENT: {
+		Type:     CONTROLROOM,
+		Exchange: cr_rabbitmq.ExchangeInfo{Name: "news.topic", Kind: "direct", Durable: true},
+		Key:      cr_rabbitmq.BindingInfo{Key: "news.summary"},
 	},
 
 	RMQ_HEARTBEAT: {
@@ -65,9 +69,4 @@ var Producer = map[cr_producer_events_t]ProducerDef{
 		Key:      cr_rabbitmq.BindingInfo{Key: "routing.heartbeat"},
 	},
 
-	SUMMARY_EVENT: {
-		Type:     CONTROLROOM,
-		Exchange: cr_rabbitmq.ExchangeInfo{Name: "news.topic", Kind: "direct", Durable: true},
-		Key:      cr_rabbitmq.BindingInfo{Key: "news.summary"},
-	},
 }
