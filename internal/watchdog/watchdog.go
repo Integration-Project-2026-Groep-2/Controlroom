@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
-	"integration-project-ehb/controlroom/internal/cr_config"
+	config "integration-project-ehb/controlroom/internal/cr_config"
 	"integration-project-ehb/controlroom/internal/cr_logger"
 	"integration-project-ehb/controlroom/internal/heartbeat"
 	"integration-project-ehb/controlroom/pkg/logger"
@@ -34,7 +34,8 @@ func RunWatchdog(es *elasticsearch.Client, ctx context.Context, ch *amqp.Channel
 			{
 				warnings, err := cr_logger.QueryWarning(es)
 				if err != nil {
-					logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("failed to fetch warnings: %v", err)))
+					logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("watchdog: failed to fetch warnings: %v", err)))
+					continue
 				}
 
 				for _, warning := range warnings {
@@ -43,12 +44,12 @@ func RunWatchdog(es *elasticsearch.Client, ctx context.Context, ch *amqp.Channel
 						enc := xml.NewEncoder(&buf)
 
 						if err := enc.Encode(warning); err != nil {
-							logger.Log(logger.NewMessage(logger.ERROR, logger.WATCHDOG, fmt.Sprintf("failed to encode warning to xml: %v", err)))
+							logger.Log(logger.NewMessage(logger.ERROR, logger.WATCHDOG, fmt.Sprintf("watchdog: failed to encode warning to XML: %v", err)))
 							continue
 						}
 
 						if err := enc.Flush(); err != nil {
-							logger.Log(logger.NewMessage(logger.ERROR, logger.WATCHDOG, fmt.Sprintf("failed to flush xml encoder: %v", err)))
+							logger.Log(logger.NewMessage(logger.ERROR, logger.WATCHDOG, fmt.Sprintf("watchdog: failed to flush warning XML encoder: %v", err)))
 							continue
 						}
 
@@ -61,9 +62,9 @@ func RunWatchdog(es *elasticsearch.Client, ctx context.Context, ch *amqp.Channel
 								ContentType: "application/xml",
 								Body:        buf.Bytes(),
 							}); err != nil {
-							logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("failed to publish warning: %v", err)))
+							logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("watchdog: failed to publish warning: %v", err)))
 						} else {
-							logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, "published warning"))
+							logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, "watchdog: published warning"))
 						}
 					}
 				}
@@ -73,7 +74,8 @@ func RunWatchdog(es *elasticsearch.Client, ctx context.Context, ch *amqp.Channel
 			{
 				errors, err := cr_logger.QueryError(es)
 				if err != nil {
-					logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("failed to fetch errors: %v", err)))
+					logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("watchdog: failed to fetch errors: %v", err)))
+					continue
 				}
 
 				for _, errData := range errors {
@@ -82,12 +84,12 @@ func RunWatchdog(es *elasticsearch.Client, ctx context.Context, ch *amqp.Channel
 						enc := xml.NewEncoder(&buf)
 
 						if err := enc.Encode(errData); err != nil {
-							logger.Log(logger.NewMessage(logger.ERROR, logger.WATCHDOG, fmt.Sprintf("failed to encode error to xml: %v", err)))
+							logger.Log(logger.NewMessage(logger.ERROR, logger.WATCHDOG, fmt.Sprintf("watchdog: failed to encode error to XML: %v", err)))
 							continue
 						}
 
 						if err := enc.Flush(); err != nil {
-							logger.Log(logger.NewMessage(logger.ERROR, logger.WATCHDOG, fmt.Sprintf("failed to flush xml encoder: %v", err)))
+							logger.Log(logger.NewMessage(logger.ERROR, logger.WATCHDOG, fmt.Sprintf("watchdog: failed to flush error XML encoder: %v", err)))
 							continue
 						}
 
@@ -100,9 +102,9 @@ func RunWatchdog(es *elasticsearch.Client, ctx context.Context, ch *amqp.Channel
 								ContentType: "application/xml",
 								Body:        buf.Bytes(),
 							}); err != nil {
-							logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("failed to publish error: %v", err)))
+							logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("watchdog: failed to publish error: %v", err)))
 						} else {
-							logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, "published error"))
+							logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, "watchdog: published error"))
 						}
 					}
 				}
@@ -112,7 +114,7 @@ func RunWatchdog(es *elasticsearch.Client, ctx context.Context, ch *amqp.Channel
 			{
 				resp, err := heartbeat.QueryLastSeenPerService(ctx, es)
 				if err != nil {
-					logger.Log(logger.NewMessage(logger.ERROR, logger.WATCHDOG, fmt.Sprintf("Failed to query heartbeat data: %v", err)))
+					logger.Log(logger.NewMessage(logger.ERROR, logger.WATCHDOG, fmt.Sprintf("watchdog: failed to query heartbeat data: %v", err)))
 					// Stop execution for this tick so we don't accidentally mark everything offline
 					continue
 				}
@@ -131,7 +133,7 @@ func RunWatchdog(es *elasticsearch.Client, ctx context.Context, ch *amqp.Channel
 				}
 
 				if err := json.NewDecoder(resp.Body).Decode(&esResult); err != nil {
-					logger.Log(logger.NewMessage(logger.ERROR, logger.WATCHDOG, fmt.Sprintf("Failed to decode ES response: %v", err)))
+					logger.Log(logger.NewMessage(logger.ERROR, logger.WATCHDOG, fmt.Sprintf("watchdog: failed to decode heartbeat response: %v", err)))
 					continue
 				}
 
@@ -150,14 +152,14 @@ func RunWatchdog(es *elasticsearch.Client, ctx context.Context, ch *amqp.Channel
 
 					if isCurrentlyOnline && !wasOnline {
 						ServiceState[svc] = true
-						logger.Log(logger.NewMessage(logger.INFO, logger.WATCHDOG, fmt.Sprintf("%s is ONLINE! Reported by [%s]", svc, config.Hostname)))
+						logger.Log(logger.NewMessage(logger.INFO, logger.WATCHDOG, fmt.Sprintf("watchdog: %s is online, reported by [%s]", svc, config.Hostname)))
 
 						publishHb(svc, count, true, Info, HeartbeatOnline)
 						WatchdogQueue <- fmt.Sprintf("**RESOLVED:** Service **%s** is back online! Reported by [%s]", svc, config.Hostname)
 
 					} else if !isCurrentlyOnline && wasOnline {
 						ServiceState[svc] = false
-						logger.Log(logger.NewMessage(logger.WARN, logger.WATCHDOG, fmt.Sprintf("%s is OFFLINE! Reported by [%s]", svc, config.Hostname)))
+						logger.Log(logger.NewMessage(logger.WARN, logger.WATCHDOG, fmt.Sprintf("watchdog: %s is offline, reported by [%s]", svc, config.Hostname)))
 
 						publishHb(svc, count, false, Critical, HeartbeatFailed)
 						WatchdogQueue <- fmt.Sprintf("**CRITICAL:** Service **%s** is down! (Heartbeats in last 60s: %v)", svc, count)
@@ -171,7 +173,7 @@ func RunWatchdog(es *elasticsearch.Client, ctx context.Context, ch *amqp.Channel
 
 func AlertTeams(message string) {
 	if TeamsWebhook == "" {
-		logger.Log(logger.NewMessage(logger.WARN, logger.WATCHDOG, "Teams webhook URL is not configured"))
+		logger.Log(logger.NewMessage(logger.WARN, logger.WATCHDOG, "watchdog: Teams webhook URL is not configured"))
 		return
 	}
 
@@ -198,13 +200,13 @@ func AlertTeams(message string) {
 
 	body, err := json.Marshal(data)
 	if err != nil {
-		logger.Log(logger.NewMessage(logger.WARN, logger.WATCHDOG, err.Error()))
+		logger.Log(logger.NewMessage(logger.ERROR, logger.WATCHDOG, fmt.Sprintf("watchdog: failed to marshal Teams alert payload: %v", err)))
 		return
 	}
 
 	resp, err := http.Post(TeamsWebhook, "application/json", bytes.NewBuffer(body))
 	if err != nil {
-		logger.Log(logger.NewMessage(logger.WARN, logger.WATCHDOG, err.Error()))
+		logger.Log(logger.NewMessage(logger.ERROR, logger.WATCHDOG, fmt.Sprintf("watchdog: failed to post Teams alert: %v", err)))
 		return
 	}
 	defer resp.Body.Close()
@@ -213,8 +215,8 @@ func AlertTeams(message string) {
 		buf := new(bytes.Buffer)
 		buf.ReadFrom(resp.Body)
 		logger.Log(logger.NewMessage(
-			logger.WARN,
+			logger.ERROR,
 			logger.WATCHDOG,
-			fmt.Sprintf("teams webhook rejected the payload. status: %d, response: %s", resp.StatusCode, buf.String())))
+			fmt.Sprintf("watchdog: Teams webhook rejected the payload (status: %d, response: %s)", resp.StatusCode, buf.String())))
 	}
 }

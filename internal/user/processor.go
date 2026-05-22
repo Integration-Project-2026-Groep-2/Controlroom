@@ -24,18 +24,18 @@ import (
 func ProcessUser(es *elasticsearch.Client, body []byte) error {
 	var uc gen.UserConfirmed
 	if err := xml.Unmarshal(body, &uc); err != nil {
-		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("Unmarshal error when trying to unmarshal user xml: %v", err.Error())))
-		return fmt.Errorf("unmarshal error when trying to unmarshal user xml: %v", err.Error())
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("user: failed to unmarshal XML: %v", err)))
+		return fmt.Errorf("user: failed to unmarshal XML: %w", err)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	if err := indexUser(es, ctx, &uc); err != nil {
-		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("Failed to index user object: %s", err.Error())))
-		return fmt.Errorf("Failed to index user object: %s", err.Error())
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("user: failed to index user %s: %v", uc.Id, err)))
+		return fmt.Errorf("user: failed to index user: %w", err)
 	}
 
-	logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("Indexed user object: %s", uc.Id)))
+	logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("user: indexed user %s", uc.Id)))
 	return nil
 }

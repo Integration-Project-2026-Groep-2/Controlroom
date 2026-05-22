@@ -16,16 +16,16 @@ import (
 func ProcessCompany(es *elasticsearch.Client, body []byte) error {
 	var company gen.CompanyConfirmed
 	if err := xml.Unmarshal(body, &company); err != nil {
-		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("Unmarshal error when trying to unmarshal company xml: %v", err.Error())))
-		return fmt.Errorf("unmarshal error when trying to unmarshal company xml: %v", err.Error())
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("company: failed to unmarshal XML: %v", err)))
+		return fmt.Errorf("company: failed to unmarshal XML: %w", err)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := indexCompany(es, ctx, &company); err != nil {
-		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("Failed to index company object: %s", err.Error())))
-		return fmt.Errorf("Failed to index company object: %s", err.Error())
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("company: failed to index company %s: %v", company.Id, err)))
+		return fmt.Errorf("company: failed to index company: %w", err)
 	}
-	logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("Indexed company object: %s", company.Id)))
+	logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("company: indexed company %s", company.Id)))
 	return nil
 }

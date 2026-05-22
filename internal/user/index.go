@@ -17,7 +17,7 @@ import (
 // indexUser marshals a UserConfirmed to JSON and indexes it in Elasticsearch.
 func indexUser(es *elasticsearch.Client, ctx context.Context, uo *gen.UserConfirmed) error {
 
-	logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, "indexing user"))
+	logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, "user: indexing user"))
 
 	doc := gen.UserDoc{
 		Id:        uo.Id,
@@ -47,12 +47,12 @@ func indexUser(es *elasticsearch.Client, ctx context.Context, uo *gen.UserConfir
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
 		if err != nil {
-			logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("failed to close reader when indexing user: %v", err)))
+			logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, fmt.Sprintf("user: failed to close response body after indexing user: %v", err)))
 		}
 	}(res.Body)
 
 	if res.IsError() {
-		logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("response contains an error when indexing user: %v", res.String())))
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("user: Elasticsearch error indexing user: %v", res.String())))
 		return fmt.Errorf("elasticsearch: %s", res.String())
 	}
 

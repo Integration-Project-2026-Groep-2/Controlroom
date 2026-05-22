@@ -16,8 +16,8 @@ func ProcessControlroomAck(es *elasticsearch.Client, body []byte) error {
 	var ack gen.UserAck
 
 	if err := xml.Unmarshal(body, &ack); err != nil {
-		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("Unmarshal error user_ack xml: %v", err.Error())))
-		return fmt.Errorf("unmarshal error user_ack: %v", err)
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("user_acknowledgment: failed to unmarshal XML: %v", err)))
+		return fmt.Errorf("user_acknowledgment: failed to unmarshal XML: %w", err)
 	}
 
 	doc := UserAckDoc{
@@ -30,8 +30,8 @@ func ProcessControlroomAck(es *elasticsearch.Client, body []byte) error {
 	defer cancel()
 
 	if err := indexUserAck(es, ctx, &doc); err != nil {
-		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("Failed to index user ack: %s", err.Error())))
-		return fmt.Errorf("failed to index user ack: %s", err.Error())
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("user_acknowledgment: failed to index user ack for %s: %v", ack.Service, err)))
+		return fmt.Errorf("user_acknowledgment: failed to index user ack: %w", err)
 	}
 
 	logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("Processed User Ack for service: %s, user: %s", ack.Service, ack.UserId)))
@@ -42,8 +42,8 @@ func ProcessCRMAck(es *elasticsearch.Client, body []byte) error {
 	var dto gen.UserDoc
 
 	if err := xml.Unmarshal(body, &dto); err != nil {
-		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("Unmarshal error CRM user_DTO xml: %v", err.Error())))
-		return fmt.Errorf("unmarshal error CRM DTO: %v", err)
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("user_acknowledgment: failed to unmarshal CRM user DTO XML: %v", err)))
+		return fmt.Errorf("user_acknowledgment: failed to unmarshal CRM user DTO XML: %w", err)
 	}
 
 	doc := UserAckDoc{
@@ -56,8 +56,8 @@ func ProcessCRMAck(es *elasticsearch.Client, body []byte) error {
 	defer cancel()
 
 	if err := indexUserAck(es, ctx, &doc); err != nil {
-		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("Failed to index CRM user ack: %s", err.Error())))
-		return fmt.Errorf("failed to index CRM user ack: %s", err.Error())
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("user_acknowledgment: failed to index CRM user ack for %s: %v", dto.Id, err)))
+		return fmt.Errorf("user_acknowledgment: failed to index CRM user ack: %w", err)
 	}
 
 	logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("Processed CRM User DTO as Ack for user: %s", dto.Id)))

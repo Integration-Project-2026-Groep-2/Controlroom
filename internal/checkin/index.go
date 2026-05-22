@@ -14,10 +14,10 @@ import (
 )
 
 func indexCheckIn(es *elasticsearch.Client, ctx context.Context, ci *gen.CheckIn) error {
-	logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, fmt.Sprintf("indexing checkin for %s", ci.Id)))
+	logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, fmt.Sprintf("checkin: indexing checkin for %s", ci.Id)))
 
 	if es == nil {
-		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, "elasticsearch client is nil"))
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, "checkin: Elasticsearch client is nil"))
 		return fmt.Errorf("elasticsearch client is nil")
 	}
 
@@ -32,7 +32,7 @@ func indexCheckIn(es *elasticsearch.Client, ctx context.Context, ci *gen.CheckIn
 		logger.Log(logger.NewMessage(
 			logger.ERROR,
 			logger.CONTROLROOM,
-			fmt.Sprintf("failed to marshal checkin for %s: %v", ci.Id, err),
+			fmt.Sprintf("checkin: failed to marshal checkin for %s: %v", ci.Id, err),
 		))
 		return err
 	}
@@ -49,18 +49,18 @@ func indexCheckIn(es *elasticsearch.Client, ctx context.Context, ci *gen.CheckIn
 		logger.Log(logger.NewMessage(
 			logger.ERROR,
 			logger.CONTROLROOM,
-			fmt.Sprintf("failed to index checkin for %s: %v", ci.Id, err),
+			fmt.Sprintf("checkin: failed to index checkin for %s: %v", ci.Id, err),
 		))
 		return err
 	}
 	defer func() {
 		if err := res.Body.Close(); err != nil {
-			logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, fmt.Sprintf("failed to close response body for checkin %s: %v", ci.Id, err)))
+			logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, fmt.Sprintf("checkin: failed to close response body after indexing %s: %v", ci.Id, err)))
 		}
 	}()
 
 	if res.IsError() {
-		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("elasticsearch error indexing checkin for %s: %s", ci.Id, res.String())))
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("checkin: Elasticsearch error indexing checkin for %s: %s", ci.Id, res.String())))
 		return fmt.Errorf("elasticsearch error: %s", res.String())
 	}
 

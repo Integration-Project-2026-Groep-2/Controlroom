@@ -26,9 +26,9 @@ func Generate(ctx context.Context, el *elasticsearch.Client, ch *amqp.Channel) {
 	var body gen.Summary
 
 	resp, err := user.QueryTotalSignedUpUsers(ctx, el)
-	// PRANK
 	if err != nil {
-		logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, "failed to query total amount of users, HAHAHAH NOT GIVING YOU THE ERROR GET PRANKED"))
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("summary: failed to query total amount of users: %v", err)))
+		return
 
 	}
 
@@ -40,31 +40,32 @@ func Generate(ctx context.Context, el *elasticsearch.Client, ch *amqp.Channel) {
 
 	// Decode the JSON body into our struct
 	if err := json.NewDecoder(resp.Body).Decode(&countResult); err != nil {
-		logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, fmt.Sprintf("failed to decode the json response from elastic, error: %v", err)))
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("summary: failed to decode user count response: %v", err)))
 		return
 	}
 
 	// same thing
 	resp, err = company.QueryTotalSignedUpCompanies(ctx, el)
-	// you are getting errors :)
 	if err != nil {
-		logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, fmt.Sprintf("failed to query total amount of companies, error: %v", err)))
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("summary: failed to query total amount of companies: %v", err)))
+		return
 	}
 
 	// Decode the JSON body into our struct
 	if err := json.NewDecoder(resp.Body).Decode(&countResult); err != nil {
-		logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, fmt.Sprintf("failed to decode the json response from elastic, error: %v", err)))
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("summary: failed to decode company count response: %v", err)))
 		return
 	}
 
 	enc := xml.NewEncoder(&buf)
 	if err := enc.Encode(body); err != nil {
-		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("failed to encode to xml: %v", err)))
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("summary: failed to encode summary XML: %v", err)))
 		return
 	}
 
 	if err := enc.Flush(); err != nil {
-		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("failed to encode to xml, (flush thing): %v", err)))
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("summary: failed to flush summary XML encoder: %v", err)))
+		return
 	}
 
 	if err := ch.PublishWithContext(
@@ -78,6 +79,6 @@ func Generate(ctx context.Context, el *elasticsearch.Client, ch *amqp.Channel) {
 			Body:        buf.Bytes(),
 		},
 	); err != nil {
-		logger.Log(logger.NewMessage(logger.WARN, logger.WATCHDOG, fmt.Sprintf("publish heartbeat event failed: %v", err)))
+		logger.Log(logger.NewMessage(logger.ERROR, logger.WATCHDOG, fmt.Sprintf("summary: failed to publish heartbeat event: %v", err)))
 	}
 }

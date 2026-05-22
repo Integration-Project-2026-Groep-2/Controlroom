@@ -2,8 +2,6 @@ package logger
 
 import (
 	"bytes"
-	"context"
-	"fmt"
 	"integration-project-ehb/controlroom/pkg/gen"
 	"io"
 	"os"
@@ -11,8 +9,6 @@ import (
 
 	"github.com/coreos/go-systemd/v22/journal"
 	"github.com/elastic/go-elasticsearch/v9"
-	"github.com/elastic/go-elasticsearch/v9/esapi"
-	"github.com/mailru/easyjson"
 )
 
 type Severity string
@@ -137,39 +133,6 @@ func writeEscaped(buf *bytes.Buffer, s string) {
 			buf.WriteByte(hex[c&0xF])
 		default:
 			buf.WriteByte(c)
-		}
-	}
-}
-
-func IndexLogsQueue() {
-	for payload := range queue {
-		data, err := easyjson.Marshal(payload)
-		if err != nil {
-			fmt.Printf("marshal error: %v\n", err)
-			continue
-		}
-
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-
-		req := esapi.IndexRequest{
-			Index:   Index,
-			Body:    bytes.NewReader(data),
-			Refresh: "false",
-		}
-
-		res, err := req.Do(ctx, Client)
-		cancel()
-
-		if err != nil {
-			fmt.Printf("index logs error: %v\n", err)
-			continue
-		}
-
-		res.Body.Close()
-
-		if res.IsError() {
-			fmt.Printf("index logs error response: %v\n", res.Status())
-			continue
 		}
 	}
 }

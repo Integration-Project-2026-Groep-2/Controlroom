@@ -15,16 +15,16 @@ import (
 func ProcessStatusCheck(es *elasticsearch.Client, body []byte) error {
 	var sct gen.StatusCheck
 	if err := xml.Unmarshal(body, &sct); err != nil {
-		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("Unmarshal error when trying to unmarshal statuscheck xml: %v", err.Error())))
-		return fmt.Errorf("unmarshal: %w", err)
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("statuscheck: failed to unmarshal XML: %v", err)))
+		return fmt.Errorf("statuscheck: failed to unmarshal XML: %w", err)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	if err := indexStatusCheck(es, ctx, &sct); err != nil {
-		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("Failed to index statuscheck: %s", err.Error())))
-		return fmt.Errorf("index: %w", err)
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("statuscheck: failed to index statuscheck for %s: %v", sct.ServiceId, err)))
+		return fmt.Errorf("statuscheck: failed to index statuscheck: %w", err)
 	}
 
 	// logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("Finished processing StatusCheck: %s", sct.ServiceId)))

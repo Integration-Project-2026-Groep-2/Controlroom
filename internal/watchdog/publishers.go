@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"integration-project-ehb/controlroom/internal/cr_config"
+	config "integration-project-ehb/controlroom/internal/cr_config"
 	"integration-project-ehb/controlroom/pkg/gen"
 	"integration-project-ehb/controlroom/pkg/logger"
 
@@ -21,7 +21,7 @@ func publishHb(svc string, count float64, up bool, severity SeverityLevel, event
 	ch := WatchdogChan.Load()
 
 	if ch == nil {
-		logger.Log(logger.NewMessage(logger.WARN, logger.WATCHDOG, "rabbitmq channel is not initialized"))
+		logger.Log(logger.NewMessage(logger.WARN, logger.WATCHDOG, "watchdog: RabbitMQ channel is not initialized"))
 		return
 	}
 
@@ -53,12 +53,13 @@ func publishHb(svc string, count float64, up bool, severity SeverityLevel, event
 
 	enc := xml.NewEncoder(&buf)
 	if err := enc.Encode(body); err != nil {
-		logger.Log(logger.NewMessage(logger.ERROR, logger.WATCHDOG, fmt.Sprintf("failed to encode to xml: %v", err)))
+		logger.Log(logger.NewMessage(logger.ERROR, logger.WATCHDOG, fmt.Sprintf("watchdog: failed to encode heartbeat event to XML: %v", err)))
 		return
 	}
 
 	if err := enc.Flush(); err != nil {
-		logger.Log(logger.NewMessage(logger.ERROR, logger.WATCHDOG, fmt.Sprintf("failed to encode to xml, (flush thing): %v", err)))
+		logger.Log(logger.NewMessage(logger.ERROR, logger.WATCHDOG, fmt.Sprintf("watchdog: failed to flush heartbeat XML encoder: %v", err)))
+		return
 	}
 
 	if err := ch.PublishWithContext(
@@ -72,7 +73,7 @@ func publishHb(svc string, count float64, up bool, severity SeverityLevel, event
 			Body:        buf.Bytes(),
 		},
 	); err != nil {
-		logger.Log(logger.NewMessage(logger.WARN, logger.WATCHDOG, fmt.Sprintf("publish heartbeat event failed: %v", err)))
+		logger.Log(logger.NewMessage(logger.ERROR, logger.WATCHDOG, fmt.Sprintf("watchdog: failed to publish heartbeat event: %v", err)))
 	}
 
 }

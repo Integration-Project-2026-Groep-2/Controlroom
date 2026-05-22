@@ -16,7 +16,7 @@ import (
 )
 
 func indexCompany(es *elasticsearch.Client, ctx context.Context, comp *gen.CompanyConfirmed) error {
-	logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, fmt.Sprintf("indexing company %s", comp.Id)))
+	logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, fmt.Sprintf("company: indexing company %s", comp.Id)))
 
 	doc := gen.CompanyDoc{
 		Id:          comp.Id,
@@ -27,7 +27,7 @@ func indexCompany(es *elasticsearch.Client, ctx context.Context, comp *gen.Compa
 
 	jsonData, err := easyjson.Marshal(doc)
 	if err != nil {
-		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("failed to marshal company %s: %v", comp.Id, err)))
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("company: failed to marshal company %s: %v", comp.Id, err)))
 		return err
 	}
 
@@ -40,21 +40,21 @@ func indexCompany(es *elasticsearch.Client, ctx context.Context, comp *gen.Compa
 
 	res, err := req.Do(ctx, es)
 	if err != nil {
-		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("failed to index company %s: %v", comp.Id, err)))
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("company: failed to index company %s: %v", comp.Id, err)))
 		return fmt.Errorf("index: %w", err)
 	}
 	defer func(Body io.ReadCloser) {
 		if err := Body.Close(); err != nil {
-			logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, fmt.Sprintf("failed to close body after indexing company %s: %v", comp.Id, err)))
+			logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, fmt.Sprintf("company: failed to close response body after indexing %s: %v", comp.Id, err)))
 		}
 	}(res.Body)
 
 	if res.IsError() {
-		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("elasticsearch error indexing company %s: %s", comp.Id, res.String())))
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("company: Elasticsearch error indexing company %s: %s", comp.Id, res.String())))
 		return fmt.Errorf("elasticsearch error: %s", res.String())
 	}
 
-	logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("indexed company %s", comp.Id)))
+	logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("company: indexed company %s", comp.Id)))
 
 	// ==============================================================================
 	// NIEUW: AUTOMATISATIE VAN DE ENRICH POLICY
@@ -67,13 +67,13 @@ func indexCompany(es *elasticsearch.Client, ctx context.Context, comp *gen.Compa
 	if enrichErr != nil {
 		// We gebruiken hier WARN in plaats van ERROR, omdat het bedrijf wel al succesvol is opgeslagen.
 		// Een falende policy update mag de rest van de applicatie niet laten crashen.
-		logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, fmt.Sprintf("failed to trigger enrich policy after indexing company %s: %v", comp.Id, enrichErr)))
+		logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, fmt.Sprintf("company: failed to trigger enrich policy after indexing %s: %v", comp.Id, enrichErr)))
 	} else {
 		defer enrichRes.Body.Close()
 		if enrichRes.IsError() {
-			logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, fmt.Sprintf("elasticsearch error executing policy: %s", enrichRes.String())))
+			logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, fmt.Sprintf("company: Elasticsearch error executing enrich policy: %s", enrichRes.String())))
 		} else {
-			logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("successfully refreshed company_lookup policy for new company %s", comp.Id)))
+			logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("company: refreshed company_lookup policy for new company %s", comp.Id)))
 		}
 	}
 	// ==============================================================================

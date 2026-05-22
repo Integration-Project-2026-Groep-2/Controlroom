@@ -15,7 +15,7 @@ import (
 
 func indexStatusCheck(es *elasticsearch.Client, ctx context.Context, sct *gen.StatusCheck) error {
 
-	logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, fmt.Sprintf("indexing statuscheck for %s", sct.ServiceId)))
+	logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, fmt.Sprintf("statuscheck: indexing statuscheck for %s", sct.ServiceId)))
 
 	doc := gen.StatusCheckDoc{
 		ServiceId: sct.ServiceId,
@@ -27,7 +27,7 @@ func indexStatusCheck(es *elasticsearch.Client, ctx context.Context, sct *gen.St
 
 	jsonData, err := json.Marshal(doc)
 	if err != nil {
-		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("failed to marshal statuscheck for %s: %v", sct.ServiceId, err)))
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("statuscheck: failed to marshal statuscheck for %s: %v", sct.ServiceId, err)))
 		return err
 	}
 
@@ -40,17 +40,17 @@ func indexStatusCheck(es *elasticsearch.Client, ctx context.Context, sct *gen.St
 
 	res, err := req.Do(ctx, es)
 	if err != nil {
-		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("failed to index statuscheck for %s: %v", sct.ServiceId, err)))
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("statuscheck: failed to index statuscheck for %s: %v", sct.ServiceId, err)))
 		return err
 	}
 	defer func(Body io.ReadCloser) {
 		if err := Body.Close(); err != nil {
-			logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, fmt.Sprintf("failed to close body after indexing statuscheck %s: %v", sct.ServiceId, err)))
+			logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, fmt.Sprintf("statuscheck: failed to close response body after indexing %s: %v", sct.ServiceId, err)))
 		}
 	}(res.Body)
 
 	if res.IsError() {
-		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("elasticsearch error indexing statuscheck for %s: %s", sct.ServiceId, res.String())))
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("statuscheck: Elasticsearch error indexing statuscheck for %s: %s", sct.ServiceId, res.String())))
 		return fmt.Errorf("elasticsearch error: %s", res.String())
 	}
 

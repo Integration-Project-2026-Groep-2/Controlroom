@@ -19,7 +19,7 @@ const (
 )
 
 func indexK8Pod(ctx context.Context, es *elasticsearch.Client, pod PodInfo) error {
-	logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, fmt.Sprintf("indexing pod %s/%s", pod.Namespace, pod.Name)))
+	logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, fmt.Sprintf("k8retriever: indexing pod %s/%s", pod.Namespace, pod.Name)))
 
 	doc := map[string]any{
 		"namespace":       pod.Namespace,
@@ -40,7 +40,7 @@ func indexK8Pod(ctx context.Context, es *elasticsearch.Client, pod PodInfo) erro
 		logger.Log(logger.NewMessage(
 			logger.ERROR,
 			logger.CONTROLROOM,
-			fmt.Sprintf("failed to marshal pod %s/%s: %v", pod.Namespace, pod.Name, err),
+			fmt.Sprintf("k8retriever: failed to marshal pod %s/%s: %v", pod.Namespace, pod.Name, err),
 		))
 		return fmt.Errorf("marshal: %w", err)
 	}
@@ -55,7 +55,7 @@ func indexK8Pod(ctx context.Context, es *elasticsearch.Client, pod PodInfo) erro
 
 	res, err := req.Do(ctx, es)
 	if err != nil {
-		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("failed to index pod %s/%s: %v", pod.Namespace, pod.Name, err)))
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("k8retriever: failed to index pod %s/%s: %v", pod.Namespace, pod.Name, err)))
 		return fmt.Errorf("index request: %w", err)
 	}
 
@@ -64,7 +64,7 @@ func indexK8Pod(ctx context.Context, es *elasticsearch.Client, pod PodInfo) erro
 			logger.Log(logger.NewMessage(
 				logger.WARN,
 				logger.CONTROLROOM,
-				fmt.Sprintf("failed to close response body for pod %s/%s: %v", pod.Namespace, pod.Name, err),
+				fmt.Sprintf("k8retriever: failed to close response body for pod %s/%s: %v", pod.Namespace, pod.Name, err),
 			))
 		}
 	}(res.Body)
@@ -73,12 +73,12 @@ func indexK8Pod(ctx context.Context, es *elasticsearch.Client, pod PodInfo) erro
 		logger.Log(logger.NewMessage(
 			logger.ERROR,
 			logger.CONTROLROOM,
-			fmt.Sprintf("elasticsearch error indexing pod %s/%s: %s", pod.Namespace, pod.Name, res.String()),
+			fmt.Sprintf("k8retriever: Elasticsearch error indexing pod %s/%s: %s", pod.Namespace, pod.Name, res.String()),
 		))
 		return fmt.Errorf("elasticsearch: %s", res.String())
 	}
 
-	logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, fmt.Sprintf("successfully indexed pod %s/%s", pod.Namespace, pod.Name)))
+	logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, fmt.Sprintf("k8retriever: successfully indexed pod %s/%s", pod.Namespace, pod.Name)))
 
 	return nil
 }
