@@ -26,7 +26,9 @@ func IndexLogsQueue() {
 
 		data, err := easyjson.Marshal(payload)
 		if err != nil {
-			fmt.Printf("marshal error: %v\n", err)
+			if debugMode {
+				fmt.Printf("marshal error: %v\n", err)
+			}
 			continue
 		}
 
@@ -42,14 +44,18 @@ func IndexLogsQueue() {
 		cancel()
 
 		if err != nil {
-			fmt.Printf("index logs error: %v\n", err)
+			if debugMode {
+				fmt.Printf("index logs error: %v\n", err)
+			}
 			continue
 		}
 
 		res.Body.Close()
 
 		if res.IsError() {
-			fmt.Printf("index logs error response: %v\n", res.Status())
+			if debugMode {
+				fmt.Printf("index logs error response: %v\n", res.Status())
+			}
 			continue
 		}
 	}
