@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -300,7 +301,11 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 	}
 }
 
+const VERSION = "1.8.9"
+
 func main() {
+
+	log.Printf("[VERSION] %s\n", VERSION)
 
 	if err := logger.Init(&config.ElasticConfig, "controlroom-logs", os.Stdout, 4); err != nil {
 		fmt.Fprintf(os.Stderr, "logger init: %v\n", err)
