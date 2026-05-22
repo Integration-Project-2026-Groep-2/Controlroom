@@ -7,8 +7,13 @@ import (
 	config "integration-project-ehb/controlroom/internal/cr_config"
 	"net/http"
 	"net/url"
-	"os"
 )
+
+func setDashboardBasicAuth(req *http.Request) {
+	if u := config.KibanaConfig.DashboardUser; u != "" {
+		req.SetBasicAuth(u, config.KibanaConfig.DashboardPassword)
+	}
+}
 
 // getAllPanelTitles returns the titles for Kibana lens and visualization saved objects.
 func getAllPanelTitles() (map[string]string, error) {
@@ -17,10 +22,8 @@ func getAllPanelTitles() (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("kbn-xsrf", config.KibanaConfig.UserName)
-	if u := os.Getenv("KIBANA_USERNAME"); u != "" {
-		req.SetBasicAuth(u, os.Getenv("KIBANA_PASSWORD"))
-	}
+	req.Header.Set("kbn-xsrf", config.KbnXsrfToken)
+	setDashboardBasicAuth(req)
 
 	client := http.DefaultClient
 	res, err := client.Do(req)
@@ -59,9 +62,7 @@ func findSavedObjectByTitle(title string, objectType string) (string, error) {
 		return "", err
 	}
 	req.Header.Set("kbn-xsrf", config.KbnXsrfToken)
-	if u := os.Getenv("KIBANA_USERNAME"); u != "" {
-		req.SetBasicAuth(u, os.Getenv("KIBANA_PASSWORD"))
-	}
+	setDashboardBasicAuth(req)
 
 	client := http.DefaultClient
 	res, err := client.Do(req)
@@ -105,9 +106,7 @@ func createOrUpdateSavedObject(objectType string, id string, payload map[string]
 	}
 	req.Header.Set("kbn-xsrf", config.KbnXsrfToken)
 	req.Header.Set("Content-Type", "application/json")
-	if u := os.Getenv("KIBANA_USERNAME"); u != "" {
-		req.SetBasicAuth(u, os.Getenv("KIBANA_PASSWORD"))
-	}
+	setDashboardBasicAuth(req)
 
 	client := http.DefaultClient
 	res, err := client.Do(req)

@@ -81,9 +81,7 @@ func getDashboardAttributes(dashboardID string) (map[string]any, []map[string]an
 		return nil, nil, nil, err
 	}
 	req.Header.Set("kbn-xsrf", config.KbnXsrfToken)
-	if u := config.KibanaConfig.UserName; u != "" {
-		req.SetBasicAuth(u, config.KibanaConfig.Password)
-	}
+	setDashboardBasicAuth(req)
 
 	client := http.DefaultClient
 	res, err := client.Do(req)
@@ -161,9 +159,7 @@ func putDashboardAttributes(attributes map[string]any, references []map[string]a
 	}
 	putReq.Header.Set("kbn-xsrf", config.KbnXsrfToken)
 	putReq.Header.Set("Content-Type", "application/json")
-	if u := config.KibanaConfig.UserName; u != "" {
-		putReq.SetBasicAuth(u, config.KibanaConfig.Password)
-	}
+	setDashboardBasicAuth(putReq)
 
 	client := http.DefaultClient
 	putRes, err := client.Do(putReq)
@@ -189,9 +185,7 @@ func findLensByTitle(serviceName string) (string, error) {
 		return "", err
 	}
 	req.Header.Set("kbn-xsrf", config.KbnXsrfToken)
-	if u := config.KibanaConfig.UserName; u != "" {
-		req.SetBasicAuth(u, config.KibanaConfig.Password)
-	}
+	setDashboardBasicAuth(req)
 
 	client := http.DefaultClient
 	res, err := client.Do(req)
@@ -231,9 +225,7 @@ func getAllLensTitles() (map[string]string, error) {
 		return nil, err
 	}
 	req.Header.Set("kbn-xsrf", config.KbnXsrfToken)
-	if u := config.KibanaConfig.UserName; u != "" {
-		req.SetBasicAuth(u, config.KibanaConfig.Password)
-	}
+	setDashboardBasicAuth(req)
 
 	client := http.DefaultClient
 	res, err := client.Do(req)
@@ -313,9 +305,7 @@ func createLensSavedObject(serviceName string) (string, error) {
 	}
 	req.Header.Set("kbn-xsrf", config.KbnXsrfToken)
 	req.Header.Set("Content-Type", "application/json")
-	if u := config.KibanaConfig.UserName; u != "" {
-		req.SetBasicAuth(u, config.KibanaConfig.Password)
-	}
+	setDashboardBasicAuth(req)
 
 	client := http.DefaultClient
 	res, err := client.Do(req)
@@ -364,9 +354,7 @@ func updateLensSavedObject(id string, serviceName string) (string, error) {
 	}
 	req.Header.Set("kbn-xsrf", config.KbnXsrfToken)
 	req.Header.Set("Content-Type", "application/json")
-	if u := config.KibanaConfig.UserName; u != "" {
-		req.SetBasicAuth(u, config.KibanaConfig.Password)
-	}
+	setDashboardBasicAuth(req)
 
 	client := http.DefaultClient
 	res, err := client.Do(req)
