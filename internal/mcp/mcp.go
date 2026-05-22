@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -534,8 +533,6 @@ func SetupMCP(client *elasticsearch.Client) error {
 
 	port := os.Getenv("MCP_PORT")
 	listenAddr := ":" + port
-
-	log.Printf("Starting MCP server on %s", listenAddr)
 
 	httpServer := server.NewStreamableHTTPServer(s)
 

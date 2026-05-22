@@ -4,9 +4,7 @@ go 1.26.1
 
 require (
 	github.com/elastic/go-elasticsearch/v9 v9.4.0
-	github.com/go-pdf/fpdf v0.9.0
 	github.com/go-playground/validator/v10 v10.30.1
-	github.com/joho/godotenv v1.5.1
 	github.com/mark3labs/mcp-go v0.51.0
 	github.com/rabbitmq/amqp091-go v1.10.0
 	github.com/stretchr/testify v1.11.1
