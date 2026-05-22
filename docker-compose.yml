@@ -15,7 +15,7 @@
     networks:
       - controlroom-network
     healthcheck:
-      test: ["CMD-SHELL", "curl -s -u elastic:$${ELASTIC_PASSWORD} http://localhost:9200/_cluster/health | grep -q '\"status\":\"green\\|yellow\"'"]
+      test: [ "CMD-SHELL", "curl -s -u elastic:$${ELASTIC_PASSWORD} http://localhost:9200/_cluster/health | grep -q '\"status\":\"green\\|yellow\"'" ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -42,14 +42,23 @@
     container_name: controlroom
     depends_on:
       - elasticsearch
+      - kibana
     environment:
       - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@${RABBITMQ_HOST}:5672/
       - RABBITMQ_HOST=${RABBITMQ_HOST}
       - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - PORT_KIBANA=${PORT_KIBANA}
       - CONTROLROOM_ES_USER=${CONTROLROOM_ES_USER}
       - CONTROLROOM_ES_PASS=${CONTROLROOM_ES_PASS}
       - TEAMS_WEBHOOK_URL=${TEAMS_WEBHOOK_URL}
       - MONITORED_SERVICES=${MONITORED_SERVICES}
+      - KIBANA_URL=http://kibana
+      - KIBANA_USERNAME=${KIBANA_USERNAME}
+      - KIBANA_PASSWORD=${KIBANA_PASSWORD}
+      - DASHBOARD_LOGS_ID=${DASHBOARD_LOGS_ID}
+      - DATAVIEW_LOGS_ID=${DATAVIEW_LOGS_ID}
+      - DASHBOARD_HEARTBEATS_ID=${DASHBOARD_HEARTBEATS_ID}
+      - DATAVIEW_HEARTBEATS_ID=${DATAVIEW_HEARTBEATS_ID}
     networks:
       - controlroom-network
     restart: unless-stopped
