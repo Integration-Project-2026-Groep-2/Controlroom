@@ -68,17 +68,38 @@ func Generate(ctx context.Context, el *elasticsearch.Client, ch *amqp.Channel) {
 		return
 	}
 
-	if err := ch.PublishWithContext(
-		context.Background(),
-		config.Producer[config.HEARTBEAT_SUCCEEDED_EVENT].Exchange.Name,
-		config.Producer[config.HEARTBEAT_SUCCEEDED_EVENT].Key.Key,
-		false,
-		false,
-		amqp.Publishing{
-			ContentType: "application/xml",
-			Body:        buf.Bytes(),
-		},
-	); err != nil {
-		logger.Log(logger.NewMessage(logger.ERROR, logger.WATCHDOG, fmt.Sprintf("summary: failed to publish heartbeat event: %v", err)))
+	// publish to jarvis
+	{
+		if err := ch.PublishWithContext(
+			context.Background(),
+			config.Producer[config.HEARTBEAT_SUCCEEDED_EVENT].Exchange.Name,
+			config.Producer[config.HEARTBEAT_SUCCEEDED_EVENT].Key.Key,
+			false,
+			false,
+			amqp.Publishing{
+				ContentType: "application/xml",
+				Body:        buf.Bytes(),
+			},
+		); err != nil {
+			logger.Log(logger.NewMessage(logger.ERROR, logger.WATCHDOG, fmt.Sprintf("summary: failed to publish heartbeat event: %v", err)))
+		}
+
+	}
+
+	{
+		if err := ch.PublishWithContext(
+			context.Background(),
+			config.Producer[config.SUMMARY_EVENT].Exchange.Name,
+			config.Producer[config.SUMMARY_EVENT].Key.Key,
+			false,
+			false,
+			amqp.Publishing{
+				ContentType: "application/xml",
+				Body:        buf.Bytes(),
+			},
+		); err != nil {
+			logger.Log(logger.NewMessage(logger.ERROR, logger.WATCHDOG, fmt.Sprintf("summary: failed to publish heartbeat event: %v", err)))
+		}
+
 	}
 }
