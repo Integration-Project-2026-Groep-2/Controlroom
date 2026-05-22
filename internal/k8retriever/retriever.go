@@ -3,6 +3,8 @@ package k8retriever
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -57,14 +59,15 @@ func GetPods(ctx context.Context) ([]PodInfo, error) {
 		return nil, fmt.Errorf("failed to create clientset: %w", err)
 	}
 
-	namespace, err := clientset.CoreV1().
-		Namespaces().
-		Get(ctx, "default", metav1.GetOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to get namespace: %w", err)
+	const namespaceFile = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
+	namespace := "default"
+	if namespaceBytes, err := os.ReadFile(namespaceFile); err == nil {
+		if resolvedNamespace := strings.TrimSpace(string(namespaceBytes)); resolvedNamespace != "" {
+			namespace = resolvedNamespace
+		}
 	}
 
-	pods, err := clientset.CoreV1().Pods(namespace.GetNamespace()).List(ctx, metav1.ListOptions{})
+	pods, err := clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list pods: %w", err)
 	}
