@@ -1,7 +1,6 @@
 package config
 
 import (
-	"fmt"
 	"os"
 	//	"strings"
 
@@ -14,15 +13,19 @@ import (
 // var DebugMode bool = strings.EqualFold(os.Getenv("DebugMode"), "true")
 
 type kibanaConfig struct {
-	Url      string
-	UserName string
-	Password string
+	Url               string
+	UserName          string
+	Password          string
+	DashboardUser     string
+	DashboardPassword string
 }
 
 var KibanaConfig = kibanaConfig{
-	Url:      fmt.Sprintf("%s%s", map[bool]string{true: "http://localhost", false: os.Getenv("KIBANA_URL")}[os.Getenv("KIBANA_URL") == ""], map[bool]string{true: "", false: ":" + os.Getenv("PORT_KIBANA")}[os.Getenv("KIBANA_URL") == "" || os.Getenv("PORT_KIBANA") == ""]),
-	UserName: os.Getenv("KIBANA_USERNAME"),
-	Password: os.Getenv("KIBANA_PASSWORD"),
+	Url:               os.Getenv("KIBANA_URL"),
+	UserName:          os.Getenv("KIBANA_USERNAME"),
+	Password:          os.Getenv("KIBANA_PASSWORD"),
+	DashboardUser:     os.Getenv("DASHBOARD_USER"),
+	DashboardPassword: os.Getenv("DASHBOARD_PASSWORD"),
 }
 
 var ElasticConfig = elasticsearch.Config{

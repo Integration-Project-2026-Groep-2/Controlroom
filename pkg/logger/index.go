@@ -21,7 +21,7 @@ func IndexLogsQueue() {
 	for payload := range queue {
 
 		if debugMode {
-			log.Println(payload)
+			log.Printf("[debug mode]: %s", payload)
 		}
 
 		data, err := easyjson.Marshal(payload)

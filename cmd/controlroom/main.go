@@ -369,22 +369,24 @@ func main() {
 		}()
 	}
 
+	if true {
 	// dynamic dashboards go go go
-	{
-		go func() {
-			if config.KibanaConfig.UserName == "" {
-				logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, "dashboard sync: KIBANA_USERNAME is not set; Kibana auth will be disabled"))
-			}
+		{
+			go func() {
+				if config.KibanaConfig.DashboardUser == "" {
+					logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, "dashboard sync: DASHBOARD_USER is not set; dashboard auth will be disabled"))
+				}
 
-			logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, "dashboard sync: starting dashboard synchronization loop"))
+				logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, "dashboard sync: starting dashboard synchronization loop"))
 
-			ticker := time.NewTicker(5 * time.Second)
+				ticker := time.NewTicker(5 * time.Second)
 
-			for range ticker.C {
-				sync.SyncLogsDashboard(client)
-				sync.SyncHeartbeatDashboard(client)
-			}
-		}()
+				for range ticker.C {
+					sync.SyncLogsDashboard(client)
+					sync.SyncHeartbeatDashboard(client)
+				}
+			}()
+		}
 	}
 
 	const (

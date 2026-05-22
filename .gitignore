@@ -48,3 +48,5 @@ tmp/
 temp/
 .key
 build/
+/tests/deployments/editoruser.sh
+/tests/deployments/superuser.sh
