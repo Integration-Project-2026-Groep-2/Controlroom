@@ -184,7 +184,7 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 		}
 		// defer ch.Close()
 
-		msgs, err := ch.Consume(def.Queue.Name, fmt.Sprintf("controlroom-%d", os.Getpid()), false, false, false, false, nil)
+		msgs, err := ch.Consume(def.Queue.Name, fmt.Sprintf("controlroom-%d", os.Getpid()), false, false, false, true, nil)
 		if err != nil {
 			logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("controlroom: failed to start consumer for %s: %v", def.Queue.Name, err)))
 			return fmt.Errorf("setup %s: %w", def.Queue.Name, err)
