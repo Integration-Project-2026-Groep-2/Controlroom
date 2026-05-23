@@ -36,8 +36,6 @@ func IndexMetrics(es *elasticsearch.Client, ctx context.Context, samples []Metri
 
 	// TODO(nasr): replace this with the easy json implementation
 	for _, sample := range samples {
-		// Create a document struct similar to gen.HeartbeatDoc
-		// Map MetricSample to a gen-compatible structure or use direct JSON
 		doc := map[string]any{
 			"@timestamp": sample.Timestamp,
 			"metric":     sample.Metric,

@@ -27,7 +27,7 @@ type Metrics struct {
 func RetrieveMetrics(ctx context.Context, client *http.Client, metricsUrl string) ([]Metrics, error) {
 	logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, "[DEBUG] indexing metrics"))
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/metrics", strings.TrimSuffix(metricsUrl, "/")), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s", strings.TrimSuffix(metricsUrl, "/")), nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build request: %w", err)
 	}

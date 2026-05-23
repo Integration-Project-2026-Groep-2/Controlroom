@@ -242,7 +242,8 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 		hbPubCh, err := conn.Channel()
 		if err != nil {
 			logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("failing to make a channel for the heartbaet publisher to rabbitmq: %v", err)))
-
+		} else {
+			defer hbPubCh.Close()
 		}
 		ticker := time.NewTicker(time.Second)
 		defer ticker.Stop()
