@@ -447,7 +447,7 @@ func createLensPayload(serviceName string) map[string]any {
 			{
 				"name": "indexpattern-datasource-layer-layer1",
 				"type": "index-pattern",
-				"id":   config.HeartbeatDataviewId,
+				"id":   config.LogsDataViewId,
 			},
 		},
 	}
