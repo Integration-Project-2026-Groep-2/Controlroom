@@ -24,6 +24,7 @@ import (
 	"integration-project-ehb/controlroom/internal/jarvis_metrics"
 	"integration-project-ehb/controlroom/internal/k8retriever"
 	"integration-project-ehb/controlroom/internal/mcp_server"
+	"integration-project-ehb/controlroom/internal/rmq_heartbeat_publisher"
 	"integration-project-ehb/controlroom/internal/statuscheck"
 	"integration-project-ehb/controlroom/internal/summary"
 	"integration-project-ehb/controlroom/internal/user"
@@ -250,7 +251,7 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 		for {
 			select {
 			case <-ticker.C:
-				err := cr_rabbitmq.PublishHeartbeat(hbPubCh)
+				err := rmq_heartbeat_publisher.PublishHeartbeat(hbPubCh)
 				if err != nil {
 					logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("RabbitMQ publishing failed, is RabbitMQ alive? error: %v", err)))
 				}

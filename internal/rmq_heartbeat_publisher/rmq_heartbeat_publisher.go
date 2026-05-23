@@ -1,9 +1,12 @@
-package cr_rabbitmq
+package rmq_heartbeat_publisher
 
 import (
 	"bytes"
+	"context"
 	"encoding/xml"
 	"integration-project-ehb/controlroom/pkg/gen"
+
+	"integration-project-ehb/controlroom/internal/cr_config"
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -29,11 +32,22 @@ func PublishHeartbeat(channel *amqp.Channel) error {
 		return err
 	}
 
-	return channel.Publish("health.exchange", "heartbeat", false, false,
+	err := channel.PublishWithContext(
+		context.Background(),
+		config.Producer[config.RMQ_HEARTBEAT].Exchange.Name,
+		config.Producer[config.RMQ_HEARTBEAT].Key.Key,
+		false, false,
 		amqp.Publishing{
 			ContentType: "application/xml",
 			Timestamp:   time.Now().UTC(),
 			Body:        buf.Bytes(),
 		},
 	)
+
+	if err != nil {
+		return err
+
+	}
+
+	return nil
 }
