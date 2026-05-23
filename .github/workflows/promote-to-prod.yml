@@ -1,6 +1,9 @@
 name: Promote to Prod
 
 on:
+  release:
+    types:
+      - published
   workflow_dispatch:
     inputs:
       sha:
@@ -9,9 +12,6 @@ on:
       version:
         description: 'Version tag (e.g. v1.4.0) — leave empty to auto-generate release-<sha>'
         required: false
-  push:
-    tags:
-      - 'v*'
 
 env:
   IMAGE: ghcr.io/integration-project-2026-groep-2/controlroom
@@ -35,12 +35,11 @@ jobs:
         id: resolve
         run: |
           set -euo pipefail
-          if [ "${{ github.event_name }}" = "push" ]; then
-            # For pushed tags, use the short (7) SHA consistent with CI
+          if [ "${{ github.event_name }}" = "release" ]; then
+            RELEASE_TAG="${{ github.event.release.tag_name }}"
+            IMAGE_TAG="${RELEASE_TAG#v}"
             SHA_FULL="${GITHUB_SHA}"
             SHA_SHORT="${SHA_FULL::7}"
-            RELEASE_TAG="${{ github.ref_name }}"
-            IMAGE_TAG="${RELEASE_TAG#v}"
             echo "RELEASE_TAG=${RELEASE_TAG}"            >> $GITHUB_ENV
             echo "IMAGE_TAG=${IMAGE_TAG}"                >> $GITHUB_ENV
             echo "SOURCE_TAG=sha-${SHA_SHORT}"           >> $GITHUB_ENV
@@ -58,9 +57,16 @@ jobs:
               echo "source_tag=sha-${SHA_SHORT}"     >> $GITHUB_OUTPUT
               echo "sha=${SHA_SHORT}"                >> $GITHUB_OUTPUT
             else
-              docker pull ${{ env.IMAGE }}:latest-dev
+              if ! docker pull ${{ env.IMAGE }}:latest-dev; then
+                echo "::error::ghcr.io/integration-project-2026-groep-2/infra:latest-dev not found. Run the dev build on main first."
+                exit 1
+              fi
               SHA_FULL=$(docker inspect ${{ env.IMAGE }}:latest-dev \
-                --format '{{index .RepoTags 0}}' | grep -oP 'sha-\K[a-f0-9]+')
+                --format '{{range .RepoTags}}{{println .}}{{end}}' | grep -oP 'sha-\K[a-f0-9]+' | head -n1)
+              if [ -z "${SHA_FULL}" ]; then
+                echo "::error::Unable to resolve sha tag from latest-dev"
+                exit 1
+              fi
               SHA_SHORT="${SHA_FULL::7}"
               echo "SOURCE_TAG=latest-dev"                >> $GITHUB_ENV
               echo "SHA=${SHA_SHORT}"                      >> $GITHUB_ENV
@@ -124,10 +130,3 @@ jobs:
               "commit": "${{ github.sha }}",
               "actor": "${{ github.actor }}"
             }
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.resolve.outputs.release_tag }}
-          name: ${{ steps.resolve.outputs.release_tag }}
-          generate_release_notes: true
