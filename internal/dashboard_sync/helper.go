@@ -2,12 +2,26 @@ package sync
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	config "integration-project-ehb/controlroom/internal/cr_config"
 	"net/http"
 	"net/url"
 )
+
+// note(nasr): i don't know if this will work but kibana requires a http connection while it's behind https
+// at the moomenet. maybe we can use a self signed sertificate or something.
+// DashboardHttpClient returns an HTTP client configured to handle HTTPS with self-signed certificates.
+func DashboardHttpClient() *http.Client {
+	return &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		},
+	}
+}
 
 func setDashboardBasicAuth(req *http.Request) {
 	if u := config.KibanaConfig.DashboardUser; u != "" {
@@ -25,7 +39,7 @@ func getAllPanelTitles() (map[string]string, error) {
 	req.Header.Set("kbn-xsrf", config.KbnXsrfToken)
 	setDashboardBasicAuth(req)
 
-	client := http.DefaultClient
+	client := DashboardHttpClient()
 	res, err := client.Do(req)
 	if err != nil {
 		return nil, err
@@ -64,7 +78,7 @@ func findSavedObjectByTitle(title string, objectType string) (string, error) {
 	req.Header.Set("kbn-xsrf", config.KbnXsrfToken)
 	setDashboardBasicAuth(req)
 
-	client := http.DefaultClient
+	client := DashboardHttpClient()
 	res, err := client.Do(req)
 	if err != nil {
 		return "", err
@@ -108,7 +122,7 @@ func createOrUpdateSavedObject(objectType string, id string, payload map[string]
 	req.Header.Set("Content-Type", "application/json")
 	setDashboardBasicAuth(req)
 
-	client := http.DefaultClient
+	client := DashboardHttpClient()
 	res, err := client.Do(req)
 	if err != nil {
 		return "", err

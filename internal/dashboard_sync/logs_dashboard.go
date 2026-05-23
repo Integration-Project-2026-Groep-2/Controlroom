@@ -83,7 +83,7 @@ func getDashboardAttributes(dashboardID string) (map[string]any, []map[string]an
 	req.Header.Set("kbn-xsrf", config.KbnXsrfToken)
 	setDashboardBasicAuth(req)
 
-	client := http.DefaultClient
+	client := DashboardHttpClient()
 	res, err := client.Do(req)
 	if err != nil {
 		return nil, nil, nil, err
@@ -161,7 +161,7 @@ func putDashboardAttributes(attributes map[string]any, references []map[string]a
 	putReq.Header.Set("Content-Type", "application/json")
 	setDashboardBasicAuth(putReq)
 
-	client := http.DefaultClient
+	client := DashboardHttpClient()
 	putRes, err := client.Do(putReq)
 	if err != nil {
 		return err
@@ -187,7 +187,7 @@ func findLensByTitle(serviceName string) (string, error) {
 	req.Header.Set("kbn-xsrf", config.KbnXsrfToken)
 	setDashboardBasicAuth(req)
 
-	client := http.DefaultClient
+	client := DashboardHttpClient()
 	res, err := client.Do(req)
 	if err != nil {
 		return "", err
