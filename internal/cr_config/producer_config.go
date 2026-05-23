@@ -68,5 +68,4 @@ var Producer = map[cr_producer_events_t]ProducerDef{
 		Exchange: cr_rabbitmq.ExchangeInfo{Name: "heartbeat.direct", Kind: "direct", Durable: true},
 		Key:      cr_rabbitmq.BindingInfo{Key: "routing.heartbeat"},
 	},
-
 }

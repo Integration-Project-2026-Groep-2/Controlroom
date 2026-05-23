@@ -60,3 +60,6 @@ var HeartbeatDashboardId = os.Getenv("DASHBOARD_HEARTBEATS_ID")
 var HeartbeatDataviewId = os.Getenv("DATAVIEW_HEARTBEATS_ID")
 
 var KbnXsrfToken = "true"
+var McpMasterUrl = os.Getenv("MCP_MASTER_URL")
+
+const GithubBaseAPI = "https://api.github.com"

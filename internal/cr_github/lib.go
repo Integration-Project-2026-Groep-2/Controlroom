@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"net/http"
 	"time"
-)
 
-const base = "https://api.github.com"
+	cr_config "integration-project-ehb/controlroom/internal/cr_config"
+)
 
 type GithubConfig struct {
 	HTTP  *http.Client
@@ -67,7 +67,7 @@ func addHeaders(req *http.Request, token string) {
 // note(nasr): disabled but kept — could be useful if this package is ever
 // extracted into its own service that needs to discover organisations.
 func _(ctx context.Context, client *GithubConfig) (map[string]string, error) {
-	url := fmt.Sprintf("%s/user/orgs", base)
+	url := fmt.Sprintf("%s/user/orgs", cr_config.GithubBaseAPI)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -99,7 +99,7 @@ func _(ctx context.Context, client *GithubConfig) (map[string]string, error) {
 // FetchRepos retrieves all repositories for the configured organisation and
 // returns a name→URL map. It also populates config.Repos as a side effect.
 func FetchRepos(ctx context.Context, config *GithubConfig) (map[string]string, error) {
-	u := fmt.Sprintf("%s/orgs/%s/repos?per_page=100", base, config.Org)
+	u := fmt.Sprintf("%s/orgs/%s/repos?per_page=100", cr_config.GithubBaseAPI, config.Org)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, err
@@ -136,7 +136,7 @@ func FetchRecentRuns(ctx context.Context, config *GithubConfig, repo string, lim
 	}
 
 	u := fmt.Sprintf("%s/repos/%s/%s/actions/runs?head_branch=main&per_page=%d&status=completed",
-		base, config.Org, repo, limit)
+		cr_config.GithubBaseAPI, config.Org, repo, limit)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
@@ -167,7 +167,7 @@ func FetchRecentRuns(ctx context.Context, config *GithubConfig, repo string, lim
 
 // RequestChanges opens a pull request on the given repo.
 func RequestChanges(ctx context.Context, config *GithubConfig, pr PRResponse) (map[string]any, error) {
-	u := fmt.Sprintf("%s/repos/%s/%s/pulls", base, pr.Owner, pr.Repo)
+	u := fmt.Sprintf("%s/repos/%s/%s/pulls", cr_config.GithubBaseAPI, pr.Owner, pr.Repo)
 
 	body := map[string]string{
 		"title": pr.Title,
@@ -211,7 +211,7 @@ func FetchRecentCommits(ctx context.Context, config *GithubConfig, repo string, 
 		limit = 10
 	}
 
-	u := fmt.Sprintf("%s/repos/%s/%s/commits?per_page=%d", base, config.Org, repo, limit)
+	u := fmt.Sprintf("%s/repos/%s/%s/commits?per_page=%d", cr_config.GithubBaseAPI, config.Org, repo, limit)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, err
@@ -244,7 +244,7 @@ func FetchPRs(ctx context.Context, config *GithubConfig, repo, state string, lim
 		limit = 10
 	}
 
-	u := fmt.Sprintf("%s/repos/%s/%s/pulls?state=%s&per_page=%d", base, config.Org, repo, state, limit)
+	u := fmt.Sprintf("%s/repos/%s/%s/pulls?state=%s&per_page=%d", cr_config.GithubBaseAPI, config.Org, repo, state, limit)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, err
@@ -276,7 +276,7 @@ func GetBlob(ctx context.Context, config *GithubConfig, owner, repo string, file
 
 	blobs := make([]Blob, 0, len(fileSHAs))
 	for _, sha := range fileSHAs {
-		u := fmt.Sprintf("%s/repos/%s/%s/git/blobs/%s", base, owner, repo, sha)
+		u := fmt.Sprintf("%s/repos/%s/%s/git/blobs/%s", cr_config.GithubBaseAPI, owner, repo, sha)
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 		if err != nil {
 			return nil, err
@@ -305,7 +305,7 @@ func GetBlob(ctx context.Context, config *GithubConfig, owner, repo string, file
 }
 
 func CreateBlob(ctx context.Context, config *GithubConfig, owner, repo, content string) (Blob, error) {
-	u := fmt.Sprintf("%s/repos/%s/%s/git/blobs", base, owner, repo)
+	u := fmt.Sprintf("%s/repos/%s/%s/git/blobs", cr_config.GithubBaseAPI, owner, repo)
 
 	body := map[string]string{
 		"content": content,

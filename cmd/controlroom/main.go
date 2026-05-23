@@ -21,7 +21,7 @@ import (
 	"integration-project-ehb/controlroom/internal/dashboard_sync"
 	"integration-project-ehb/controlroom/internal/heartbeat"
 	"integration-project-ehb/controlroom/internal/k8retriever"
-	"integration-project-ehb/controlroom/internal/mcp"
+	"integration-project-ehb/controlroom/internal/mcp_server"
 	"integration-project-ehb/controlroom/internal/statuscheck"
 	"integration-project-ehb/controlroom/internal/user"
 	userack "integration-project-ehb/controlroom/internal/user_acknowledgment"

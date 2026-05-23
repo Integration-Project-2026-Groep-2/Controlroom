@@ -3,7 +3,7 @@ package unit_tests
 import (
 	"testing"
 
-	"integration-project-ehb/controlroom/internal/mcp"
+	"integration-project-ehb/controlroom/internal/mcp_server"
 
 	"github.com/stretchr/testify/assert"
 )
