@@ -20,7 +20,7 @@ var labelKeyReplacer = strings.NewReplacer(
 	"/", "_",
 )
 
-func sanitize(input map[string]string) map[string]string {
+func Sanitize(input map[string]string) map[string]string {
 	if len(input) == 0 {
 		return nil
 	}
