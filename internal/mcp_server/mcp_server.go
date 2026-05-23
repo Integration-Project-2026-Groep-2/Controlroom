@@ -59,6 +59,37 @@ func formatDocs(docs []map[string]any) string {
 	return sb.String()
 }
 
+func parseFileChanges(raw any) ([]cr_github.FileChange, error) {
+	items, ok := raw.([]any)
+	if !ok {
+		return nil, fmt.Errorf("'files' must be an array")
+	}
+
+	files := make([]cr_github.FileChange, 0, len(items))
+	seenPaths := make(map[string]struct{}, len(items))
+	for i, item := range items {
+		itemMap, ok := item.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("files[%d] must be an object", i)
+		}
+
+		path, _ := itemMap["path"].(string)
+		content, _ := itemMap["content"].(string)
+		path = strings.TrimSpace(path)
+		if path == "" {
+			return nil, fmt.Errorf("files[%d].path must be non-empty", i)
+		}
+		if _, exists := seenPaths[path]; exists {
+			return nil, fmt.Errorf("files[%d].path duplicates an earlier file: %s", i, path)
+		}
+		seenPaths[path] = struct{}{}
+
+		files = append(files, cr_github.FileChange{Path: path, Content: content})
+	}
+
+	return files, nil
+}
+
 func elasticQuery(index string, query any, size int, client *elasticsearch.Client) ([]map[string]any, error) {
 	body := SearchRequest{
 		Size: size,
@@ -456,7 +487,6 @@ func buildServer(client *elasticsearch.Client) *server.MCPServer {
 		mcp.WithDescription("make a pull request"),
 		mcp.WithReadOnlyHintAnnotation(false), // true for read-only; this mutates
 		mcp.WithString("owner",
-			mcp.Required(),
 			mcp.Description("the owner of the repository"),
 		),
 		mcp.WithString("repo",
@@ -489,6 +519,10 @@ func buildServer(client *elasticsearch.Client) *server.MCPServer {
 		body, _ := args["body"].(string)
 		head, _ := args["head"].(string)
 		base, _ := args["base"].(string)
+		config := newGithubConfig()
+		if strings.TrimSpace(owner) == "" {
+			owner = config.Org
+		}
 
 		// error handling
 		{
@@ -512,9 +546,7 @@ func buildServer(client *elasticsearch.Client) *server.MCPServer {
 			}
 		}
 
-		config := newGithubConfig()
-
-		_, err := cr_github.RequestChanges(ctx, &config, cr_github.PRResponse{
+		result, err := cr_github.RequestChanges(ctx, &config, cr_github.PRResponse{
 			Owner: owner,
 			Repo:  repo,
 			Title: title,
@@ -527,7 +559,115 @@ func buildServer(client *elasticsearch.Client) *server.MCPServer {
 			return mcp.NewToolResultError(fmt.Sprintf("failed to create pull request: %v", err)), nil
 		}
 
-		return mcp.NewToolResultText(fmt.Sprintf("Pull request created successfully")), nil
+		return mcp.NewToolResultText(fmt.Sprintf("Pull request created: #%v %v", result["number"], result["html_url"])), nil
+	})
+
+	requestChangesWithFilesTool := mcp.NewTool("request_changes_with_files",
+		mcp.WithDescription("Write one or more files to a new branch, then open a pull request."),
+		mcp.WithReadOnlyHintAnnotation(false),
+		mcp.WithString("owner",
+			mcp.Description("the owner of the repository; defaults to the configured org"),
+		),
+		mcp.WithString("repo",
+			mcp.Required(),
+			mcp.Description("the repository name"),
+		),
+		mcp.WithString("title",
+			mcp.Required(),
+			mcp.Description("the title of the pull request"),
+		),
+		mcp.WithString("body",
+			mcp.Required(),
+			mcp.Description("the body of the pull request containing the information about the PR"),
+		),
+		mcp.WithString("head",
+			mcp.Required(),
+			mcp.Description("the head branch (e.g., 'feature-branch')"),
+		),
+		mcp.WithString("base",
+			mcp.Required(),
+			mcp.Description("the base branch (e.g., 'main')"),
+		),
+		mcp.WithString("commit_message",
+			mcp.Description("optional commit message for the branch commit"),
+		),
+		mcp.WithArray("files",
+			mcp.Required(),
+			mcp.Description("files to write into the branch commit"),
+			mcp.MinItems(1),
+			mcp.Items(map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"path": map[string]any{
+						"type":        "string",
+						"description": "path of the file in the repository",
+					},
+					"content": map[string]any{
+						"type":        "string",
+						"description": "full file content to write",
+					},
+				},
+				"required":             []string{"path", "content"},
+				"additionalProperties": false,
+			}),
+		),
+	)
+
+	s.AddTool(requestChangesWithFilesTool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := parseArguments(req)
+		owner, _ := args["owner"].(string)
+		repo, _ := args["repo"].(string)
+		title, _ := args["title"].(string)
+		body, _ := args["body"].(string)
+		head, _ := args["head"].(string)
+		base, _ := args["base"].(string)
+		commitMessage, _ := args["commit_message"].(string)
+
+		config := newGithubConfig()
+		if strings.TrimSpace(owner) == "" {
+			owner = config.Org
+		}
+
+		files, err := parseFileChanges(args["files"])
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+
+		// error handling
+		{
+			if strings.TrimSpace(owner) == "" {
+				return mcp.NewToolResultError("'owner' must be non-empty"), nil
+			}
+			if strings.TrimSpace(repo) == "" {
+				return mcp.NewToolResultError("'repo' must be non-empty"), nil
+			}
+			if strings.TrimSpace(title) == "" {
+				return mcp.NewToolResultError("'title' must be non-empty"), nil
+			}
+			if strings.TrimSpace(body) == "" {
+				return mcp.NewToolResultError("'body' must be non-empty"), nil
+			}
+			if strings.TrimSpace(head) == "" {
+				return mcp.NewToolResultError("'head' must be non-empty"), nil
+			}
+			if strings.TrimSpace(base) == "" {
+				return mcp.NewToolResultError("'base' must be non-empty"), nil
+			}
+		}
+
+		result, err := cr_github.RequestChangesWithFiles(ctx, &config, cr_github.PRResponse{
+			Owner: owner,
+			Repo:  repo,
+			Title: title,
+			Body:  body,
+			Head:  head,
+			Base:  base,
+		}, files, commitMessage)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create pull request with files: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(fmt.Sprintf("Pull request created: #%v %v", result["number"], result["html_url"])), nil
 	})
 
 	return s
