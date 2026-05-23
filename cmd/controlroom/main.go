@@ -153,6 +153,10 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 	defer conn.Close()
 	logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, "controlroom: connected to RabbitMQ"))
 
+	// All goroutines in this session must stop when this session ends (disconnect/retry).
+	sessionCtx, sessionCancel := context.WithCancel(ctx)
+	defer sessionCancel()
+
 	closeCh := conn.NotifyClose(make(chan *amqp.Error, 1))
 
 	setupCh, err := conn.Channel()
@@ -202,11 +206,11 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 
 		switch def.Type {
 		case config.HEARTBEAT:
-			go cr_rabbitmq.Consume(cfg, msgs, ctx, heartbeat.ProcessHeartbeat)
+			go cr_rabbitmq.Consume(cfg, msgs, sessionCtx, heartbeat.ProcessHeartbeat)
 		case config.LOGGER:
-			go cr_rabbitmq.Consume(cfg, msgs, ctx, cr_logger.ProcessLog)
+			go cr_rabbitmq.Consume(cfg, msgs, sessionCtx, cr_logger.ProcessLog)
 		case config.STATUSCHECK:
-			go cr_rabbitmq.Consume(cfg, msgs, ctx, statuscheck.ProcessStatusCheck)
+			go cr_rabbitmq.Consume(cfg, msgs, sessionCtx, statuscheck.ProcessStatusCheck)
 		case config.USER:
 			wrapper := func(es *elasticsearch.Client, body []byte) error {
 				if err := user.ProcessUser(es, body); err != nil {
@@ -217,13 +221,13 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 				}
 				return nil
 			}
-			go cr_rabbitmq.Consume(cfg, msgs, ctx, wrapper)
+			go cr_rabbitmq.Consume(cfg, msgs, sessionCtx, wrapper)
 		case config.COMPANY:
-			go cr_rabbitmq.Consume(cfg, msgs, ctx, company.ProcessCompany)
+			go cr_rabbitmq.Consume(cfg, msgs, sessionCtx, company.ProcessCompany)
 		case config.USER_ACK:
-			go cr_rabbitmq.Consume(cfg, msgs, ctx, userack.ProcessControlroomAck)
+			go cr_rabbitmq.Consume(cfg, msgs, sessionCtx, userack.ProcessControlroomAck)
 		case config.CHECK_IN:
-			go cr_rabbitmq.Consume(cfg, msgs, ctx, checkin.ProcessCheckin)
+			go cr_rabbitmq.Consume(cfg, msgs, sessionCtx, checkin.ProcessCheckin)
 		}
 		logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("controlroom: %s consumer started (qos: %d)", def.Queue.Name, def.Qos)))
 	}
@@ -242,8 +246,9 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 		hbPubCh, err := conn.Channel()
 		if err != nil {
 			logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("failing to make a channel for the heartbaet publisher to rabbitmq: %v", err)))
-
+			return
 		}
+		defer hbPubCh.Close()
 		ticker := time.NewTicker(time.Second)
 		defer ticker.Stop()
 		for {
@@ -253,7 +258,7 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 				if err != nil {
 					logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("RabbitMQ publishing failed, is RabbitMQ alive? error: %v", err)))
 				}
-			case <-ctx.Done():
+			case <-sessionCtx.Done():
 				return
 			}
 		}
@@ -300,8 +305,8 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 				for {
 					select {
 					case <-ticker.C:
-						watchdog.RunWatchdog(client, ctx, wdch)
-					case <-ctx.Done():
+						watchdog.RunWatchdog(client, sessionCtx, wdch)
+					case <-sessionCtx.Done():
 						return
 					}
 				}
@@ -323,11 +328,11 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 			for {
 				select {
 				case <-ticker.C:
-					err := summary.Generate(ctx, client, summaryCh)
+					err := summary.Generate(sessionCtx, client, summaryCh)
 					if err != nil {
 						logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, fmt.Sprintf("controlroom: failed to gather Kubernetes resources: %v", err)))
 					}
-				case <-ctx.Done():
+				case <-sessionCtx.Done():
 					return
 
 				}
@@ -343,9 +348,9 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 		}
 		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("controlroom: RabbitMQ connection lost: %v", reason)))
 		return fmt.Errorf("connection lost: %w", reason)
-	case <-ctx.Done():
+	case <-sessionCtx.Done():
 		logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, "controlroom: context cancelled, closing RabbitMQ session"))
-		return ctx.Err()
+		return sessionCtx.Err()
 	}
 }
 
