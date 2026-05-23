@@ -34,7 +34,7 @@ func RunWatchdog(es *elasticsearch.Client, ctx context.Context, ch *amqp.Channel
 			{
 				warnings, err := cr_logger.QueryWarning(es)
 				if err != nil {
-					logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("watchdog: failed to fetch warnings: %v", err)))
+					logger.Log(logger.NewMessage(logger.ERROR, logger.WATCHDOG, fmt.Sprintf("watchdog: failed to fetch warnings: %v", err)))
 					continue
 				}
 
@@ -62,9 +62,9 @@ func RunWatchdog(es *elasticsearch.Client, ctx context.Context, ch *amqp.Channel
 								ContentType: "application/xml",
 								Body:        buf.Bytes(),
 							}); err != nil {
-							logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("watchdog: failed to publish warning: %v", err)))
+							logger.Log(logger.NewMessage(logger.ERROR, logger.WATCHDOG, fmt.Sprintf("watchdog: failed to publish warning: %v", err)))
 						} else {
-							logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, "watchdog: published warning"))
+							logger.Log(logger.NewMessage(logger.DEBUG, logger.WATCHDOG, "watchdog: published warning"))
 						}
 					}
 				}
@@ -74,7 +74,7 @@ func RunWatchdog(es *elasticsearch.Client, ctx context.Context, ch *amqp.Channel
 			{
 				errors, err := cr_logger.QueryError(es)
 				if err != nil {
-					logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("watchdog: failed to fetch errors: %v", err)))
+					logger.Log(logger.NewMessage(logger.ERROR, logger.WATCHDOG, fmt.Sprintf("watchdog: failed to fetch errors: %v", err)))
 					continue
 				}
 
@@ -102,9 +102,9 @@ func RunWatchdog(es *elasticsearch.Client, ctx context.Context, ch *amqp.Channel
 								ContentType: "application/xml",
 								Body:        buf.Bytes(),
 							}); err != nil {
-							logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("watchdog: failed to publish error: %v", err)))
+							logger.Log(logger.NewMessage(logger.ERROR, logger.WATCHDOG, fmt.Sprintf("watchdog: failed to publish error: %v", err)))
 						} else {
-							logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, "watchdog: published error"))
+							logger.Log(logger.NewMessage(logger.DEBUG, logger.WATCHDOG, "watchdog: published error"))
 						}
 					}
 				}
@@ -172,6 +172,9 @@ func RunWatchdog(es *elasticsearch.Client, ctx context.Context, ch *amqp.Channel
 }
 
 func AlertTeams(message string) {
+
+	logger.Log(logger.NewMessage(logger.INFO, logger.WATCHDOG, "Alerting Teams"))
+
 	if TeamsWebhook == "" {
 		logger.Log(logger.NewMessage(logger.WARN, logger.WATCHDOG, "watchdog: Teams webhook URL is not configured"))
 		return
