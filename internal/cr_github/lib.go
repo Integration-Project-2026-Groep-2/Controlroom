@@ -3,6 +3,7 @@ package cr_github
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -46,6 +47,14 @@ type Blob struct {
 	FileSHA  string `json:"sha"`
 	Content  string `json:"content"`
 	Encoding string `json:"encoding"`
+}
+
+type RepositoryContent struct {
+	Path     string `json:"path"`
+	FileSHA  string `json:"sha"`
+	Content  string `json:"content"`
+	Encoding string `json:"encoding"`
+	Type     string `json:"type"`
 }
 
 // FileChange describes one file that should be written to a branch commit.
@@ -697,6 +706,72 @@ func GetBlob(ctx context.Context, config *GithubConfig, repo string, fileSHAs ..
 	}
 
 	return blobs, nil
+}
+
+// GetFile retrieves one or more files by repository path using the GitHub
+// contents API. It returns decoded content when GitHub serves base64 payloads.
+func GetFile(ctx context.Context, config *GithubConfig, owner, repo, ref string, paths ...string) ([]RepositoryContent, error) {
+	owner = strings.TrimSpace(owner)
+	if owner == "" {
+		owner = config.Org
+	}
+	if len(paths) == 0 {
+		return nil, fmt.Errorf("no file paths provided")
+	}
+
+	contents := make([]RepositoryContent, 0, len(paths))
+	cleanRef := strings.TrimSpace(ref)
+	for _, path := range paths {
+		path = strings.TrimSpace(path)
+		if path == "" {
+			return nil, fmt.Errorf("file path must be non-empty")
+		}
+
+		pathParts := strings.Split(path, "/")
+		for i, part := range pathParts {
+			pathParts[i] = url.PathEscape(part)
+		}
+		escapedPath := strings.Join(pathParts, "/")
+		u := fmt.Sprintf("%s/repos/%s/%s/contents/%s", cr_config.GithubBaseAPI, owner, repo, escapedPath)
+		if cleanRef != "" {
+			u += "?ref=" + url.QueryEscape(cleanRef)
+		}
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		addHeaders(req, config.Token)
+		resp, err := config.HTTP.Do(req)
+		if err != nil {
+			return nil, err
+		}
+
+		if resp.StatusCode >= 400 {
+			resp.Body.Close()
+			return nil, fmt.Errorf("get file %s: %s", path, resp.Status)
+		}
+
+		var content RepositoryContent
+		if err := json.NewDecoder(resp.Body).Decode(&content); err != nil {
+			resp.Body.Close()
+			return nil, err
+		}
+		resp.Body.Close()
+
+		if strings.EqualFold(content.Encoding, "base64") && strings.TrimSpace(content.Content) != "" {
+			decoded, err := base64.StdEncoding.DecodeString(strings.ReplaceAll(content.Content, "\n", ""))
+			if err != nil {
+				return nil, fmt.Errorf("decode file %s content: %w", path, err)
+			}
+			content.Content = string(decoded)
+			content.Encoding = "utf-8"
+		}
+
+		contents = append(contents, content)
+	}
+
+	return contents, nil
 }
 
 // CreateBlob creates a new blob object in the configured org and specified repo,

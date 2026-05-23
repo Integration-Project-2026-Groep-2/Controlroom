@@ -483,6 +483,59 @@ func buildServer(client *elasticsearch.Client) *server.MCPServer {
 		return mcp.NewToolResultText(formatDocs(docs)), nil
 	})
 
+	fetchFileTool := mcp.NewTool("fetch_file",
+		mcp.WithDescription("Fetch the current content of a repository file from GitHub by path, optionally pinned to a branch or commit ref."),
+		mcp.WithReadOnlyHintAnnotation(true),
+		mcp.WithString("service",
+			mcp.Required(),
+			mcp.Description("Service name used to resolve the repository"),
+		),
+		mcp.WithString("path",
+			mcp.Required(),
+			mcp.Description("Repository file path, e.g. internal/mcp_server/mcp_server.go"),
+		),
+		mcp.WithString("ref",
+			mcp.Description("Optional branch, tag, or commit SHA to read from"),
+		),
+	)
+	s.AddTool(fetchFileTool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := parseArguments(req)
+
+		service, _ := args["service"].(string)
+		path, _ := args["path"].(string)
+		ref, _ := args["ref"].(string)
+
+		if strings.TrimSpace(service) == "" {
+			return mcp.NewToolResultError("'service' must be non-empty"), nil
+		}
+		if strings.TrimSpace(path) == "" {
+			return mcp.NewToolResultError("'path' must be non-empty"), nil
+		}
+
+		config := newGithubConfig()
+		repo, errResult, err := resolveRepo(ctx, &config, service)
+		if err != nil {
+			return errResult, nil
+		}
+
+		files, err := cr_github.GetFile(ctx, &config, config.Org, repo, ref, path)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("github file fetch failed: %v", err)), nil
+		}
+
+		docs := make([]map[string]any, len(files))
+		for i, file := range files {
+			docs[i] = map[string]any{
+				"path":     file.Path,
+				"sha":      file.FileSHA,
+				"encoding": file.Encoding,
+				"content":  file.Content,
+				"type":     file.Type,
+			}
+		}
+		return mcp.NewToolResultText(formatDocs(docs)), nil
+	})
+
 	requestChangesTool := mcp.NewTool("request_changes",
 		mcp.WithDescription("make a pull request"),
 		mcp.WithReadOnlyHintAnnotation(false), // true for read-only; this mutates
