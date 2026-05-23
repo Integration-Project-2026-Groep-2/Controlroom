@@ -12,7 +12,7 @@ import (
 
 func ProcessJarvisMetrics(ctx context.Context, es *elasticsearch.Client, httpClient *http.Client) {
 
-	logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, "[DEBUG] indexing metrics"))
+	logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, "[DEBUG] indexing metrics"))
 
 	data, err := RetrieveMetrics(ctx, httpClient, config.McpMasterUrl)
 	if err != nil {
@@ -23,4 +23,6 @@ func ProcessJarvisMetrics(ctx context.Context, es *elasticsearch.Client, httpCli
 	if err != nil {
 		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("failed to retrieve jarvis statistics: %s", err)))
 	}
+
+	logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("mission succesful jarvis, let's head back home!", err)))
 }
