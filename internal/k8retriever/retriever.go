@@ -13,6 +13,26 @@ import (
 	"k8s.io/client-go/rest"
 )
 
+// note(nasr): were getting errrors on the paths that the k8 retreiver returns
+// we are just go oing to map eveyrthing to an underscore to fix it
+var labelKeyReplacer = strings.NewReplacer(
+	".", "_",
+	"/", "_",
+)
+
+func sanitize(input map[string]string) map[string]string {
+	if len(input) == 0 {
+		return nil
+	}
+
+	output := make(map[string]string, len(input))
+	for key, value := range input {
+		output[labelKeyReplacer.Replace(key)] = value
+	}
+
+	return output
+}
+
 type ContainerInfo struct {
 	Name            string   `json:"name"`
 	Image           string   `json:"image"`
