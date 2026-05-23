@@ -139,7 +139,7 @@ func BuildFetchLogsQuery(service, gte, lte string) map[string]any {
 	return map[string]any{
 		"bool": map[string]any{
 			"filter": []any{
-				map[string]any{"term": map[string]any{"service.keyword": service}},
+				map[string]any{"term": map[string]any{"service.keyword": strings.ToLower(service)}},
 				map[string]any{"range": map[string]any{"timestamp": map[string]any{"gte": gte, "lte": lte}}},
 				map[string]any{"terms": map[string]any{"level.keyword": []string{"ERROR", "WARN"}}},
 			},
