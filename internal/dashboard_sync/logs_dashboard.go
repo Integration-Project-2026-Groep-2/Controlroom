@@ -557,13 +557,8 @@ func SyncLogsDashboard(es *elasticsearch.Client) {
 		pType, _ := p["type"].(string)
 		if pType == "lens" {
 			lensTitle := getPanelTitle(p, refs, lensTitles)
-			if after, ok := strings.CutPrefix(lensTitle, "Logs - "); ok {
-				if activeServiceNames[after] {
-					keptPanels = append(keptPanels, p)
-				} else {
-					logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, fmt.Sprintf("dashboard sync: dropping stale logs panel for service %s", after)))
-					changed = true
-				}
+			if _, ok := strings.CutPrefix(lensTitle, "Logs - "); ok {
+				keptPanels = append(keptPanels, p)
 			} else {
 				keptPanels = append(keptPanels, p)
 			}
