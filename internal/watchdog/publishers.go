@@ -64,8 +64,8 @@ func publishHb(svc string, count float64, up bool, severity SeverityLevel, event
 
 	if err := ch.PublishWithContext(
 		context.Background(),
-		config.Producer[config.HEARTBEAT_SUCCEEDED_EVENT].Exchange.Name,
-		config.Producer[config.HEARTBEAT_SUCCEEDED_EVENT].Key.Key,
+		config.Producer[config.HEARTBEAT_FAILED_EVENT].Exchange.Name,
+		config.Producer[config.HEARTBEAT_FAILED_EVENT].Key.Key,
 		false,
 		false,
 		amqp.Publishing{
