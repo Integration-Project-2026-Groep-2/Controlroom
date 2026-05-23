@@ -47,8 +47,9 @@ func indexK8Pod(ctx context.Context, es *elasticsearch.Client, pod PodInfo) erro
 		"mem_request":             pod.MemRequest,
 		"mem_limit":               pod.MemLimit,
 		"container_count":         pod.ContainerCount,
-		"pod":                     pod.Pod,
-		"@timestamp":              time.Now().UTC().Format(time.RFC3339Nano),
+		// note(nsar): causing name errors
+		// "pod":                     pod.Pod,
+		"@timestamp": time.Now().UTC().Format(time.RFC3339Nano),
 	}
 
 	data, err := json.Marshal(doc)
