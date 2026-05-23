@@ -43,7 +43,7 @@ const (
 	healthyAfter   = 10 * time.Second
 )
 
-const VERSION = "1.8.9"
+const VERSION = "1.9.2"
 
 var GlobalHttpClient = &http.Client{
 	// note(nasr): if still not connected after 30 secodnds (should be enough for tls handshake, etc, etc) then fail w
@@ -435,6 +435,7 @@ func main() {
 				ticker := time.NewTicker(5 * time.Second)
 
 				for range ticker.C {
+					// TODO(nasr): IMPORTANT!!!!!!!! make this dashboards react to an internal data structure
 					sync.SyncLogsDashboard(esClient)
 					sync.SyncHeartbeatDashboard(esClient)
 				}

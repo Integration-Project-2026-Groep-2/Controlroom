@@ -18,6 +18,9 @@ import (
 // IndexMetrics indexes a slice of metric samples into Elasticsearch.
 // Uses the same pattern as heartbeat indexing with gen.HeartbeatDoc.
 func IndexMetrics(es *elasticsearch.Client, ctx context.Context, samples []Metrics) error {
+
+	logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, "[DEBUG] indexing metrics"))
+
 	if es == nil {
 		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, "metrics: Elasticsearch client is nil"))
 		return fmt.Errorf("elasticsearch client is nil")

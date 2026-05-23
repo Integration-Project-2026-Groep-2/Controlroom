@@ -24,6 +24,8 @@ type Metrics struct {
 // RetrieveMetrics fetches Prometheus exposition format from mcp-master:8080/metrics,
 // parses it, and yields MetricSample structs ready for indexing.
 func RetrieveMetrics(ctx context.Context, client *http.Client, metricsUrl string) ([]Metrics, error) {
+	logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, "[DEBUG] indexing metrics"))
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/metrics", strings.TrimSuffix(metricsUrl, "/")), nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build request: %w", err)

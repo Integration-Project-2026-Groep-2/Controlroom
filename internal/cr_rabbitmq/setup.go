@@ -90,6 +90,7 @@ func SendToDLQ(dlqCh *amqp.Channel, dlqName string, body []byte, reason string, 
 		false,             // mandatory
 		false,             // immediate
 		amqp.Publishing{
+			// note(nasr): what is this?
 			ContentType: "application/octet-stream",
 			Body:        body,
 			Headers: amqp.Table{
