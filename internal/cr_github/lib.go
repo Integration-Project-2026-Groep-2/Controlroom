@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	cr_config "integration-project-ehb/controlroom/internal/cr_config"
@@ -43,6 +46,57 @@ type Blob struct {
 	FileSHA  string `json:"sha"`
 	Content  string `json:"content"`
 	Encoding string `json:"encoding"`
+}
+
+// FileChange describes one file that should be written to a branch commit.
+type FileChange struct {
+	Path    string `json:"path"`
+	Content string `json:"content"`
+}
+
+type gitObject struct {
+	SHA  string `json:"sha"`
+	Type string `json:"type"`
+	URL  string `json:"url"`
+}
+
+type gitReference struct {
+	Ref     string    `json:"ref"`
+	Object  gitObject `json:"object"`
+	NodeID  string    `json:"node_id,omitempty"`
+	URL     string    `json:"url,omitempty"`
+	Message string    `json:"message,omitempty"`
+}
+
+type gitTreeEntry struct {
+	Path    string `json:"path"`
+	Mode    string `json:"mode"`
+	Type    string `json:"type"`
+	SHA     string `json:"sha,omitempty"`
+	Content string `json:"content,omitempty"`
+}
+
+type gitTree struct {
+	SHA string `json:"sha"`
+}
+
+type gitCommit struct {
+	SHA  string    `json:"sha"`
+	Tree gitObject `json:"tree"`
+}
+
+type githubStatusError struct {
+	operation  string
+	statusCode int
+	status     string
+}
+
+func (e *githubStatusError) Error() string {
+	return fmt.Sprintf("%s: %s", e.operation, e.status)
+}
+
+func (e *githubStatusError) StatusCode() int {
+	return e.statusCode
 }
 
 // PRResponse carries the fields needed to open a pull request.
@@ -212,6 +266,250 @@ func RequestChanges(ctx context.Context, config *GithubConfig, pr PRResponse) (m
 	return result, nil
 }
 
+// GetGitReference retrieves a git reference, such as refs/heads/main.
+func GetGitReference(ctx context.Context, config *GithubConfig, repo, ref string) (gitReference, error) {
+	ref = strings.TrimSpace(ref)
+	if ref == "" {
+		return gitReference{}, fmt.Errorf("git reference must be non-empty")
+	}
+
+	escapedRef := url.PathEscape(ref)
+	u := fmt.Sprintf("%s/repos/%s/%s/git/ref/heads/%s", cr_config.GithubBaseAPI, config.Org, repo, escapedRef)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return gitReference{}, err
+	}
+
+	addHeaders(req, config.Token)
+	resp, err := config.HTTP.Do(req)
+	if err != nil {
+		return gitReference{}, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		return gitReference{}, &githubStatusError{operation: "get git reference", statusCode: resp.StatusCode, status: resp.Status}
+	}
+
+	var result gitReference
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return gitReference{}, err
+	}
+
+	return result, nil
+}
+
+// GetCommit retrieves a git commit object by SHA.
+func GetCommit(ctx context.Context, config *GithubConfig, repo, sha string) (gitCommit, error) {
+	sha = strings.TrimSpace(sha)
+	if sha == "" {
+		return gitCommit{}, fmt.Errorf("commit SHA must be non-empty")
+	}
+
+	escapedSHA := url.PathEscape(sha)
+	u := fmt.Sprintf("%s/repos/%s/%s/git/commits/%s", cr_config.GithubBaseAPI, config.Org, repo, escapedSHA)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return gitCommit{}, err
+	}
+
+	addHeaders(req, config.Token)
+	resp, err := config.HTTP.Do(req)
+	if err != nil {
+		return gitCommit{}, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		return gitCommit{}, &githubStatusError{operation: "get git commit", statusCode: resp.StatusCode, status: resp.Status}
+	}
+
+	var result gitCommit
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return gitCommit{}, err
+	}
+
+	return result, nil
+}
+
+// CreateTree creates a git tree from blob SHAs, based on an existing tree.
+func CreateTree(ctx context.Context, config *GithubConfig, repo, baseTreeSHA string, entries []gitTreeEntry) (gitTree, error) {
+	if strings.TrimSpace(baseTreeSHA) == "" {
+		return gitTree{}, fmt.Errorf("base tree SHA must be non-empty")
+	}
+	if len(entries) == 0 {
+		return gitTree{}, fmt.Errorf("tree entries must be non-empty")
+	}
+
+	u := fmt.Sprintf("%s/repos/%s/%s/git/trees", cr_config.GithubBaseAPI, config.Org, repo)
+	body := map[string]any{
+		"base_tree": baseTreeSHA,
+		"tree":      entries,
+	}
+
+	bodyBytes, err := json.Marshal(body)
+	if err != nil {
+		return gitTree{}, err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return gitTree{}, err
+	}
+
+	addHeaders(req, config.Token)
+	resp, err := config.HTTP.Do(req)
+	if err != nil {
+		return gitTree{}, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		return gitTree{}, &githubStatusError{operation: "create git tree", statusCode: resp.StatusCode, status: resp.Status}
+	}
+
+	var result gitTree
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return gitTree{}, err
+	}
+
+	return result, nil
+}
+
+// CreateGitReference creates a new git reference (branch) pointing to a specific commit SHA.
+func CreateGitReference(ctx context.Context, config *GithubConfig, repo, branchName, sha string) error {
+	branchName = strings.TrimSpace(branchName)
+	sha = strings.TrimSpace(sha)
+	if branchName == "" {
+		return fmt.Errorf("branch name must be non-empty")
+	}
+	if sha == "" {
+		return fmt.Errorf("commit SHA must be non-empty")
+	}
+
+	u := fmt.Sprintf("%s/repos/%s/%s/git/refs", cr_config.GithubBaseAPI, config.Org, repo)
+
+	body := map[string]string{
+		"ref": "refs/heads/" + branchName,
+		"sha": sha,
+	}
+
+	bodyBytes, err := json.Marshal(body)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return err
+	}
+
+	addHeaders(req, config.Token)
+	resp, err := config.HTTP.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		return &githubStatusError{operation: "create git reference", statusCode: resp.StatusCode, status: resp.Status}
+	}
+
+	return nil
+}
+
+// RequestChangesWithFiles writes file changes to a branch, opens a PR, and returns the PR payload.
+func RequestChangesWithFiles(ctx context.Context, config *GithubConfig, pr PRResponse, files []FileChange, commitMessage string) (map[string]any, error) {
+	owner := pr.Owner
+	if owner == "" {
+		owner = config.Org
+	}
+	if strings.TrimSpace(pr.Repo) == "" {
+		return nil, fmt.Errorf("repo must be non-empty")
+	}
+	if strings.TrimSpace(pr.Head) == "" {
+		return nil, fmt.Errorf("head must be non-empty")
+	}
+	if strings.TrimSpace(pr.Base) == "" {
+		return nil, fmt.Errorf("base must be non-empty")
+	}
+	if len(files) == 0 {
+		return nil, fmt.Errorf("files must be non-empty")
+	}
+
+	commitMessage = strings.TrimSpace(commitMessage)
+	if commitMessage == "" {
+		commitMessage = pr.Title
+	}
+
+	if _, err := GetGitReference(ctx, config, pr.Repo, pr.Head); err == nil {
+		return nil, fmt.Errorf("branch %q already exists", pr.Head)
+	} else {
+		var statusErr *githubStatusError
+		if !errors.As(err, &statusErr) || statusErr.StatusCode() != http.StatusNotFound {
+			return nil, err
+		}
+	}
+
+	baseRef, err := GetGitReference(ctx, config, pr.Repo, pr.Base)
+	if err != nil {
+		return nil, err
+	}
+
+	baseCommit, err := GetCommit(ctx, config, pr.Repo, baseRef.Object.SHA)
+	if err != nil {
+		return nil, err
+	}
+
+	entries := make([]gitTreeEntry, 0, len(files))
+	for _, file := range files {
+		if strings.TrimSpace(file.Path) == "" {
+			return nil, fmt.Errorf("file path must be non-empty")
+		}
+		blob, err := CreateBlob(ctx, config, pr.Repo, file.Content)
+		if err != nil {
+			return nil, err
+		}
+		entries = append(entries, gitTreeEntry{
+			Path: file.Path,
+			Mode: "100644",
+			Type: "blob",
+			SHA:  blob.FileSHA,
+		})
+	}
+
+	tree, err := CreateTree(ctx, config, pr.Repo, baseCommit.Tree.SHA, entries)
+	if err != nil {
+		return nil, err
+	}
+	if tree.SHA == baseCommit.Tree.SHA {
+		return nil, fmt.Errorf("no file changes detected")
+	}
+
+	commit, err := CreateCommit(ctx, config, pr.Repo, tree.SHA, baseRef.Object.SHA, commitMessage)
+	if err != nil {
+		return nil, err
+	}
+
+	commitSHA, _ := commit["sha"].(string)
+	if strings.TrimSpace(commitSHA) == "" {
+		return nil, fmt.Errorf("create commit response missing sha")
+	}
+
+	if err := CreateGitReference(ctx, config, pr.Repo, pr.Head, commitSHA); err != nil {
+		return nil, err
+	}
+
+	return RequestChanges(ctx, config, PRResponse{
+		Owner: owner,
+		Repo:  pr.Repo,
+		Title: pr.Title,
+		Body:  pr.Body,
+		Head:  pr.Head,
+		Base:  pr.Base,
+	})
+}
+
 // FetchRecentCommits retrieves the N most recent commits on the default branch
 // for the configured org and specified repo.
 func FetchRecentCommits(ctx context.Context, config *GithubConfig, repo string, limit int) ([]map[string]any, error) {
@@ -351,4 +649,87 @@ func CreateBlob(ctx context.Context, config *GithubConfig, repo, content string)
 	}
 
 	return blob, nil
+}
+
+// CreateBranchWithMostRecentCommit creates a new branch from the most recent commit on main,
+// optionally with new content. Returns the created blob SHA.
+func CreateBranchWithMostRecentCommit(ctx context.Context, config *GithubConfig, repo, branchName, content string) (Blob, error) {
+	// Fetch the most recent commit SHA from main
+	commits, err := FetchRecentCommits(ctx, config, repo, 1)
+	if err != nil {
+		return Blob{}, err
+	}
+
+	if len(commits) == 0 {
+		return Blob{}, fmt.Errorf("no commits found on main branch")
+	}
+
+	commit := commits[0]
+	// note(nastr): @nasr because you we're confused earlier. its a map so you can just reference it like this
+	sha, ok := commit["sha"].(string)
+	if !ok {
+		return Blob{}, fmt.Errorf("invalid commit SHA format")
+	}
+
+	if err := CreateGitReference(ctx, config, repo, branchName, sha); err != nil {
+		return Blob{}, err
+	}
+
+	var blob Blob
+	if content != "" {
+		blob, err = CreateBlob(ctx, config, repo, content)
+		if err != nil {
+			return Blob{}, err
+		}
+	}
+
+	return blob, nil
+}
+
+// CreateCommit creates a new commit with the given tree SHA and message, returning the commit SHA.
+// parentSHA is the SHA of the parent commit; treeSHA is the SHA of the tree object.
+func CreateCommit(ctx context.Context, config *GithubConfig, repo, treeSHA, parentSHA, message string) (map[string]any, error) {
+	u := fmt.Sprintf("%s/repos/%s/%s/git/commits", cr_config.GithubBaseAPI, config.Org, repo)
+
+	body := map[string]any{
+		"tree":    treeSHA,
+		"parents": []string{parentSHA},
+		"message": message,
+		"author": map[string]string{
+			"name":  cr_config.GithubJarvisName,
+			"email": cr_config.GithubJarvisMail,
+		},
+		"committer": map[string]string{
+			"name":  cr_config.GithubJarvisName,
+			"email": cr_config.GithubJarvisMail,
+		},
+	}
+
+	bodyBytes, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return nil, err
+	}
+
+	addHeaders(req, config.Token)
+	resp, err := config.HTTP.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("create commit: %s", resp.Status)
+	}
+
+	var result map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }

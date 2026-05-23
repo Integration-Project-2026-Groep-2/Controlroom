@@ -63,3 +63,9 @@ var KbnXsrfToken = "true"
 var McpMasterUrl = os.Getenv("MCP_MASTER_URL")
 
 const GithubBaseAPI = "https://api.github.com"
+
+
+// -- github
+
+const GithubJarvisName = "jarvis el morabit cowe"
+const GithubJarvisMail = "controlroom-master@integration-project.local"
