@@ -23,11 +23,14 @@ import (
 	"integration-project-ehb/controlroom/internal/k8retriever"
 	"integration-project-ehb/controlroom/internal/mcp_server"
 	"integration-project-ehb/controlroom/internal/statuscheck"
+	"integration-project-ehb/controlroom/internal/summary"
 	"integration-project-ehb/controlroom/internal/user"
 	userack "integration-project-ehb/controlroom/internal/user_acknowledgment"
 	"integration-project-ehb/controlroom/internal/watchdog"
 	"integration-project-ehb/controlroom/pkg/logger"
 )
+
+const weekly = 7 * 24 * time.Hour
 
 func setup(ch *amqp.Channel) error {
 
@@ -205,6 +208,8 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 		logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("controlroom: %s consumer started (qos: %d)", def.Queue.Name, def.Qos)))
 	}
 
+	logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, "controlroom: all consumers running, waiting for messages"))
+
 	// TODO(nasr): fix the channel thing
 
 	//- setup rabbitmq heartbeat
@@ -284,7 +289,31 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 		}
 	}
 
-	logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, "controlroom: all consumers running, waiting for messages"))
+	// - summary initialization
+	{
+
+		summaryCh, err := conn.Channel()
+		if err != nil {
+			logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, fmt.Sprintf("controlroom: failed to initialize the summary channel: %v", err)))
+		}
+
+		go func() {
+			ticker := time.NewTicker(weekly)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ticker.C:
+					err := summary.Generate(ctx, client, summaryCh)
+					if err != nil {
+						logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, fmt.Sprintf("controlroom: failed to gather Kubernetes resources: %v", err)))
+					}
+				case <-ctx.Done():
+					return
+
+				}
+			}
+		}()
+	}
 
 	select {
 	case reason := <-closeCh:
@@ -350,6 +379,7 @@ func main() {
 		}()
 	}
 
+	//- note(nasr): outside of the startSession function because this isn't dependent on rabbitmq
 	//- gathering k8 resources. imrpovement over statuschecks. provide more accurate information
 	//- because the services are running containerized
 	//- if this doesn't work it should fail without breaking the rest
@@ -372,6 +402,8 @@ func main() {
 		}()
 	}
 
+	//- not dependant on rabbitmq
+	// note(nasr): toggle for debugging
 	if true {
 		// dynamic dashboards go go go
 		{

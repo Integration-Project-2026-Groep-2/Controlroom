@@ -9,7 +9,6 @@ import (
 	"integration-project-ehb/controlroom/internal/company"
 	"integration-project-ehb/controlroom/internal/user"
 	"integration-project-ehb/controlroom/pkg/gen"
-	"integration-project-ehb/controlroom/pkg/logger"
 
 	"github.com/elastic/go-elasticsearch/v9"
 
@@ -20,16 +19,14 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-func Generate(ctx context.Context, el *elasticsearch.Client, ch *amqp.Channel) {
+func Generate(ctx context.Context, el *elasticsearch.Client, ch *amqp.Channel) error {
 
 	var buf bytes.Buffer
 	var body gen.Summary
 
 	resp, err := user.QueryTotalSignedUpUsers(ctx, el)
 	if err != nil {
-		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("summary: failed to query total amount of users: %v", err)))
-		return
-
+		return fmt.Errorf("summary: failed to query total amount of users: %v", err)
 	}
 
 	// TODO(nasr): figure out how to do this properly later
@@ -40,32 +37,28 @@ func Generate(ctx context.Context, el *elasticsearch.Client, ch *amqp.Channel) {
 
 	// Decode the JSON body into our struct
 	if err := json.NewDecoder(resp.Body).Decode(&countResult); err != nil {
-		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("summary: failed to decode user count response: %v", err)))
-		return
+		return fmt.Errorf("summary: failed to decode user count response: %v", err)
 	}
 
 	// same thing
 	resp, err = company.QueryTotalSignedUpCompanies(ctx, el)
 	if err != nil {
-		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("summary: failed to query total amount of companies: %v", err)))
-		return
+		fmt.Errorf("summary: failed to query total amount of companies: %v", err)
 	}
 
 	// Decode the JSON body into our struct
 	if err := json.NewDecoder(resp.Body).Decode(&countResult); err != nil {
-		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("summary: failed to decode company count response: %v", err)))
-		return
+		return fmt.Errorf("summary: failed to decode company count response: %v", err)
 	}
 
 	enc := xml.NewEncoder(&buf)
 	if err := enc.Encode(body); err != nil {
-		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("summary: failed to encode summary XML: %v", err)))
-		return
+		return fmt.Errorf("summary: failed to encode summary XML: %v", err)
 	}
 
 	if err := enc.Flush(); err != nil {
-		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("summary: failed to flush summary XML encoder: %v", err)))
-		return
+		return fmt.Errorf("summary: failed to flush summary XML encoder: %v", err)
+
 	}
 
 	// publisher to mailing
@@ -81,8 +74,11 @@ func Generate(ctx context.Context, el *elasticsearch.Client, ch *amqp.Channel) {
 				Body:        buf.Bytes(),
 			},
 		); err != nil {
-			logger.Log(logger.NewMessage(logger.ERROR, logger.WATCHDOG, fmt.Sprintf("summary: failed to publish heartbeat event: %v", err)))
+			return fmt.Errorf("summary: failed to publish heartbeat event: %v", err)
+
 		}
 
 	}
+
+	return nil
 }
