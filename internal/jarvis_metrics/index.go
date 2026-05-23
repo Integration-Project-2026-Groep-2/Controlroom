@@ -2,64 +2,93 @@ package jarvis_metrics
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
-	"strings"
 	"time"
 
 	"bytes"
 
-	"integration-project-ehb/controlroom/pkg/gen"
 	"integration-project-ehb/controlroom/pkg/logger"
 
 	"github.com/elastic/go-elasticsearch/v9"
 	"github.com/elastic/go-elasticsearch/v9/esapi"
 )
 
-func indexMetrics(es *elasticsearch.Client, ctx context.Context, hb *gen.Heartbeat) error {
 
-	sId := strings.ToLower(hb.ServiceId)
-	logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, fmt.Sprintf("heartbeat: indexing heartbeat for %s", sId)))
-
+// IndexMetrics indexes a slice of metric samples into Elasticsearch.
+// Uses the same pattern as heartbeat indexing with gen.HeartbeatDoc.
+func IndexMetrics(es *elasticsearch.Client, ctx context.Context, samples []MetricSample) error {
 	if es == nil {
-		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, "heartbeat: Elasticsearch client is nil"))
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, "metrics: Elasticsearch client is nil"))
 		return fmt.Errorf("elasticsearch client is nil")
 	}
 
-	doc := gen.HeartbeatDoc{
-		ServiceId: sId,
-		Timestamp: hb.Timestamp,
-		Indexed:   time.Now(),
+	if len(samples) == 0 {
+		logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, "metrics: no samples to index"))
+		return nil
 	}
 
-	jsonData, err := doc.MarshalJSON()
-	if err != nil {
-		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("heartbeat: failed to marshal heartbeat for %s: %v", sId, err)))
-		return err
-	}
+	indexed := 0
+	failed := 0
 
-	req := esapi.IndexRequest{
-		Index:      "jarvis-metrics",
-		DocumentID: fmt.Sprintf("%s-%d", sId, hb.Timestamp.Unix()),
-		Body:       bytes.NewReader(jsonData),
-		Refresh:    "true",
-	}
-
-	res, err := req.Do(ctx, es)
-	if err != nil {
-		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("heartbeat: failed to index heartbeat for %s: %v", sId, err)))
-		return err
-	}
-	defer func(Body io.ReadCloser) {
-		if err := Body.Close(); err != nil {
-			logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, fmt.Sprintf("heartbeat: failed to close response body after indexing %s: %v", sId, err)))
+	// TODO(nasr): replace this with the easy json implementation
+	for _, sample := range samples {
+		// Create a document struct similar to gen.HeartbeatDoc
+		// Map MetricSample to a gen-compatible structure or use direct JSON
+		doc := map[string]interface{}{
+			"@timestamp": sample.Timestamp,
+			"metric":     sample.Metric,
+			"value":      sample.Value,
+			"labels":     sample.Labels,
+			"indexed":    time.Now(),
 		}
-	}(res.Body)
 
-	if res.IsError() {
-		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("heartbeat: Elasticsearch error indexing heartbeat for %s: %s", sId, res.String())))
-		return fmt.Errorf("elasticsearch error: %s", res.String())
+		jsonData, err := json.Marshal(doc)
+		if err != nil {
+			logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("metrics: failed to marshal sample %s: %v", sample.Metric, err)))
+			failed++
+			continue
+		}
+
+		// DocumentID: metric-name + labels hash + timestamp for uniqueness
+		docID := fmt.Sprintf("%s-%d", sample.Metric, sample.Timestamp.Unix())
+
+		req := esapi.IndexRequest{
+			Index:      "jarvis-data",
+			DocumentID: docID,
+			Body:       bytes.NewReader(jsonData),
+			Refresh:    "true",
+		}
+
+		res, err := req.Do(ctx, es)
+		if err != nil {
+			logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("metrics: failed to index sample %s: %v", sample.Metric, err)))
+			failed++
+			continue
+		}
+
+		defer func(Body io.ReadCloser) {
+			if err := Body.Close(); err != nil {
+				logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, fmt.Sprintf("metrics: failed to close response body for sample %s: %v", sample.Metric, err)))
+			}
+		}(res.Body)
+
+		if res.IsError() {
+			logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("metrics: Elasticsearch error indexing sample %s: %s", sample.Metric, res.String())))
+			failed++
+			continue
+		}
+
+		indexed++
+	}
+
+	logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, fmt.Sprintf("metrics: indexed %d/%d samples (failed: %d)", indexed, len(samples), failed)))
+
+	if failed > 0 {
+		return fmt.Errorf("failed to index %d/%d metrics samples", failed, len(samples))
 	}
 
 	return nil
 }
+
