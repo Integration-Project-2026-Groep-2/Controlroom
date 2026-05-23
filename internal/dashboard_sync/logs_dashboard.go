@@ -582,10 +582,15 @@ func SyncLogsDashboard(es *elasticsearch.Client) {
 
 	for serviceName, lensID := range activeLensIDs {
 		uniqueIndex := fmt.Sprintf("panel_%d", time.Now().UnixNano())
+		lensPayload := createLensPayload(serviceName)
 		newPanel := map[string]any{
 			"panelIndex": uniqueIndex,
 			"embeddableConfig": map[string]any{
-				"enhancements": map[string]any{"dynamicActions": map[string]any{"events": []any{}}},
+				"attributes":      lensPayload["attributes"],
+				"references":      lensPayload["references"],
+				"enhancements":    map[string]any{},
+				"hidePanelTitles": false,
+				"type":            "lens",
 			},
 			"gridData": map[string]any{"x": 0, "y": maxY, "w": 48, "h": 15, "i": uniqueIndex},
 			"version":  1,
