@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -19,6 +20,7 @@ import (
 	"integration-project-ehb/controlroom/internal/cr_logger"
 	"integration-project-ehb/controlroom/internal/cr_rabbitmq"
 	"integration-project-ehb/controlroom/internal/dashboard_sync"
+	"integration-project-ehb/controlroom/internal/jarvis_metrics"
 	"integration-project-ehb/controlroom/internal/heartbeat"
 	"integration-project-ehb/controlroom/internal/k8retriever"
 	"integration-project-ehb/controlroom/internal/mcp_server"
@@ -30,7 +32,26 @@ import (
 	"integration-project-ehb/controlroom/pkg/logger"
 )
 
+// --------------------------------
+
+// note(nasr): usefull consts for the main entry point
 const weekly = 7 * 24 * time.Hour
+
+const (
+	initialBackoff = 1 * time.Second
+	maxBackoff     = 60 * time.Second
+	healthyAfter   = 10 * time.Second
+)
+
+const VERSION = "1.8.9"
+
+var GlobalHttpClient = &http.Client{
+	// note(nasr): if still not connected after 30 secodnds (should be enough for tls handshake, etc, etc) then fail w
+	Timeout: 30 * time.Second,
+}
+
+// --------------------------------
+
 
 func setup(ch *amqp.Channel) error {
 
@@ -329,8 +350,6 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 	}
 }
 
-const VERSION = "1.8.9"
-
 func main() {
 
 	log.Printf("[VERSION] %s\n", VERSION)
@@ -341,12 +360,12 @@ func main() {
 	}
 	defer logger.Shutdown()
 
-	client, err := elasticsearch.NewClient(config.ElasticConfig)
+	esClient, err := elasticsearch.NewClient(config.ElasticConfig)
 	if err != nil {
 		logger.Log(logger.NewMessage(logger.PANIC, logger.CONTROLROOM, fmt.Sprintf("controlroom: failed to create Elasticsearch client: %v", err)))
 	}
 
-	res, err := client.Info()
+	res, err := esClient.Info()
 	if err != nil {
 		logger.Log(logger.NewMessage(logger.PANIC, logger.CONTROLROOM, fmt.Sprintf("controlroom: failed to connect to Elasticsearch: %v", err)))
 	}
@@ -372,7 +391,7 @@ func main() {
 	{
 		// NOTE(nasr): runs alongside the RabbitMQ session loop so mcp-master can initialized mcp server
 		go func() {
-			err := mcp.SetupMCP(client)
+			err := mcp.SetupMCP(esClient)
 			if err != nil {
 				logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("controlroom: MCP server exited: %v", err)))
 			}
@@ -390,7 +409,7 @@ func main() {
 			for {
 				select {
 				case <-ticker.C:
-					err := k8retriever.ProcessK8sData(client)
+					err := k8retriever.ProcessK8sData(esClient)
 					if err != nil {
 						logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, fmt.Sprintf("controlroom: failed to gather Kubernetes resources: %v", err)))
 					}
@@ -417,24 +436,25 @@ func main() {
 				ticker := time.NewTicker(5 * time.Second)
 
 				for range ticker.C {
-					sync.SyncLogsDashboard(client)
-					sync.SyncHeartbeatDashboard(client)
+					sync.SyncLogsDashboard(esClient)
+					sync.SyncHeartbeatDashboard(esClient)
 				}
 			}()
 		}
 	}
 
-	const (
-		initialBackoff = 1 * time.Second
-		maxBackoff     = 60 * time.Second
-		healthyAfter   = 10 * time.Second
-	)
+
+	// TODO(nasr & lars): should this communication happen over rabbitmq?
+	// jarvis metrics
+	{
+		go jarvis_metrics.ProcessJarvisMetrics(ctx, esClient, GlobalHttpClient)
+	}
 
 	backoff := initialBackoff
 
 	for {
 		start := time.Now()
-		err := startSession(ctx, client)
+		err := startSession(ctx, esClient)
 
 		if errors.Is(err, context.Canceled) {
 			return
