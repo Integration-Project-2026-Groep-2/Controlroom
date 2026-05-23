@@ -3,6 +3,7 @@ package jarvis_metrics
 import (
 	"context"
 	"fmt"
+	"integration-project-ehb/controlroom/pkg/logger"
 	"io"
 	"maps"
 	"net/http"
