@@ -187,7 +187,7 @@ func FetchRepos(ctx context.Context, config *GithubConfig) (map[string]string, e
 
 	result := make(map[string]string, len(repos))
 	for _, repo := range repos {
-		result[strings.ToLower(repo.Name)] = repo.URL
+		result[strings.ToLower(repo.Name)] = repo.Name
 	}
 
 	config.Repos = result
