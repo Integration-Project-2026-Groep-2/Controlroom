@@ -506,8 +506,7 @@ func buildServer(client *elasticsearch.Client) *server.MCPServer {
 			mcp.Description("the head branch (e.g., 'feature-branch')"),
 		),
 		mcp.WithString("base",
-			mcp.Required(),
-			mcp.Description("the base branch (e.g., 'main')"),
+			mcp.Description("the base branch; defaults to the repository default branch when omitted"),
 		),
 	)
 
@@ -540,9 +539,6 @@ func buildServer(client *elasticsearch.Client) *server.MCPServer {
 			}
 			if strings.TrimSpace(head) == "" {
 				return mcp.NewToolResultError("'head' must be non-empty"), nil
-			}
-			if strings.TrimSpace(base) == "" {
-				return mcp.NewToolResultError("'base' must be non-empty"), nil
 			}
 		}
 

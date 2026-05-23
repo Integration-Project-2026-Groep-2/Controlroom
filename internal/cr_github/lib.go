@@ -190,8 +190,13 @@ func FetchRecentRuns(ctx context.Context, config *GithubConfig, repo string, lim
 		limit = 10
 	}
 
-	u := fmt.Sprintf("%s/repos/%s/%s/actions/runs?head_branch=main&per_page=%d&status=completed",
-		cr_config.GithubBaseAPI, config.Org, repo, limit)
+	defaultBranch, err := getDefaultBranch(ctx, config, config.Org, repo)
+	if err != nil {
+		return nil, err
+	}
+
+	u := fmt.Sprintf("%s/repos/%s/%s/actions/runs?head_branch=%s&per_page=%d&status=completed",
+		cr_config.GithubBaseAPI, config.Org, repo, url.QueryEscape(defaultBranch), limit)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
@@ -220,10 +225,51 @@ func FetchRecentRuns(ctx context.Context, config *GithubConfig, repo string, lim
 	return envelope.WorkflowRuns, nil
 }
 
+func getDefaultBranch(ctx context.Context, config *GithubConfig, owner, repo string) (string, error) {
+	owner = strings.TrimSpace(owner)
+	if owner == "" {
+		owner = config.Org
+	}
+	if strings.TrimSpace(repo) == "" {
+		return "", fmt.Errorf("repo must be non-empty")
+	}
+
+	u := fmt.Sprintf("%s/repos/%s/%s", cr_config.GithubBaseAPI, owner, repo)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return "", err
+	}
+
+	addHeaders(req, config.Token)
+	resp, err := config.HTTP.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		return "", &githubStatusError{operation: "get repository info", statusCode: resp.StatusCode, status: resp.Status}
+	}
+
+	var result struct {
+		DefaultBranch string `json:"default_branch"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", err
+	}
+
+	branch := strings.TrimSpace(result.DefaultBranch)
+	if branch == "" {
+		return "", fmt.Errorf("repository %s/%s does not report a default branch", owner, repo)
+	}
+
+	return branch, nil
+}
+
 // RequestChanges opens a pull request on the configured org and specified repo.
 // If PRResponse.Owner is empty, config.Org is used.
 func RequestChanges(ctx context.Context, config *GithubConfig, pr PRResponse) (map[string]any, error) {
-	owner := pr.Owner
+	owner := strings.TrimSpace(pr.Owner)
 	if owner == "" {
 		owner = config.Org
 	}
@@ -267,14 +313,18 @@ func RequestChanges(ctx context.Context, config *GithubConfig, pr PRResponse) (m
 }
 
 // GetGitReference retrieves a git reference, such as refs/heads/main.
-func GetGitReference(ctx context.Context, config *GithubConfig, repo, ref string) (gitReference, error) {
+func GetGitReference(ctx context.Context, config *GithubConfig, owner, repo, ref string) (gitReference, error) {
+	owner = strings.TrimSpace(owner)
+	if owner == "" {
+		owner = config.Org
+	}
 	ref = strings.TrimSpace(ref)
 	if ref == "" {
 		return gitReference{}, fmt.Errorf("git reference must be non-empty")
 	}
 
 	escapedRef := url.PathEscape(ref)
-	u := fmt.Sprintf("%s/repos/%s/%s/git/ref/heads/%s", cr_config.GithubBaseAPI, config.Org, repo, escapedRef)
+	u := fmt.Sprintf("%s/repos/%s/%s/git/ref/heads/%s", cr_config.GithubBaseAPI, owner, repo, escapedRef)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return gitReference{}, err
@@ -300,14 +350,18 @@ func GetGitReference(ctx context.Context, config *GithubConfig, repo, ref string
 }
 
 // GetCommit retrieves a git commit object by SHA.
-func GetCommit(ctx context.Context, config *GithubConfig, repo, sha string) (gitCommit, error) {
+func GetCommit(ctx context.Context, config *GithubConfig, owner, repo, sha string) (gitCommit, error) {
+	owner = strings.TrimSpace(owner)
+	if owner == "" {
+		owner = config.Org
+	}
 	sha = strings.TrimSpace(sha)
 	if sha == "" {
 		return gitCommit{}, fmt.Errorf("commit SHA must be non-empty")
 	}
 
 	escapedSHA := url.PathEscape(sha)
-	u := fmt.Sprintf("%s/repos/%s/%s/git/commits/%s", cr_config.GithubBaseAPI, config.Org, repo, escapedSHA)
+	u := fmt.Sprintf("%s/repos/%s/%s/git/commits/%s", cr_config.GithubBaseAPI, owner, repo, escapedSHA)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return gitCommit{}, err
@@ -333,7 +387,11 @@ func GetCommit(ctx context.Context, config *GithubConfig, repo, sha string) (git
 }
 
 // CreateTree creates a git tree from blob SHAs, based on an existing tree.
-func CreateTree(ctx context.Context, config *GithubConfig, repo, baseTreeSHA string, entries []gitTreeEntry) (gitTree, error) {
+func CreateTree(ctx context.Context, config *GithubConfig, owner, repo, baseTreeSHA string, entries []gitTreeEntry) (gitTree, error) {
+	owner = strings.TrimSpace(owner)
+	if owner == "" {
+		owner = config.Org
+	}
 	if strings.TrimSpace(baseTreeSHA) == "" {
 		return gitTree{}, fmt.Errorf("base tree SHA must be non-empty")
 	}
@@ -341,7 +399,7 @@ func CreateTree(ctx context.Context, config *GithubConfig, repo, baseTreeSHA str
 		return gitTree{}, fmt.Errorf("tree entries must be non-empty")
 	}
 
-	u := fmt.Sprintf("%s/repos/%s/%s/git/trees", cr_config.GithubBaseAPI, config.Org, repo)
+	u := fmt.Sprintf("%s/repos/%s/%s/git/trees", cr_config.GithubBaseAPI, owner, repo)
 	body := map[string]any{
 		"base_tree": baseTreeSHA,
 		"tree":      entries,
@@ -377,7 +435,11 @@ func CreateTree(ctx context.Context, config *GithubConfig, repo, baseTreeSHA str
 }
 
 // CreateGitReference creates a new git reference (branch) pointing to a specific commit SHA.
-func CreateGitReference(ctx context.Context, config *GithubConfig, repo, branchName, sha string) error {
+func CreateGitReference(ctx context.Context, config *GithubConfig, owner, repo, branchName, sha string) error {
+	owner = strings.TrimSpace(owner)
+	if owner == "" {
+		owner = config.Org
+	}
 	branchName = strings.TrimSpace(branchName)
 	sha = strings.TrimSpace(sha)
 	if branchName == "" {
@@ -387,7 +449,7 @@ func CreateGitReference(ctx context.Context, config *GithubConfig, repo, branchN
 		return fmt.Errorf("commit SHA must be non-empty")
 	}
 
-	u := fmt.Sprintf("%s/repos/%s/%s/git/refs", cr_config.GithubBaseAPI, config.Org, repo)
+	u := fmt.Sprintf("%s/repos/%s/%s/git/refs", cr_config.GithubBaseAPI, owner, repo)
 
 	body := map[string]string{
 		"ref": "refs/heads/" + branchName,
@@ -420,7 +482,7 @@ func CreateGitReference(ctx context.Context, config *GithubConfig, repo, branchN
 
 // RequestChangesWithFiles writes file changes to a branch, opens a PR, and returns the PR payload.
 func RequestChangesWithFiles(ctx context.Context, config *GithubConfig, pr PRResponse, files []FileChange, commitMessage string) (map[string]any, error) {
-	owner := pr.Owner
+	owner := strings.TrimSpace(pr.Owner)
 	if owner == "" {
 		owner = config.Org
 	}
@@ -429,9 +491,6 @@ func RequestChangesWithFiles(ctx context.Context, config *GithubConfig, pr PRRes
 	}
 	if strings.TrimSpace(pr.Head) == "" {
 		return nil, fmt.Errorf("head must be non-empty")
-	}
-	if strings.TrimSpace(pr.Base) == "" {
-		return nil, fmt.Errorf("base must be non-empty")
 	}
 	if len(files) == 0 {
 		return nil, fmt.Errorf("files must be non-empty")
@@ -442,7 +501,7 @@ func RequestChangesWithFiles(ctx context.Context, config *GithubConfig, pr PRRes
 		commitMessage = pr.Title
 	}
 
-	if _, err := GetGitReference(ctx, config, pr.Repo, pr.Head); err == nil {
+	if _, err := GetGitReference(ctx, config, owner, pr.Repo, pr.Head); err == nil {
 		return nil, fmt.Errorf("branch %q already exists", pr.Head)
 	} else {
 		var statusErr *githubStatusError
@@ -451,12 +510,34 @@ func RequestChangesWithFiles(ctx context.Context, config *GithubConfig, pr PRRes
 		}
 	}
 
-	baseRef, err := GetGitReference(ctx, config, pr.Repo, pr.Base)
-	if err != nil {
-		return nil, err
+	baseBranch := strings.TrimSpace(pr.Base)
+	if baseBranch == "" {
+		var err error
+		baseBranch, err = getDefaultBranch(ctx, config, owner, pr.Repo)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	baseCommit, err := GetCommit(ctx, config, pr.Repo, baseRef.Object.SHA)
+	baseRef, err := GetGitReference(ctx, config, owner, pr.Repo, baseBranch)
+	if err != nil {
+		var statusErr *githubStatusError
+		if errors.As(err, &statusErr) && statusErr.StatusCode() == http.StatusNotFound {
+			defaultBranch, defaultErr := getDefaultBranch(ctx, config, owner, pr.Repo)
+			if defaultErr != nil {
+				return nil, err
+			}
+			if defaultBranch != "" && defaultBranch != baseBranch {
+				baseBranch = defaultBranch
+				baseRef, err = GetGitReference(ctx, config, owner, pr.Repo, baseBranch)
+			}
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	baseCommit, err := GetCommit(ctx, config, owner, pr.Repo, baseRef.Object.SHA)
 	if err != nil {
 		return nil, err
 	}
@@ -466,7 +547,7 @@ func RequestChangesWithFiles(ctx context.Context, config *GithubConfig, pr PRRes
 		if strings.TrimSpace(file.Path) == "" {
 			return nil, fmt.Errorf("file path must be non-empty")
 		}
-		blob, err := CreateBlob(ctx, config, pr.Repo, file.Content)
+		blob, err := CreateBlob(ctx, config, owner, pr.Repo, file.Content)
 		if err != nil {
 			return nil, err
 		}
@@ -478,7 +559,7 @@ func RequestChangesWithFiles(ctx context.Context, config *GithubConfig, pr PRRes
 		})
 	}
 
-	tree, err := CreateTree(ctx, config, pr.Repo, baseCommit.Tree.SHA, entries)
+	tree, err := CreateTree(ctx, config, owner, pr.Repo, baseCommit.Tree.SHA, entries)
 	if err != nil {
 		return nil, err
 	}
@@ -486,7 +567,7 @@ func RequestChangesWithFiles(ctx context.Context, config *GithubConfig, pr PRRes
 		return nil, fmt.Errorf("no file changes detected")
 	}
 
-	commit, err := CreateCommit(ctx, config, pr.Repo, tree.SHA, baseRef.Object.SHA, commitMessage)
+	commit, err := CreateCommit(ctx, config, owner, pr.Repo, tree.SHA, baseRef.Object.SHA, commitMessage)
 	if err != nil {
 		return nil, err
 	}
@@ -496,7 +577,7 @@ func RequestChangesWithFiles(ctx context.Context, config *GithubConfig, pr PRRes
 		return nil, fmt.Errorf("create commit response missing sha")
 	}
 
-	if err := CreateGitReference(ctx, config, pr.Repo, pr.Head, commitSHA); err != nil {
+	if err := CreateGitReference(ctx, config, owner, pr.Repo, pr.Head, commitSHA); err != nil {
 		return nil, err
 	}
 
@@ -506,7 +587,7 @@ func RequestChangesWithFiles(ctx context.Context, config *GithubConfig, pr PRRes
 		Title: pr.Title,
 		Body:  pr.Body,
 		Head:  pr.Head,
-		Base:  pr.Base,
+		Base:  baseBranch,
 	})
 }
 
@@ -517,7 +598,12 @@ func FetchRecentCommits(ctx context.Context, config *GithubConfig, repo string, 
 		limit = 10
 	}
 
-	u := fmt.Sprintf("%s/repos/%s/%s/commits?per_page=%d", cr_config.GithubBaseAPI, config.Org, repo, limit)
+	defaultBranch, err := getDefaultBranch(ctx, config, config.Org, repo)
+	if err != nil {
+		return nil, err
+	}
+
+	u := fmt.Sprintf("%s/repos/%s/%s/commits?sha=%s&per_page=%d", cr_config.GithubBaseAPI, config.Org, repo, url.QueryEscape(defaultBranch), limit)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, err
@@ -615,8 +701,12 @@ func GetBlob(ctx context.Context, config *GithubConfig, repo string, fileSHAs ..
 
 // CreateBlob creates a new blob object in the configured org and specified repo,
 // returning its SHA identifier.
-func CreateBlob(ctx context.Context, config *GithubConfig, repo, content string) (Blob, error) {
-	u := fmt.Sprintf("%s/repos/%s/%s/git/blobs", cr_config.GithubBaseAPI, config.Org, repo)
+func CreateBlob(ctx context.Context, config *GithubConfig, owner, repo, content string) (Blob, error) {
+	owner = strings.TrimSpace(owner)
+	if owner == "" {
+		owner = config.Org
+	}
+	u := fmt.Sprintf("%s/repos/%s/%s/git/blobs", cr_config.GithubBaseAPI, owner, repo)
 
 	body := map[string]string{
 		"content": content,
@@ -651,17 +741,17 @@ func CreateBlob(ctx context.Context, config *GithubConfig, repo, content string)
 	return blob, nil
 }
 
-// CreateBranchWithMostRecentCommit creates a new branch from the most recent commit on main,
+// CreateBranchWithMostRecentCommit creates a new branch from the most recent commit on the default branch,
 // optionally with new content. Returns the created blob SHA.
 func CreateBranchWithMostRecentCommit(ctx context.Context, config *GithubConfig, repo, branchName, content string) (Blob, error) {
-	// Fetch the most recent commit SHA from main
+	// Fetch the most recent commit SHA from the repository's default branch.
 	commits, err := FetchRecentCommits(ctx, config, repo, 1)
 	if err != nil {
 		return Blob{}, err
 	}
 
 	if len(commits) == 0 {
-		return Blob{}, fmt.Errorf("no commits found on main branch")
+		return Blob{}, fmt.Errorf("no commits found on default branch")
 	}
 
 	commit := commits[0]
@@ -671,13 +761,13 @@ func CreateBranchWithMostRecentCommit(ctx context.Context, config *GithubConfig,
 		return Blob{}, fmt.Errorf("invalid commit SHA format")
 	}
 
-	if err := CreateGitReference(ctx, config, repo, branchName, sha); err != nil {
+	if err := CreateGitReference(ctx, config, config.Org, repo, branchName, sha); err != nil {
 		return Blob{}, err
 	}
 
 	var blob Blob
 	if content != "" {
-		blob, err = CreateBlob(ctx, config, repo, content)
+		blob, err = CreateBlob(ctx, config, config.Org, repo, content)
 		if err != nil {
 			return Blob{}, err
 		}
@@ -688,8 +778,12 @@ func CreateBranchWithMostRecentCommit(ctx context.Context, config *GithubConfig,
 
 // CreateCommit creates a new commit with the given tree SHA and message, returning the commit SHA.
 // parentSHA is the SHA of the parent commit; treeSHA is the SHA of the tree object.
-func CreateCommit(ctx context.Context, config *GithubConfig, repo, treeSHA, parentSHA, message string) (map[string]any, error) {
-	u := fmt.Sprintf("%s/repos/%s/%s/git/commits", cr_config.GithubBaseAPI, config.Org, repo)
+func CreateCommit(ctx context.Context, config *GithubConfig, owner, repo, treeSHA, parentSHA, message string) (map[string]any, error) {
+	owner = strings.TrimSpace(owner)
+	if owner == "" {
+		owner = config.Org
+	}
+	u := fmt.Sprintf("%s/repos/%s/%s/git/commits", cr_config.GithubBaseAPI, owner, repo)
 
 	body := map[string]any{
 		"tree":    treeSHA,
