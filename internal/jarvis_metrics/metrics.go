@@ -16,7 +16,7 @@ type McpDataLabel struct {
 type McpData struct {
 	Timestamp time.Time `json:"timestamp" validate:"required"`
 	// Metric    time.Time `json:"timestamp" validate:"required"`
-	Value     float64   `json:"integer" validate:"required"`
+	Value float64 `json:"integer" validate:"required"`
 }
 
 func RetrieveMetrics(context context.Context, client *http.Client) (McpData, error) {

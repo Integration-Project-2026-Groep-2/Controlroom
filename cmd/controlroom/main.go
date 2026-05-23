@@ -227,7 +227,6 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 				err := cr_rabbitmq.PublishHeartbeat(hbPubCh)
 				if err != nil {
 					logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("RabbitMQ publishing failed, is RabbitMQ alive? error: %v", err)))
-					return
 				}
 			case <-ctx.Done():
 				return
