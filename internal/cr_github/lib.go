@@ -46,8 +46,9 @@ type Blob struct {
 }
 
 // PRResponse carries the fields needed to open a pull request.
+// If Owner is empty, config.Org will be used as the owner.
 type PRResponse struct {
-	Owner string
+	Owner string // optional; defaults to config.Org
 	Repo  string
 	Title string
 	Body  string
@@ -165,9 +166,15 @@ func FetchRecentRuns(ctx context.Context, config *GithubConfig, repo string, lim
 	return envelope.WorkflowRuns, nil
 }
 
-// RequestChanges opens a pull request on the given repo.
+// RequestChanges opens a pull request on the configured org and specified repo.
+// If PRResponse.Owner is empty, config.Org is used.
 func RequestChanges(ctx context.Context, config *GithubConfig, pr PRResponse) (map[string]any, error) {
-	u := fmt.Sprintf("%s/repos/%s/%s/pulls", cr_config.GithubBaseAPI, pr.Owner, pr.Repo)
+	owner := pr.Owner
+	if owner == "" {
+		owner = config.Org
+	}
+
+	u := fmt.Sprintf("%s/repos/%s/%s/pulls", cr_config.GithubBaseAPI, owner, pr.Repo)
 
 	body := map[string]string{
 		"title": pr.Title,
@@ -205,7 +212,8 @@ func RequestChanges(ctx context.Context, config *GithubConfig, pr PRResponse) (m
 	return result, nil
 }
 
-// FetchRecentCommits retrieves the N most recent commits on the default branch.
+// FetchRecentCommits retrieves the N most recent commits on the default branch
+// for the configured org and specified repo.
 func FetchRecentCommits(ctx context.Context, config *GithubConfig, repo string, limit int) ([]map[string]any, error) {
 	if limit <= 0 || limit > 100 {
 		limit = 10
@@ -236,6 +244,7 @@ func FetchRecentCommits(ctx context.Context, config *GithubConfig, repo string, 
 	return commits, nil
 }
 
+// FetchPRs retrieves pull requests for the configured org and specified repo.
 func FetchPRs(ctx context.Context, config *GithubConfig, repo, state string, limit int) ([]map[string]any, error) {
 	if state != "open" && state != "closed" && state != "all" {
 		state = "open"
@@ -269,14 +278,16 @@ func FetchPRs(ctx context.Context, config *GithubConfig, repo, state string, lim
 	return prs, nil
 }
 
-func GetBlob(ctx context.Context, config *GithubConfig, owner, repo string, fileSHAs ...string) ([]Blob, error) {
+// GetBlob retrieves blobs from the configured org and specified repo.
+// Fetches one or more blobs by their SHA identifiers.
+func GetBlob(ctx context.Context, config *GithubConfig, repo string, fileSHAs ...string) ([]Blob, error) {
 	if len(fileSHAs) == 0 {
 		return nil, fmt.Errorf("no file SHAs provided")
 	}
 
 	blobs := make([]Blob, 0, len(fileSHAs))
 	for _, sha := range fileSHAs {
-		u := fmt.Sprintf("%s/repos/%s/%s/git/blobs/%s", cr_config.GithubBaseAPI, owner, repo, sha)
+		u := fmt.Sprintf("%s/repos/%s/%s/git/blobs/%s", cr_config.GithubBaseAPI, config.Org, repo, sha)
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 		if err != nil {
 			return nil, err
@@ -304,8 +315,10 @@ func GetBlob(ctx context.Context, config *GithubConfig, owner, repo string, file
 	return blobs, nil
 }
 
-func CreateBlob(ctx context.Context, config *GithubConfig, owner, repo, content string) (Blob, error) {
-	u := fmt.Sprintf("%s/repos/%s/%s/git/blobs", cr_config.GithubBaseAPI, owner, repo)
+// CreateBlob creates a new blob object in the configured org and specified repo,
+// returning its SHA identifier.
+func CreateBlob(ctx context.Context, config *GithubConfig, repo, content string) (Blob, error) {
+	u := fmt.Sprintf("%s/repos/%s/%s/git/blobs", cr_config.GithubBaseAPI, config.Org, repo)
 
 	body := map[string]string{
 		"content": content,
