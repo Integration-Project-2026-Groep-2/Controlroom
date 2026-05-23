@@ -422,18 +422,21 @@ func buildServer(client *elasticsearch.Client) *server.MCPServer {
 			return mcp.NewToolResultError("'shas' must be a non-empty comma-separated list"), nil
 		}
 
-		shas := make([]string, 0)
+		size := strings.Count(shaRaw, ",") + 1
+		shas := make([]string, 0, size)
+
 		for s := range strings.SplitSeq(shaRaw, ",") {
 			if trimmed := strings.TrimSpace(s); trimmed != "" {
 				shas = append(shas, trimmed)
 			}
 		}
+
 		if len(shas) == 0 {
 			return mcp.NewToolResultError("no valid SHAs found in 'shas'"), nil
 		}
 
 		config := newGithubConfig()
-		blobs, err := cr_github.GetBlob(ctx, &config, owner, repo, shas...)
+		blobs, err := cr_github.GetBlob(ctx, &config, repo, shas...)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("github blob fetch failed: %v", err)), nil
 		}
@@ -510,7 +513,8 @@ func buildServer(client *elasticsearch.Client) *server.MCPServer {
 		}
 
 		config := newGithubConfig()
-		result, err := cr_github.RequestChanges(ctx, &config, cr_github.PRResponse{
+
+		_, err := cr_github.RequestChanges(ctx, &config, cr_github.PRResponse{
 			Owner: owner,
 			Repo:  repo,
 			Title: title,
@@ -518,6 +522,7 @@ func buildServer(client *elasticsearch.Client) *server.MCPServer {
 			Head:  head,
 			Base:  base,
 		})
+
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("failed to create pull request: %v", err)), nil
 		}
