@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"strings"
 	"time"
-
 
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
@@ -15,10 +15,10 @@ import (
 
 // Metrics represents a single metric point ready for indexing.
 type Metrics struct {
-	Timestamp time.Time              `json:"@timestamp"`
-	Metric    string                 `json:"metric"`
-	Value     float64                `json:"value"`
-	Labels    map[string]interface{} `json:"labels"`
+	Timestamp time.Time      `json:"@timestamp"`
+	Metric    string         `json:"metric"`
+	Value     float64        `json:"value"`
+	Labels    map[string]any `json:"labels"`
 }
 
 // RetrieveMetrics fetches Prometheus exposition format from mcp-master:8080/metrics,
@@ -38,7 +38,7 @@ func RetrieveMetrics(ctx context.Context, client *http.Client, metricsUrl string
 	if resp.StatusCode >= 400 {
 		body, _ := io.ReadAll(resp.Body)
 		errMsg := fmt.Sprintf("mcp-master returned %d: %s", resp.StatusCode, string(body))
-		return nil, fmt.Errorf(errMsg)
+		return nil, fmt.Errorf("resposne code for fetching results %v", errMsg)
 	}
 
 	decoder := expfmt.NewDecoder(resp.Body, expfmt.FmtText)
@@ -60,7 +60,7 @@ func RetrieveMetrics(ctx context.Context, client *http.Client, metricsUrl string
 
 		// note(nasr): ai genreated mapping stuff
 		for _, metric := range mf.GetMetric() {
-			labels := make(map[string]interface{})
+			labels := make(map[string]any)
 			for _, labelPair := range metric.GetLabel() {
 				labels[labelPair.GetName()] = labelPair.GetValue()
 			}
@@ -111,10 +111,8 @@ func RetrieveMetrics(ctx context.Context, client *http.Client, metricsUrl string
 					}
 
 					for _, quantile := range metric.Summary.GetQuantile() {
-						quantileLabels := make(map[string]interface{})
-						for k, v := range labels {
-							quantileLabels[k] = v
-						}
+						quantileLabels := make(map[string]any)
+						maps.Copy(quantileLabels, labels)
 						quantileLabels["quantile"] = quantile.GetQuantile()
 
 						quantileSample := Metrics{
@@ -151,10 +149,8 @@ func RetrieveMetrics(ctx context.Context, client *http.Client, metricsUrl string
 					}
 
 					for _, bucket := range metric.Histogram.GetBucket() {
-						bucketLabels := make(map[string]interface{})
-						for k, v := range labels {
-							bucketLabels[k] = v
-						}
+						bucketLabels := make(map[string]any)
+						maps.Copy(bucketLabels, labels)
 						bucketLabels["le"] = bucket.GetUpperBound()
 
 						bucketSample := Metrics{

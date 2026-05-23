@@ -20,8 +20,8 @@ import (
 	"integration-project-ehb/controlroom/internal/cr_logger"
 	"integration-project-ehb/controlroom/internal/cr_rabbitmq"
 	"integration-project-ehb/controlroom/internal/dashboard_sync"
-	"integration-project-ehb/controlroom/internal/jarvis_metrics"
 	"integration-project-ehb/controlroom/internal/heartbeat"
+	"integration-project-ehb/controlroom/internal/jarvis_metrics"
 	"integration-project-ehb/controlroom/internal/k8retriever"
 	"integration-project-ehb/controlroom/internal/mcp_server"
 	"integration-project-ehb/controlroom/internal/statuscheck"
@@ -51,7 +51,6 @@ var GlobalHttpClient = &http.Client{
 }
 
 // --------------------------------
-
 
 func setup(ch *amqp.Channel) error {
 
@@ -442,7 +441,6 @@ func main() {
 			}()
 		}
 	}
-
 
 	// TODO(nasr & lars): should this communication happen over rabbitmq?
 	// jarvis metrics

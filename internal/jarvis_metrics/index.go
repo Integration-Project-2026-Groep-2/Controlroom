@@ -15,10 +15,9 @@ import (
 	"github.com/elastic/go-elasticsearch/v9/esapi"
 )
 
-
 // IndexMetrics indexes a slice of metric samples into Elasticsearch.
 // Uses the same pattern as heartbeat indexing with gen.HeartbeatDoc.
-func IndexMetrics(es *elasticsearch.Client, ctx context.Context, samples []MetricSample) error {
+func IndexMetrics(es *elasticsearch.Client, ctx context.Context, samples []Metrics) error {
 	if es == nil {
 		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, "metrics: Elasticsearch client is nil"))
 		return fmt.Errorf("elasticsearch client is nil")
@@ -36,7 +35,7 @@ func IndexMetrics(es *elasticsearch.Client, ctx context.Context, samples []Metri
 	for _, sample := range samples {
 		// Create a document struct similar to gen.HeartbeatDoc
 		// Map MetricSample to a gen-compatible structure or use direct JSON
-		doc := map[string]interface{}{
+		doc := map[string]any{
 			"@timestamp": sample.Timestamp,
 			"metric":     sample.Metric,
 			"value":      sample.Value,
@@ -91,4 +90,3 @@ func IndexMetrics(es *elasticsearch.Client, ctx context.Context, samples []Metri
 
 	return nil
 }
-

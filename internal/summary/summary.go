@@ -43,7 +43,7 @@ func Generate(ctx context.Context, el *elasticsearch.Client, ch *amqp.Channel) e
 	// same thing
 	resp, err = company.QueryTotalSignedUpCompanies(ctx, el)
 	if err != nil {
-		fmt.Errorf("summary: failed to query total amount of companies: %v", err)
+		return fmt.Errorf("summary: failed to query total amount of companies: %v", err)
 	}
 
 	// Decode the JSON body into our struct
