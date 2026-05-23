@@ -581,18 +581,6 @@ func SyncLogsDashboard(es *elasticsearch.Client) {
 	}
 
 	for serviceName, lensID := range activeLensIDs {
-		exists := false
-		for _, p := range keptPanels {
-			if resolvePanelLensID(p, refs) == lensID {
-				exists = true
-				break
-			}
-		}
-
-		if exists {
-			continue
-		}
-
 		uniqueIndex := fmt.Sprintf("panel_%d", time.Now().UnixNano())
 		newPanel := map[string]any{
 			"panelIndex": uniqueIndex,
