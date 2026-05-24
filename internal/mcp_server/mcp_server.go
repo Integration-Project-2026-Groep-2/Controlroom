@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"integration-project-ehb/controlroom/internal/checkin"
 	"integration-project-ehb/controlroom/internal/cr_github"
 	"integration-project-ehb/controlroom/internal/k8retriever"
 	"integration-project-ehb/controlroom/pkg/logger"
@@ -751,6 +752,74 @@ func buildServer(client *elasticsearch.Client) *server.MCPServer {
 		docs, err := elasticQuery("kubernetes-pods", luceneQuery(query), limit, client)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Elasticsearch retrieval error: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(formatDocs(docs)), nil
+	})
+
+	attendanceTool := mcp.NewTool("checkin_attendance_summary",
+		mcp.WithDescription("Retrieve all festival check-in records to compute overall attendance statistics (opkomst statistieken)."),
+		mcp.WithReadOnlyHintAnnotation(true),
+	)
+	s.AddTool(attendanceTool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		res, err := checkin.QueryAll(client, ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Failed to query check-ins: %v", err)), nil
+		}
+		defer res.Body.Close()
+
+		if res.IsError() {
+			return mcp.NewToolResultError(fmt.Sprintf("Elasticsearch error: %s", res.String())), nil
+		}
+
+		var result ResultResponse
+		if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Decode error: %v", err)), nil
+		}
+
+		docs := make([]map[string]any, 0, len(result.Hits.Hits))
+		for _, h := range result.Hits.Hits {
+			docs = append(docs, h.Source)
+		}
+
+		summaryText := fmt.Sprintf("Total Check-ins Found: %d\n\n%s", len(docs), formatDocs(docs))
+		return mcp.NewToolResultText(summaryText), nil
+	})
+
+	visitorLookupTool := mcp.NewTool("checkin_visitor_lookup",
+		mcp.WithDescription("Look up the arrival and check-in timeline for a specific festival visitor using their badge UUID."),
+		mcp.WithReadOnlyHintAnnotation(true),
+		mcp.WithString("uuid",
+			mcp.Required(),
+			mcp.Description("The unique identifier (UUID) of the visitor or badge"),
+		),
+	)
+	s.AddTool(visitorLookupTool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := parseArguments(req)
+		uuid, _ := args["uuid"].(string)
+
+		if strings.TrimSpace(uuid) == "" {
+			return mcp.NewToolResultError("'uuid' parameter must be a non-empty string"), nil
+		}
+
+		res, err := checkin.QueryCheckinTimeAllTime(client, ctx, strings.TrimSpace(uuid))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Failed to query visitor check-in: %v", err)), nil
+		}
+		defer res.Body.Close()
+
+		if res.IsError() {
+			return mcp.NewToolResultError(fmt.Sprintf("Elasticsearch error: %s", res.String())), nil
+		}
+
+		var result ResultResponse
+		if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Decode error: %v", err)), nil
+		}
+
+		docs := make([]map[string]any, 0, len(result.Hits.Hits))
+		for _, h := range result.Hits.Hits {
+			docs = append(docs, h.Source)
 		}
 
 		return mcp.NewToolResultText(formatDocs(docs)), nil
