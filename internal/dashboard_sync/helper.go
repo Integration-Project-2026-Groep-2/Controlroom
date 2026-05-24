@@ -146,46 +146,6 @@ func doRequestWithRetry(req *http.Request, retryConfig HTTPRetryConfig) (*http.R
 	return nil, fmt.Errorf("request failed after %d attempts", retryConfig.MaxRetries+1)
 }
 
-// getAllPanelTitles returns a map of Kibana lens and visualization saved object IDs to their titles.
-// This is used to resolve panel references without making individual API calls.
-func getAllPanelTitles() (map[string]string, error) {
-	reqURL := fmt.Sprintf("%s/api/saved_objects/_find?type=lens&type=visualization&per_page=1000", config.KibanaConfig.Url)
-	req, err := http.NewRequest("GET", reqURL, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	res, err := doRequestWithRetry(req, defaultRetryConfig)
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(res.Body)
-		return nil, fmt.Errorf("kibana get all panel titles failed: %s (body: %s)", res.Status, string(body))
-	}
-
-	var found map[string]any
-	if err := json.NewDecoder(res.Body).Decode(&found); err != nil {
-		return nil, fmt.Errorf("decode all panel titles response: %w", err)
-	}
-
-	titles := make(map[string]string)
-	if so, ok := found["saved_objects"].([]any); ok {
-		for _, obj := range so {
-			item := obj.(map[string]any)
-			id, idOk := item["id"].(string)
-			if attrs, ok := item["attributes"].(map[string]any); ok && idOk {
-				if title, ok := attrs["title"].(string); ok && title != "" {
-					titles[id] = title
-				}
-			}
-		}
-	}
-	return titles, nil
-}
-
 // findSavedObjectByTitle returns the Kibana saved object ID for an exact title match.
 // objectType should be "lens", "visualization", etc.
 // Returns empty string if not found (not an error).

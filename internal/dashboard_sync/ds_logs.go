@@ -95,7 +95,9 @@ func findLensByTitle(serviceName string) (string, error) {
 		return "", err
 	}
 	req.Header.Set("kbn-xsrf", config.KbnXsrfToken)
-	setDashboardBasicAuth(req)
+	if err := setDashboardBasicAuth(req); err != nil {
+		return "", err
+	}
 
 	client := DashboardHttpClient()
 	res, err := client.Do(req)
@@ -137,7 +139,9 @@ func getAllLensTitles() (map[string]string, error) {
 		return nil, err
 	}
 	req.Header.Set("kbn-xsrf", config.KbnXsrfToken)
-	setDashboardBasicAuth(req)
+	if err := setDashboardBasicAuth(req); err != nil {
+		return nil, err
+	}
 
 	client := DashboardHttpClient()
 	res, err := client.Do(req)
@@ -170,30 +174,6 @@ func getAllLensTitles() (map[string]string, error) {
 	return titles, nil
 }
 
-// panelExists reports whether a lens panel with the given ID is already present.
-func panelExists(panels []map[string]any, id string) bool {
-	for _, p := range panels {
-		if t, ok := p["type"].(string); ok && t == "lens" {
-			if pid, ok := p["id"].(string); ok && pid == id {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-// findPanelIndexByTitle returns the index of the panel with the matching title.
-func findPanelIndexByTitle(panels []map[string]any, title string) int {
-	for i, p := range panels {
-		if attrs, ok := p["attributes"].(map[string]any); ok {
-			if t, ok := attrs["title"].(string); ok && t == title {
-				return i
-			}
-		}
-	}
-	return -1
-}
-
 // createLensSavedObject creates a new Kibana lens saved object for a service.
 func createLensSavedObject(serviceName string) (string, error) {
 	payload := createLensPayload(serviceName)
@@ -217,7 +197,9 @@ func createLensSavedObject(serviceName string) (string, error) {
 	}
 	req.Header.Set("kbn-xsrf", config.KbnXsrfToken)
 	req.Header.Set("Content-Type", "application/json")
-	setDashboardBasicAuth(req)
+	if err := setDashboardBasicAuth(req); err != nil {
+		return "", err
+	}
 
 	client := DashboardHttpClient()
 	res, err := client.Do(req)
@@ -266,7 +248,9 @@ func updateLensSavedObject(id string, serviceName string) (string, error) {
 	}
 	req.Header.Set("kbn-xsrf", config.KbnXsrfToken)
 	req.Header.Set("Content-Type", "application/json")
-	setDashboardBasicAuth(req)
+	if err := setDashboardBasicAuth(req); err != nil {
+		return "", err
+	}
 
 	client := DashboardHttpClient()
 	res, err := client.Do(req)
@@ -361,56 +345,6 @@ func createLensPayload(serviceName string) map[string]any {
 			},
 		},
 	}
-}
-
-// getPanelTitle resolves the display title for a panel from Kibana references or inline attributes.
-// Returns empty string if title cannot be resolved.
-func getPanelTitle(p map[string]any, refs []map[string]any, lensTitles map[string]string) string {
-	pID := resolvePanelLensID(p, refs)
-	if pID != "" {
-		if title, exists := lensTitles[pID]; exists && title != "" {
-			return title
-		}
-	}
-
-	// Fallback: check embedded attributes
-	if ec, ok := p["embeddableConfig"].(map[string]any); ok {
-		if attrs, ok := ec["attributes"].(map[string]any); ok {
-			if title, ok := attrs["title"].(string); ok && title != "" {
-				return title
-			}
-		}
-	}
-
-	return ""
-}
-
-// resolvePanelLensID resolves the saved object ID for a panel using its direct or referenced ID.
-func resolvePanelLensID(p map[string]any, refs []map[string]any) string {
-	if id, ok := p["id"].(string); ok && id != "" {
-		return id
-	}
-	if panelIndex, ok := p["panelIndex"].(string); ok {
-		expectedRefName := panelIndex + ":savedObjectRef"
-		for _, r := range refs {
-			if rName, ok := r["name"].(string); ok && rName == expectedRefName {
-				if id, ok := r["id"].(string); ok {
-					return id
-				}
-			}
-		}
-	}
-	if refName, ok := p["panelRefName"].(string); ok && refName != "" {
-		for _, r := range refs {
-			if rName, ok := r["name"].(string); ok && rName == refName {
-				if id, ok := r["id"].(string); ok {
-					return id
-				}
-			}
-		}
-	}
-
-	return ""
 }
 
 // SyncLogsDashboard keeps the logs dashboard aligned with today's active services.
@@ -533,8 +467,21 @@ func SyncLogsDashboard(es *elasticsearch.Client) {
 		}
 
 		if existing, ok := activePanels[serviceName]; ok {
-			// Panel already exists; add it as-is
+			panelUpdated := false
+			if existingID, idOK := existing["id"].(string); !idOK || existingID != lensID {
+				existing["id"] = lensID
+				panelUpdated = true
+			}
+			if existingType, typeOK := existing["type"].(string); !typeOK || existingType != "lens" {
+				existing["type"] = "lens"
+				panelUpdated = true
+			}
+
 			staticPanels = append(staticPanels, existing)
+			if panelUpdated {
+				changed = true
+				logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, fmt.Sprintf("dashboard sync: refreshed logs panel reference for service %s", serviceName)))
+			}
 		} else {
 			// Create new panel
 			uniqueIndex := fmt.Sprintf("panel_%d", time.Now().UnixNano())
