@@ -38,19 +38,7 @@ func QueryRecentHeartbeats(ctx context.Context, es *elasticsearch.Client, servic
 }
 
 func QueryLastSeenPerService(ctx context.Context, es *elasticsearch.Client) (*esapi.Response, error) {
-	body := ` {
-	"size": 0,
-	"query": {
-		"range": {
-			"timestamp": { "gte": "now-60s" }
-    }
-  },
-  "aggs": {
-    "per_service": {
-      "terms": { "field": "serviceId" },
-      "aggs": { "last_seen": { "max": { "field": "timestamp" } } } }
-  }
-}
+	body := `{"size":0,"query":{"range":{"timestamp":{"gte":"now-60s"}}},"aggs":{"per_service":{"terms":{"field":"serviceId"},"aggs":{"last_seen":{"max":{"field":"timestamp"}}}}}}`
 
 	res, err := es.Search(
 		es.Search.WithContext(ctx),
