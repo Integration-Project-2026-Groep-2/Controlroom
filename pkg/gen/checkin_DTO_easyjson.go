@@ -45,6 +45,18 @@ func easyjson38a3fcb9DecodeIntegrationProjectEhbControlroomPkgGen(in *jlexer.Lex
 					in.AddError((out.Timestamp).UnmarshalJSON(data))
 				}
 			}
+		case "allowed":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Allowed = bool(in.Bool())
+			}
+		case "reason":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Reason = string(in.String())
+			}
 		default:
 			in.SkipRecursive()
 		}
@@ -68,6 +80,16 @@ func easyjson38a3fcb9EncodeIntegrationProjectEhbControlroomPkgGen(out *jwriter.W
 		const prefix string = ",\"timestamp\":"
 		out.RawString(prefix)
 		out.Raw((in.Timestamp).MarshalJSON())
+	}
+	{
+		const prefix string = ",\"allowed\":"
+		out.RawString(prefix)
+		out.Bool(bool(in.Allowed))
+	}
+	{
+		const prefix string = ",\"reason\":"
+		out.RawString(prefix)
+		out.String(string(in.Reason))
 	}
 	out.RawByte('}')
 }

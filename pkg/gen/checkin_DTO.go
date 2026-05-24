@@ -14,4 +14,6 @@ var _ = time.Time{}
 type CheckInDoc struct {
 	Id        string    `xml:"id" json:"id" validate:"required"`
 	Timestamp time.Time `xml:"timestamp" json:"timestamp" validate:"required"`
+	Allowed   bool      `xml:"allowed" json:"allowed" validate:"required"`
+	Reason    string    `xml:"reason" json:"reason"`
 }

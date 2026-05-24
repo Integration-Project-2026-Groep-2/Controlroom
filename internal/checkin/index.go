@@ -24,6 +24,8 @@ func indexCheckIn(es *elasticsearch.Client, ctx context.Context, ci *gen.CheckIn
 	doc := gen.CheckInDoc{
 		Id:        ci.Id,
 		Timestamp: ci.Timestamp,
+		Allowed:   ci.Allowed,
+		Reason:    ci.Reason,
 	}
 
 	jsonData, err := easyjson.Marshal(doc)
