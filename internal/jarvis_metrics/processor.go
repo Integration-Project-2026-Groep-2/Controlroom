@@ -24,5 +24,5 @@ func ProcessJarvisMetrics(ctx context.Context, es *elasticsearch.Client, httpCli
 		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("failed to retrieve jarvis statistics: %s", err)))
 	}
 
-	logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("mission succesful jarvis, let's head back home!", err)))
+	logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("mission succesful jarvis, let's head back home!")))
 }

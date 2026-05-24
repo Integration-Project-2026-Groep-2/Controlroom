@@ -6,7 +6,6 @@ import (
 	"fmt"
 	config "integration-project-ehb/controlroom/internal/cr_config"
 	"integration-project-ehb/controlroom/pkg/logger"
-	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -70,63 +69,6 @@ func getTodayServices(es *elasticsearch.Client) ([]string, error) {
 	return services, nil
 }
 
-// getDashboardAttributes fetches the Kibana dashboard attributes, panels, and references.
-func getDashboardAttributes(dashboardID string) (map[string]any, []map[string]any, []map[string]any, error) {
-	if dashboardID == "" {
-		return nil, nil, nil, fmt.Errorf("missing dashboard id")
-	}
-
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/saved_objects/dashboard/%s", config.KibanaConfig.Url, dashboardID), nil)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	req.Header.Set("kbn-xsrf", config.KbnXsrfToken)
-	setDashboardBasicAuth(req)
-
-	client := DashboardHttpClient()
-	res, err := client.Do(req)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	defer res.Body.Close()
-
-	bodyBytes, _ := io.ReadAll(res.Body)
-	if res.StatusCode != http.StatusOK {
-		return nil, nil, nil, fmt.Errorf("kibana dashboard GET failed: %s: %s", res.Status, string(bodyBytes))
-	}
-
-	var dashboard map[string]any
-	if err := json.Unmarshal(bodyBytes, &dashboard); err != nil {
-		return nil, nil, nil, fmt.Errorf("decode kibana dashboard: %w; body: %s", err, string(bodyBytes))
-	}
-
-	attributes, ok := dashboard["attributes"].(map[string]any)
-	if !ok {
-		return nil, nil, nil, fmt.Errorf("missing attributes in dashboard response")
-	}
-
-	panelsJSONStr, ok := attributes["panelsJSON"].(string)
-	if !ok {
-		return nil, nil, nil, fmt.Errorf("missing panelsJSON in dashboard attributes")
-	}
-
-	var panels []map[string]any
-	if err := json.Unmarshal([]byte(panelsJSONStr), &panels); err != nil {
-		return nil, nil, nil, fmt.Errorf("unmarshal panelsJSON: %w", err)
-	}
-
-	var references []map[string]any
-	if refsRaw, ok := dashboard["references"].([]any); ok {
-		for _, rRaw := range refsRaw {
-			if rMap, ok := rRaw.(map[string]any); ok {
-				references = append(references, rMap)
-			}
-		}
-	}
-
-	return attributes, panels, references, nil
-}
-
 // dashboardContainsLens reports whether a lens ID already exists in the dashboard payload.
 func dashboardContainsLens(panels []map[string]any, references []map[string]any, lensID string) bool {
 	for _, p := range panels {
@@ -140,38 +82,6 @@ func dashboardContainsLens(panels []map[string]any, references []map[string]any,
 		}
 	}
 	return false
-}
-
-// putDashboardAttributes saves the dashboard attributes and references back to Kibana.
-func putDashboardAttributes(attributes map[string]any, references []map[string]any, dashboardId string) error {
-	updateBody := map[string]any{
-		"attributes": attributes,
-		"references": references,
-	}
-	bodyBytes, err := json.Marshal(updateBody)
-	if err != nil {
-		return fmt.Errorf("marshal dashboard update body: %w", err)
-	}
-
-	putReq, err := http.NewRequest("PUT", fmt.Sprintf("%s/api/saved_objects/dashboard/%s", config.KibanaConfig.Url, dashboardId), bytes.NewReader(bodyBytes))
-	if err != nil {
-		return err
-	}
-	putReq.Header.Set("kbn-xsrf", config.KbnXsrfToken)
-	putReq.Header.Set("Content-Type", "application/json")
-	setDashboardBasicAuth(putReq)
-
-	client := DashboardHttpClient()
-	putRes, err := client.Do(putReq)
-	if err != nil {
-		return err
-	}
-	defer putRes.Body.Close()
-
-	if putRes.StatusCode != http.StatusOK {
-		return fmt.Errorf("kibana dashboard PUT failed: %s", putRes.Status)
-	}
-	return nil
 }
 
 // findLensByTitle returns the Kibana lens ID for the exact logs dashboard title.
