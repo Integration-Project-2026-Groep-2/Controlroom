@@ -7,7 +7,6 @@ import (
 	config "integration-project-ehb/controlroom/internal/cr_config"
 	"integration-project-ehb/controlroom/pkg/logger"
 	"strings"
-	"time"
 
 	"github.com/elastic/go-elasticsearch/v9"
 )
@@ -71,7 +70,6 @@ func getActiveServicesLastWeek(es *elasticsearch.Client) ([]string, error) {
 
 // syncHeartbeatDashboard keeps the heartbeat dashboard panels aligned with active services.
 func SyncHeartbeatDashboard(es *elasticsearch.Client) {
-
 	services, err := getActiveServicesLastWeek(es)
 	if err != nil {
 		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("dashboard sync: failed to load active heartbeat services: %v", err)))
@@ -94,7 +92,9 @@ func SyncHeartbeatDashboard(es *elasticsearch.Client) {
 	activeTSVBIDs := make(map[string]string)
 	activeLensIDs := make(map[string]string)
 
+	// Create or update TSVB and Lens saved objects for active services
 	for _, serviceName := range services {
+		// Handle TSVB (Status) visualization
 		tsvbTitle := "Status - " + serviceName
 		tsvbID, _ := findSavedObjectByTitle(tsvbTitle, "visualization")
 		newTsvbID, err := createOrUpdateSavedObject("visualization", tsvbID, createTSVBPayload(serviceName))
@@ -104,6 +104,7 @@ func SyncHeartbeatDashboard(es *elasticsearch.Client) {
 			activeTSVBIDs[serviceName] = newTsvbID
 		}
 
+		// Handle Lens (Last Received) metric
 		lensTitle := "Last Received - " + serviceName
 		lensID, _ := findSavedObjectByTitle(lensTitle, "lens")
 		newLensID, err := createOrUpdateSavedObject("lens", lensID, createLensMetricPayload(serviceName))
@@ -114,43 +115,54 @@ func SyncHeartbeatDashboard(es *elasticsearch.Client) {
 		}
 	}
 
+	// Categorize existing panels
 	var staticPanels []map[string]any
 	dynamicTSVBPanels := make(map[string]map[string]any)
 	dynamicLensPanels := make(map[string]map[string]any)
-
 	activeServiceNames := make(map[string]bool)
+
 	for _, s := range services {
 		activeServiceNames[s] = true
 	}
 
 	for _, p := range panels {
 		pType, _ := p["type"].(string)
-		if pType == "lens" || pType == "visualization" {
-			title := getPanelTitle(p, refs, panelTitles)
-			if after, ok := strings.CutPrefix(title, "Status - "); ok {
-				svc := after
-				if activeServiceNames[svc] {
-					dynamicTSVBPanels[svc] = p
-				} else {
-					logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, fmt.Sprintf("dashboard sync: dropping stale heartbeat TSVB panel for service %s", svc)))
-					changed = true
-				}
-			} else if after, ok := strings.CutPrefix(title, "Last Received - "); ok {
-				svc := after
-				if activeServiceNames[svc] {
-					dynamicLensPanels[svc] = p
-				} else {
-					logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, fmt.Sprintf("dashboard sync: dropping stale heartbeat lens panel for service %s", svc)))
-					changed = true
-				}
+		if pType != "lens" && pType != "visualization" {
+			staticPanels = append(staticPanels, p)
+			continue
+		}
+
+		title := getPanelTitle(p, refs, panelTitles)
+		if title == "" {
+			// Unresolvable title; treat as static
+			staticPanels = append(staticPanels, p)
+			continue
+		}
+
+		// Try to extract service name from title prefix
+		if after, ok := strings.CutPrefix(title, "Status - "); ok {
+			svc := after
+			if activeServiceNames[svc] {
+				dynamicTSVBPanels[svc] = p
 			} else {
-				staticPanels = append(staticPanels, p)
+				logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, fmt.Sprintf("dashboard sync: dropping stale heartbeat TSVB panel for service %s", svc)))
+				changed = true
+			}
+		} else if after, ok := strings.CutPrefix(title, "Last Received - "); ok {
+			svc := after
+			if activeServiceNames[svc] {
+				dynamicLensPanels[svc] = p
+			} else {
+				logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, fmt.Sprintf("dashboard sync: dropping stale heartbeat lens panel for service %s", svc)))
+				changed = true
 			}
 		} else {
+			// Doesn't match heartbeat pattern; treat as static
 			staticPanels = append(staticPanels, p)
 		}
 	}
 
+	// Build final panels with proper grid layout
 	var finalPanels []map[string]any
 
 	for i, serviceName := range services {
@@ -164,119 +176,62 @@ func SyncHeartbeatDashboard(es *elasticsearch.Client) {
 		tsvbID := activeTSVBIDs[serviceName]
 		lensID := activeLensIDs[serviceName]
 
+		// Add or update TSVB panel
 		if tsvbID != "" {
-			if existing, ok := dynamicTSVBPanels[serviceName]; ok {
-				oldX, oldY := -1, -1
-				iVal := ""
-				if gd, ok := existing["gridData"].(map[string]any); ok {
-					if xf, ok := gd["x"].(float64); ok {
-						oldX = int(xf)
-					}
-					if yf, ok := gd["y"].(float64); ok {
-						oldY = int(yf)
-					}
-					if iStr, ok := gd["i"].(string); ok {
-						iVal = iStr
-					}
-				}
-
-				if oldX != baseX || oldY != tsvbY {
-					existing["gridData"] = map[string]any{"x": baseX, "y": tsvbY, "w": 8, "h": 8, "i": iVal}
+			tsvbPanel := buildHeartbeatPanel(serviceName, tsvbID, "Status - "+serviceName, baseX, tsvbY, 8, 8, dynamicTSVBPanels)
+			if tsvbPanel != nil {
+				finalPanels = append(finalPanels, tsvbPanel)
+				if _, existed := dynamicTSVBPanels[serviceName]; !existed {
 					changed = true
+					logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, fmt.Sprintf("dashboard sync: added heartbeat TSVB panel for service %s", serviceName)))
 				}
-				finalPanels = append(finalPanels, existing)
-			} else {
-				idx := fmt.Sprintf("panel_%d_tsvb", time.Now().UnixNano()+int64(i))
-				newPanel := map[string]any{
-					"panelIndex": idx,
-					"embeddableConfig": map[string]any{
-						"enhancements": map[string]any{"dynamicActions": map[string]any{"events": []any{}}},
-						"title":        "",
-					},
-					"gridData": map[string]any{"x": baseX, "y": tsvbY, "w": 8, "h": 8, "i": idx},
-					"version":  1,
-					"type":     "visualization",
-					"id":       tsvbID,
-				}
-				finalPanels = append(finalPanels, newPanel)
-				changed = true
-				logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, fmt.Sprintf("dashboard sync: added heartbeat TSVB panel for service %s", serviceName)))
 			}
 		}
 
+		// Add or update Lens panel
 		if lensID != "" {
-			if existing, ok := dynamicLensPanels[serviceName]; ok {
-				oldX, oldY := -1, -1
-				iVal := ""
-				if gd, ok := existing["gridData"].(map[string]any); ok {
-					if xf, ok := gd["x"].(float64); ok {
-						oldX = int(xf)
-					}
-					if yf, ok := gd["y"].(float64); ok {
-						oldY = int(yf)
-					}
-					if iStr, ok := gd["i"].(string); ok {
-						iVal = iStr
-					}
-				}
-
-				if oldX != baseX || oldY != lensY {
-					existing["gridData"] = map[string]any{"x": baseX, "y": lensY, "w": 8, "h": 4, "i": iVal}
+			lensPanel := buildHeartbeatPanel(serviceName, lensID, "Last Received - "+serviceName, baseX, lensY, 8, 4, dynamicLensPanels)
+			if lensPanel != nil {
+				finalPanels = append(finalPanels, lensPanel)
+				if _, existed := dynamicLensPanels[serviceName]; !existed {
 					changed = true
+					logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, fmt.Sprintf("dashboard sync: added heartbeat lens panel for service %s", serviceName)))
 				}
-				finalPanels = append(finalPanels, existing)
-			} else {
-				idx := fmt.Sprintf("panel_%d_lens", time.Now().UnixNano()+int64(i))
-				newPanel := map[string]any{
-					"panelIndex": idx,
-					"embeddableConfig": map[string]any{
-						"enhancements": map[string]any{"dynamicActions": map[string]any{"events": []any{}}},
-						"timeRange":    map[string]any{"from": "now-1w", "to": "now"},
-						"title":        "",
-					},
-					"gridData": map[string]any{"x": baseX, "y": lensY, "w": 8, "h": 4, "i": idx},
-					"version":  1,
-					"type":     "lens",
-					"id":       lensID,
-				}
-				finalPanels = append(finalPanels, newPanel)
-				changed = true
-				logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, fmt.Sprintf("dashboard sync: added heartbeat lens panel for service %s", serviceName)))
 			}
 		}
 	}
 
+	// Calculate where static panels should start
 	dynamicMaxY := 0
 	if len(services) > 0 {
 		dynamicMaxY = ((len(services)-1)/6 + 1) * 10
 	}
 
+	// Adjust static panel positions to avoid overlap
 	minStaticY := 9999
 	for _, p := range staticPanels {
 		if gd, ok := p["gridData"].(map[string]any); ok {
-			if y, ok := gd["y"].(float64); ok {
-				if int(y) < minStaticY {
-					minStaticY = int(y)
-				}
+			if y, ok := gd["y"].(float64); ok && int(y) < minStaticY {
+				minStaticY = int(y)
 			}
 		}
 	}
 
-	if len(staticPanels) > 0 && minStaticY != dynamicMaxY {
+	if len(staticPanels) > 0 && minStaticY < dynamicMaxY {
 		shiftY := dynamicMaxY - minStaticY
 		for _, p := range staticPanels {
 			if gd, ok := p["gridData"].(map[string]any); ok {
 				if y, ok := gd["y"].(float64); ok {
 					gd["y"] = y + float64(shiftY)
-					p["gridData"] = gd
+					changed = true
 				}
 			}
 		}
-		changed = true
 	}
 
 	finalPanels = append(finalPanels, staticPanels...)
 
+	// Persist changes if any
 	if changed {
 		updatedPanelsBytes, err := json.Marshal(finalPanels)
 		if err != nil {
@@ -291,6 +246,53 @@ func SyncHeartbeatDashboard(es *elasticsearch.Client) {
 		logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("dashboard sync: heartbeat dashboard updated for %d active services", len(services))))
 	} else {
 		logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, "dashboard sync: heartbeat dashboard already up to date"))
+	}
+}
+
+// buildHeartbeatPanel constructs or updates a heartbeat panel with proper grid data.
+// existingPanels: map of existing panels by service name (used to preserve grid positioning if unchanged)
+func buildHeartbeatPanel(
+	serviceName string,
+	savedObjectID string,
+	title string,
+	x, y, w, h int,
+	existingPanels map[string]map[string]any,
+) map[string]any {
+	// Use the saved object ID consistently as the panel index
+	panelIndex := savedObjectID
+
+	// If this panel already exists, preserve its panel index for stability
+	if existing, ok := existingPanels[serviceName]; ok {
+		if existingIndex, ok := existing["panelIndex"].(string); ok {
+			panelIndex = existingIndex
+		}
+		// Check if position changed
+		if gd, ok := existing["gridData"].(map[string]any); ok {
+			if oldX, okX := gd["x"].(float64); okX && int(oldX) == x {
+				if oldY, okY := gd["y"].(float64); okY && int(oldY) == y {
+					// Position unchanged; return existing panel as-is
+					return existing
+				}
+			}
+		}
+	}
+
+	return map[string]any{
+		"panelIndex": panelIndex,
+		"embeddableConfig": map[string]any{
+			"enhancements": map[string]any{"dynamicActions": map[string]any{"events": []any{}}},
+			"title":        "",
+		},
+		"gridData": map[string]any{
+			"x": x,
+			"y": y,
+			"w": w,
+			"h": h,
+			"i": panelIndex,
+		},
+		"version": 1,
+		"type":    "visualization", // or "lens" depending on usage
+		"id":      savedObjectID,
 	}
 }
 

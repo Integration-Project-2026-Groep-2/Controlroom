@@ -203,13 +203,15 @@ func findLensByTitle(serviceName string) (string, error) {
 		return "", fmt.Errorf("decode find response: %w", err)
 	}
 
+	// STRICT CHECK: Verify the title matches exactly
 	if so, ok := found["saved_objects"].([]any); ok {
-		// STRIKTE CHECK: Controleer of de titel EXACT klopt
 		for _, obj := range so {
 			item := obj.(map[string]any)
 			if attrs, ok := item["attributes"].(map[string]any); ok {
 				if attrs["title"] == targetTitle {
-					return item["id"].(string), nil
+					if id, ok := item["id"].(string); ok {
+						return id, nil
+					}
 				}
 			}
 		}
@@ -227,7 +229,7 @@ func getAllLensTitles() (map[string]string, error) {
 	req.Header.Set("kbn-xsrf", config.KbnXsrfToken)
 	setDashboardBasicAuth(req)
 
-	client := http.DefaultClient
+	client := DashboardHttpClient()
 	res, err := client.Do(req)
 	if err != nil {
 		return nil, err
@@ -307,7 +309,7 @@ func createLensSavedObject(serviceName string) (string, error) {
 	req.Header.Set("Content-Type", "application/json")
 	setDashboardBasicAuth(req)
 
-	client := http.DefaultClient
+	client := DashboardHttpClient()
 	res, err := client.Do(req)
 	if err != nil {
 		return "", err
@@ -356,7 +358,7 @@ func updateLensSavedObject(id string, serviceName string) (string, error) {
 	req.Header.Set("Content-Type", "application/json")
 	setDashboardBasicAuth(req)
 
-	client := http.DefaultClient
+	client := DashboardHttpClient()
 	res, err := client.Do(req)
 	if err != nil {
 		return "", err
@@ -417,7 +419,6 @@ func createLensPayload(serviceName string) map[string]any {
 										"label":    "Count of records",
 										"dataType": "number", "operationType": "count",
 										"isBucketed": false, "sourceField": "___records___",
-										// Keep the same params as the working version
 										"params": map[string]any{"emptyAsNull": true},
 									},
 								},
@@ -432,7 +433,6 @@ func createLensPayload(serviceName string) map[string]any {
 						{"columnId": "col_timestamp"},
 						{"columnId": "col_level"},
 						{"columnId": "col_data"},
-						// Keep col_count here but mark it hidden — this is the correct way
 						{"columnId": "col_count", "hidden": true},
 					},
 				},
@@ -454,11 +454,16 @@ func createLensPayload(serviceName string) map[string]any {
 }
 
 // getPanelTitle resolves the display title for a panel from Kibana references or inline attributes.
+// Returns empty string if title cannot be resolved.
 func getPanelTitle(p map[string]any, refs []map[string]any, lensTitles map[string]string) string {
 	pID := resolvePanelLensID(p, refs)
-	if title, exists := lensTitles[pID]; exists && title != "" {
-		return title
+	if pID != "" {
+		if title, exists := lensTitles[pID]; exists && title != "" {
+			return title
+		}
 	}
+
+	// Fallback: check embedded attributes
 	if ec, ok := p["embeddableConfig"].(map[string]any); ok {
 		if attrs, ok := ec["attributes"].(map[string]any); ok {
 			if title, ok := attrs["title"].(string); ok && title != "" {
@@ -466,6 +471,7 @@ func getPanelTitle(p map[string]any, refs []map[string]any, lensTitles map[strin
 			}
 		}
 	}
+
 	return ""
 }
 
@@ -519,6 +525,8 @@ func SyncLogsDashboard(es *elasticsearch.Client) {
 
 	changed := false
 	activeLensIDs := make(map[string]string)
+
+	// Create or update lens saved objects for active services
 	for _, serviceName := range services {
 		lensID, err := findLensByTitle(serviceName)
 		if err != nil {
@@ -527,13 +535,16 @@ func SyncLogsDashboard(es *elasticsearch.Client) {
 		}
 
 		if lensID == "" {
+			// Create new lens
 			lensID, err = createLensSavedObject(serviceName)
 			if err != nil {
 				logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("dashboard sync: failed to create logs lens for %s: %v", serviceName, err)))
 				continue
 			}
 			logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, fmt.Sprintf("dashboard sync: created logs lens for %s", serviceName)))
+			changed = true
 		} else {
+			// Update existing lens
 			lensID, err = updateLensSavedObject(lensID, serviceName)
 			if err != nil {
 				logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("dashboard sync: failed to update logs lens for %s: %v", serviceName, err)))
@@ -547,28 +558,52 @@ func SyncLogsDashboard(es *elasticsearch.Client) {
 		}
 	}
 
-	var keptPanels []map[string]any
-	activeServiceNames := make(map[string]bool)
-	for _, serviceName := range services {
-		activeServiceNames[serviceName] = true
+	// Categorize panels: keep static panels, drop stale logs panels, track dynamic lens panels
+	var staticPanels []map[string]any
+	activePanels := make(map[string]map[string]any) // service name -> panel
+
+	activeServiceSet := make(map[string]bool)
+	for _, s := range services {
+		activeServiceSet[s] = true
 	}
 
 	for _, p := range panels {
 		pType, _ := p["type"].(string)
-		if pType == "lens" {
-			lensTitle := getPanelTitle(p, refs, lensTitles)
-			if _, ok := strings.CutPrefix(lensTitle, "Logs - "); ok {
-				keptPanels = append(keptPanels, p)
+
+		// Only process lens panels; pass through other types
+		if pType != "lens" {
+			staticPanels = append(staticPanels, p)
+			continue
+		}
+
+		// Extract panel title
+		panelTitle := getPanelTitle(p, refs, lensTitles)
+		if panelTitle == "" {
+			// Can't resolve title; treat as static
+			staticPanels = append(staticPanels, p)
+			continue
+		}
+
+		// Check if this is a logs panel
+		if after, ok := strings.CutPrefix(panelTitle, "Logs - "); ok {
+			serviceName := after
+			if activeServiceSet[serviceName] {
+				// Keep this panel
+				activePanels[serviceName] = p
 			} else {
-				keptPanels = append(keptPanels, p)
+				// Drop stale logs panel
+				logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, fmt.Sprintf("dashboard sync: dropping stale logs panel for service %s", serviceName)))
+				changed = true
 			}
 		} else {
-			keptPanels = append(keptPanels, p)
+			// Not a logs panel; treat as static
+			staticPanels = append(staticPanels, p)
 		}
 	}
 
+	// Calculate grid positioning
 	maxY := 0
-	for _, p := range keptPanels {
+	for _, p := range staticPanels {
 		if gridData, ok := p["gridData"].(map[string]any); ok {
 			if yVal, ok := gridData["y"].(float64); ok {
 				if hVal, ok := gridData["h"].(float64); ok {
@@ -580,35 +615,40 @@ func SyncLogsDashboard(es *elasticsearch.Client) {
 		}
 	}
 
-	for serviceName, lensID := range activeLensIDs {
-		uniqueIndex := fmt.Sprintf("panel_%d", time.Now().UnixNano())
-		lensPayload := createLensPayload(serviceName)
-		newPanel := map[string]any{
-			"panelIndex": uniqueIndex,
-			"embeddableConfig": map[string]any{
-				"attributes":      lensPayload["attributes"],
-				"references":      lensPayload["references"],
-				"enhancements":    map[string]any{},
-				"hidePanelTitles": false,
-				"type":            "lens",
-			},
-			"gridData": map[string]any{"x": 0, "y": maxY, "w": 48, "h": 15, "i": uniqueIndex},
-			"version":  1,
-			"type":     "lens",
-			"id":       lensID,
+	// Add or update panels for active services
+	for _, serviceName := range services {
+		lensID, ok := activeLensIDs[serviceName]
+		if !ok || lensID == "" {
+			continue
 		}
-		keptPanels = append(keptPanels, newPanel)
-		changed = true
-		maxY += 15
-		logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, fmt.Sprintf("dashboard sync: added logs panel for service %s", serviceName)))
+
+		if existing, ok := activePanels[serviceName]; ok {
+			// Panel already exists; add it as-is
+			staticPanels = append(staticPanels, existing)
+		} else {
+			// Create new panel
+			uniqueIndex := fmt.Sprintf("panel_%d", time.Now().UnixNano())
+			newPanel := map[string]any{
+				"panelIndex": uniqueIndex,
+				"embeddableConfig": map[string]any{
+					"enhancements":    map[string]any{},
+					"hidePanelTitles": false,
+				},
+				"gridData": map[string]any{"x": 0, "y": maxY, "w": 48, "h": 15, "i": uniqueIndex},
+				"version":  1,
+				"type":     "lens",
+				"id":       lensID,
+			}
+			staticPanels = append(staticPanels, newPanel)
+			changed = true
+			maxY += 15
+			logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, fmt.Sprintf("dashboard sync: added logs panel for service %s", serviceName)))
+		}
 	}
 
-	if len(services) == 0 && len(panels) > len(keptPanels) {
-		logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, "dashboard sync: removed stale logs panels after today's service set became empty"))
-	}
-
+	// Persist changes if any
 	if changed {
-		updatedPanelsBytes, err := json.Marshal(keptPanels)
+		updatedPanelsBytes, err := json.Marshal(staticPanels)
 		if err != nil {
 			logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("dashboard sync: failed to marshal logs dashboard panels: %v", err)))
 			return
@@ -621,10 +661,9 @@ func SyncLogsDashboard(es *elasticsearch.Client) {
 		}
 
 		logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("dashboard sync: logs dashboard updated for %d active services", len(services))))
-		return
-	}
-
-	if len(services) > 0 {
-		logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, "dashboard sync: logs dashboard already up to date"))
+	} else {
+		if len(services) > 0 {
+			logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, "dashboard sync: logs dashboard already up to date"))
+		}
 	}
 }

@@ -8,11 +8,12 @@ import (
 	config "integration-project-ehb/controlroom/internal/cr_config"
 	"net/http"
 	"net/url"
+	"time"
 )
 
-// note(nasr): i don't know if this will work but kibana requires a http connection while it's behind https
-// at the moomenet. maybe we can use a self signed sertificate or something.
 // DashboardHttpClient returns an HTTP client configured to handle HTTPS with self-signed certificates.
+// NOTE(nasr): Kibana may be behind HTTPS reverse proxy while expecting HTTP internally.
+// This client skips certificate validation for development; consider using proper certs in production.
 func DashboardHttpClient() *http.Client {
 	return &http.Client{
 		Transport: &http.Transport{
@@ -20,6 +21,7 @@ func DashboardHttpClient() *http.Client {
 				InsecureSkipVerify: true,
 			},
 		},
+		Timeout: 30 * time.Second,
 	}
 }
 
@@ -29,7 +31,8 @@ func setDashboardBasicAuth(req *http.Request) {
 	}
 }
 
-// getAllPanelTitles returns the titles for Kibana lens and visualization saved objects.
+// getAllPanelTitles returns a map of Kibana lens and visualization saved object IDs to their titles.
+// This is used to resolve panel references without making individual API calls.
 func getAllPanelTitles() (map[string]string, error) {
 	reqURL := fmt.Sprintf("%s/api/saved_objects/_find?type=lens&type=visualization&per_page=1000", config.KibanaConfig.Url)
 	req, err := http.NewRequest("GET", reqURL, nil)
@@ -46,9 +49,13 @@ func getAllPanelTitles() (map[string]string, error) {
 	}
 	defer res.Body.Close()
 
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("kibana get all panel titles failed: %s", res.Status)
+	}
+
 	var found map[string]any
 	if err := json.NewDecoder(res.Body).Decode(&found); err != nil {
-		return nil, fmt.Errorf("decode all lenses response: %w", err)
+		return nil, fmt.Errorf("decode all panel titles response: %w", err)
 	}
 
 	titles := make(map[string]string)
@@ -57,7 +64,7 @@ func getAllPanelTitles() (map[string]string, error) {
 			item := obj.(map[string]any)
 			id, idOk := item["id"].(string)
 			if attrs, ok := item["attributes"].(map[string]any); ok && idOk {
-				if title, ok := attrs["title"].(string); ok {
+				if title, ok := attrs["title"].(string); ok && title != "" {
 					titles[id] = title
 				}
 			}
@@ -67,7 +74,13 @@ func getAllPanelTitles() (map[string]string, error) {
 }
 
 // findSavedObjectByTitle returns the Kibana saved object ID for an exact title match.
+// objectType should be "lens", "visualization", etc.
+// Returns empty string if not found (not an error).
 func findSavedObjectByTitle(title string, objectType string) (string, error) {
+	if title == "" {
+		return "", fmt.Errorf("title cannot be empty")
+	}
+
 	q := url.QueryEscape(fmt.Sprintf(`"%s"`, title))
 	reqURL := fmt.Sprintf("%s/api/saved_objects/_find?type=%s&search_fields=title&search=%s", config.KibanaConfig.Url, objectType, q)
 
@@ -85,17 +98,24 @@ func findSavedObjectByTitle(title string, objectType string) (string, error) {
 	}
 	defer res.Body.Close()
 
+	if res.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("kibana find saved object failed: %s", res.Status)
+	}
+
 	var found map[string]any
 	if err := json.NewDecoder(res.Body).Decode(&found); err != nil {
 		return "", fmt.Errorf("decode find response: %w", err)
 	}
 
+	// STRICT CHECK: Only accept exact title matches
 	if so, ok := found["saved_objects"].([]any); ok {
 		for _, obj := range so {
 			item := obj.(map[string]any)
 			if attrs, ok := item["attributes"].(map[string]any); ok {
-				if attrs["title"] == title {
-					return item["id"].(string), nil
+				if objTitle, ok := attrs["title"].(string); ok && objTitle == title {
+					if id, idOk := item["id"].(string); idOk {
+						return id, nil
+					}
 				}
 			}
 		}
@@ -104,7 +124,14 @@ func findSavedObjectByTitle(title string, objectType string) (string, error) {
 }
 
 // createOrUpdateSavedObject creates or updates a Kibana saved object and returns its ID.
+// If id is empty, a new object is created (POST).
+// If id is provided, the object is updated (PUT).
+// payload should contain "attributes" and "references" at minimum.
 func createOrUpdateSavedObject(objectType string, id string, payload map[string]any) (string, error) {
+	if objectType == "" {
+		return "", fmt.Errorf("objectType cannot be empty")
+	}
+
 	method := "POST"
 	reqURL := fmt.Sprintf("%s/api/saved_objects/%s", config.KibanaConfig.Url, objectType)
 
@@ -113,7 +140,11 @@ func createOrUpdateSavedObject(objectType string, id string, payload map[string]
 		reqURL = fmt.Sprintf("%s/%s", reqURL, id)
 	}
 
-	bodyBytes, _ := json.Marshal(payload)
+	bodyBytes, err := json.Marshal(payload)
+	if err != nil {
+		return "", fmt.Errorf("marshal payload: %w", err)
+	}
+
 	req, err := http.NewRequest(method, reqURL, bytes.NewReader(bodyBytes))
 	if err != nil {
 		return "", err
@@ -139,8 +170,8 @@ func createOrUpdateSavedObject(objectType string, id string, payload map[string]
 	}
 
 	newID, ok := response["id"].(string)
-	if !ok {
-		return "", fmt.Errorf("missing id in response")
+	if !ok || newID == "" {
+		return "", fmt.Errorf("missing or empty id in response")
 	}
 	return newID, nil
 }
