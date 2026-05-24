@@ -128,7 +128,8 @@ func RunWatchdog(es *elasticsearch.Client, ctx context.Context, ch *amqp.Channel
 								Key      string  `json:"key"`
 								DocCount float64 `json:"doc_count"`
 							} `json:"buckets"`
-						} `json:"services"`
+							// note(nasr): folowwing reccomended change from @larscowe
+						} `json:"per_services"`
 					} `json:"aggregations"`
 				}
 

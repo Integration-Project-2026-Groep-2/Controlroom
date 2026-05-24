@@ -288,27 +288,27 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 				}
 
 			}()
-
-			//- deprecated now
-			//- the content below is age restricted
-			//- only read this if the user is older then 65
-			//- because this code is handwritten :)
-			//- go watchdog.ProcessAlertQueue()
-
-			//-
-			go func() {
-				ticker := time.NewTicker(5 * time.Second)
-				defer ticker.Stop()
-				for {
-					select {
-					case <-ticker.C:
-						watchdog.RunWatchdog(client, ctx, wdch)
-					case <-ctx.Done():
-						return
-					}
-				}
-			}()
 		}
+
+		//- deprecated now
+		//- the content below is age restricted
+		//- only read this if the user is older then 65
+		//- because this code is handwritten :)
+		//- go watchdog.ProcessAlertQueue()
+
+		//-
+		go func() {
+			ticker := time.NewTicker(5 * time.Second)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ticker.C:
+					watchdog.RunWatchdog(client, ctx, wdch)
+				case <-ctx.Done():
+					return
+				}
+			}
+		}()
 	}
 
 	// - summary initialization
