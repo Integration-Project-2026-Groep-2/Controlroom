@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"integration-project-ehb/controlroom/internal/cr_github"
+	"integration-project-ehb/controlroom/internal/k8retriever"
 	"integration-project-ehb/controlroom/pkg/logger"
 
 	"github.com/elastic/go-elasticsearch/v9"
@@ -717,6 +718,42 @@ func buildServer(client *elasticsearch.Client) *server.MCPServer {
 		}
 
 		return mcp.NewToolResultText(fmt.Sprintf("Pull request created: #%v %v", result["number"], result["html_url"])), nil
+	})
+
+	k8sPodsTool := mcp.NewTool("k8s_pods_summary",
+		mcp.WithDescription("Trigger a fresh retrieval of Kubernetes pod statuses from the cluster into Elasticsearch, and return the latest indexed pod configurations and states."),
+		mcp.WithReadOnlyHintAnnotation(false),
+		mcp.WithString("namespace",
+			mcp.Description("Filter pods by a specific namespace value (optional, leave empty for all indexed namespaces)"),
+		),
+		mcp.WithNumber("limit",
+			mcp.Description("Max number of pod records to return (default 20)"),
+		),
+	)
+	s.AddTool(k8sPodsTool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := parseArguments(req)
+		limit := 20
+
+		namespace, _ := args["namespace"].(string)
+		if raw, ok := args["limit"].(float64); ok && raw > 0 {
+			limit = int(raw)
+		}
+
+		if err := k8retriever.ProcessK8sData(client); err != nil {
+			logger.Log(logger.NewMessage(logger.ERROR, logger.MCP, fmt.Sprintf("k8s sync failed during tool execution: %v", err)))
+		}
+
+		query := "*"
+		if strings.TrimSpace(namespace) != "" {
+			query = fmt.Sprintf("namespace:%s", strings.TrimSpace(namespace))
+		}
+
+		docs, err := elasticQuery("kubernetes-pods", luceneQuery(query), limit, client)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Elasticsearch retrieval error: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(formatDocs(docs)), nil
 	})
 
 	return s
