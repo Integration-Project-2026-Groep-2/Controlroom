@@ -108,7 +108,7 @@ func SendToDLQ(dlqCh *amqp.Channel, dlqName string, body []byte, reason string, 
 // On success, acks the message. On error, sends to DLQ and nacks.
 // Blocks until ctx is cancelled.
 func Consume(cfg *ConsumerConfig, msgs <-chan amqp.Delivery, ctx context.Context, handler func(*elasticsearch.Client, []byte) error) {
-	maxWorkers := 18
+	maxWorkers := 32
 	sem := make(chan struct{}, maxWorkers)
 
 	for {

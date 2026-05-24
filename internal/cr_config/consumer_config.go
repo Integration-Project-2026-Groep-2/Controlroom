@@ -34,7 +34,7 @@ var ConsumerDefinitions = []ConsumerDef{
 		Queue:    cr_rabbitmq.QueueInfo{Name: "controlroom.heartbeat.queue", Durable: true},
 		Binding:  cr_rabbitmq.BindingInfo{Key: "routing.heartbeat"},
 		DLQName:  "controlroom.heartbeat.queue.dlq",
-		Qos:      18,
+		Qos:      50,
 		Passive:  false,
 	},
 	{

@@ -203,16 +203,7 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 
 		switch def.Type {
 		case config.HEARTBEAT:
-
 			go cr_rabbitmq.Consume(cfg, msgs, ctx, heartbeat.ProcessHeartbeat)
-			//			go cr_rabbitmq.Consume(cfg, msgs, ctx, heartbeat.ProcessHeartbeat)
-			//
-			//			go cr_rabbitmq.Consume(cfg, msgs, ctx, heartbeat.ProcessHeartbeat)
-			//			go cr_rabbitmq.Consume(cfg, msgs, ctx, heartbeat.ProcessHeartbeat)
-			//
-			//			go cr_rabbitmq.Consume(cfg, msgs, ctx, heartbeat.ProcessHeartbeat)
-			//			go cr_rabbitmq.Consume(cfg, msgs, ctx, heartbeat.ProcessHeartbeat)
-			//
 		case config.LOGGER:
 			go cr_rabbitmq.Consume(cfg, msgs, ctx, cr_logger.ProcessLog)
 		case config.STATUSCHECK:
