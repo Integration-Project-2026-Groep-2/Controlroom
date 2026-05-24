@@ -8,7 +8,6 @@ import (
 	"integration-project-ehb/controlroom/pkg/logger"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
 
 	"github.com/elastic/go-elasticsearch/v9"
@@ -411,38 +410,16 @@ func SyncLogsDashboard(es *elasticsearch.Client) {
 		activeServiceSet[s] = true
 	}
 
-	for _, p := range panels {
-		pType, _ := p["type"].(string)
-
-		// Only process lens panels; pass through other types
-		if pType != "lens" {
-			staticPanels = append(staticPanels, p)
-			continue
-		}
-
-		// Extract panel title
-		panelTitle := getPanelTitle(p, refs, lensTitles)
-		if panelTitle == "" {
-			// Can't resolve title; treat as static
-			staticPanels = append(staticPanels, p)
-			continue
-		}
-
-		// Check if this is a logs panel
-		if after, ok := strings.CutPrefix(panelTitle, "Logs - "); ok {
-			serviceName := after
-			if activeServiceSet[serviceName] {
-				// Keep this panel
-				activePanels[serviceName] = p
-			} else {
-				// Drop stale logs panel
-				logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, fmt.Sprintf("dashboard sync: dropping stale logs panel for service %s", serviceName)))
-				changed = true
-			}
-		} else {
-			// Not a logs panel; treat as static
-			staticPanels = append(staticPanels, p)
-		}
+	// Classify and apply prune policy using shared core
+	prefixKinds := map[string]string{"Logs - ": "logs"}
+	staticPanels, dynMap, pruneChanged := ClassifyAndPrunePanels(config.LogsDashboardId, panels, refs, lensTitles, prefixKinds, activeServiceSet)
+	if pruneChanged {
+		changed = true
+	}
+	if dyn, ok := dynMap["logs"]; ok {
+		activePanels = dyn
+	} else {
+		activePanels = make(map[string]map[string]any)
 	}
 
 	// Calculate grid positioning

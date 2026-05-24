@@ -6,7 +6,6 @@ import (
 	"fmt"
 	config "integration-project-ehb/controlroom/internal/cr_config"
 	"integration-project-ehb/controlroom/pkg/logger"
-	"strings"
 
 	"github.com/elastic/go-elasticsearch/v9"
 )
@@ -127,41 +126,21 @@ func SyncHeartbeatDashboard(es *elasticsearch.Client) {
 		activeServiceNames[s] = true
 	}
 
-	for _, p := range panels {
-		pType, _ := p["type"].(string)
-		if pType != "lens" && pType != "visualization" {
-			staticPanels = append(staticPanels, p)
-			continue
-		}
-
-		title := getPanelTitle(p, refs, panelTitles)
-		if title == "" {
-			// Unresolvable title; treat as static
-			staticPanels = append(staticPanels, p)
-			continue
-		}
-
-		// Try to extract service name from title prefix
-		if after, ok := strings.CutPrefix(title, "Status - "); ok {
-			svc := after
-			if activeServiceNames[svc] {
-				dynamicTSVBPanels[svc] = p
-			} else {
-				logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, fmt.Sprintf("dashboard sync: dropping stale heartbeat TSVB panel for service %s", svc)))
-				changed = true
-			}
-		} else if after, ok := strings.CutPrefix(title, "Last Received - "); ok {
-			svc := after
-			if activeServiceNames[svc] {
-				dynamicLensPanels[svc] = p
-			} else {
-				logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, fmt.Sprintf("dashboard sync: dropping stale heartbeat lens panel for service %s", svc)))
-				changed = true
-			}
-		} else {
-			// Doesn't match heartbeat pattern; treat as static
-			staticPanels = append(staticPanels, p)
-		}
+	// Use shared core to classify and apply prune policy for both TSVB and Lens panels
+	prefixKinds := map[string]string{"Status - ": "tsvb", "Last Received - ": "lens"}
+	staticPanels, dynMap, pruneChanged := ClassifyAndPrunePanels(config.HeartbeatDashboardId, panels, refs, panelTitles, prefixKinds, activeServiceNames)
+	if pruneChanged {
+		changed = true
+	}
+	if m, ok := dynMap["tsvb"]; ok {
+		dynamicTSVBPanels = m
+	} else {
+		dynamicTSVBPanels = map[string]map[string]any{}
+	}
+	if m, ok := dynMap["lens"]; ok {
+		dynamicLensPanels = m
+	} else {
+		dynamicLensPanels = map[string]map[string]any{}
 	}
 
 	// Build final panels with proper grid layout
