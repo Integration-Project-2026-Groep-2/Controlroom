@@ -108,6 +108,9 @@ func SendToDLQ(dlqCh *amqp.Channel, dlqName string, body []byte, reason string, 
 // On success, acks the message. On error, sends to DLQ and nacks.
 // Blocks until ctx is cancelled.
 func Consume(cfg *ConsumerConfig, msgs <-chan amqp.Delivery, ctx context.Context, handler func(*elasticsearch.Client, []byte) error) {
+	maxWorkers := 18
+	sem := make(chan struct{}, maxWorkers)
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -119,25 +122,29 @@ func Consume(cfg *ConsumerConfig, msgs <-chan amqp.Delivery, ctx context.Context
 				return
 			}
 
-			if err := handler(cfg.Client, msg.Body); err != nil {
-				logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("cr_rabbitmq: [%s] handler failed (tag=%d): %v", cfg.DLQName, msg.DeliveryTag, err)))
+			sem <- struct{}{}
 
-				if err := SendToDLQ(cfg.DLQCh, cfg.DLQName, msg.Body, err.Error(), ""); err != nil {
-					logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("cr_rabbitmq: [%s] failed to send to DLQ (tag=%d): %v", cfg.DLQName, msg.DeliveryTag, err)))
-					return
-				}
-				logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("cr_rabbitmq: [%s] message sent to DLQ (tag=%d)", cfg.DLQName, msg.DeliveryTag)))
+			go func(d amqp.Delivery) {
+				defer func() { <-sem }()
 
-				if err := msg.Nack(false, false); err != nil {
-					logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("cr_rabbitmq: [%s] NACK failed (tag=%d): %v", cfg.DLQName, msg.DeliveryTag, err)))
-					return
+				if err := handler(cfg.Client, d.Body); err != nil {
+					logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("cr_rabbitmq: [%s] handler failed (tag=%d): %v", cfg.DLQName, d.DeliveryTag, err)))
+
+					if err := SendToDLQ(cfg.DLQCh, cfg.DLQName, d.Body, err.Error(), ""); err != nil {
+						logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("cr_rabbitmq: [%s] failed to send to DLQ (tag=%d): %v", cfg.DLQName, d.DeliveryTag, err)))
+					} else {
+						logger.Log(logger.NewMessage(logger.INFO, logger.CONTROLROOM, fmt.Sprintf("cr_rabbitmq: [%s] message sent to DLQ (tag=%d)", cfg.DLQName, d.DeliveryTag)))
+					}
+
+					if err := d.Nack(false, false); err != nil {
+						logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("cr_rabbitmq: [%s] NACK failed (tag=%d): %v", cfg.DLQName, d.DeliveryTag, err)))
+					}
+				} else {
+					if err := d.Ack(false); err != nil {
+						logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("cr_rabbitmq: [%s] ACK failed (tag=%d): %v", cfg.DLQName, d.DeliveryTag, err)))
+					}
 				}
-			} else {
-				if err := msg.Ack(false); err != nil {
-					logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("cr_rabbitmq: [%s] ACK failed (tag=%d): %v", cfg.DLQName, msg.DeliveryTag, err)))
-					return
-				}
-			}
+			}(msg)
 		}
 	}
 }
