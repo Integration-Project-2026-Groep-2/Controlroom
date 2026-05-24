@@ -41,7 +41,7 @@ func indexHeartbeat(es *elasticsearch.Client, ctx context.Context, hb *gen.Heart
 		Index:      "heartbeats",
 		DocumentID: fmt.Sprintf("%s-%d", sId, hb.Timestamp.Unix()),
 		Body:       bytes.NewReader(jsonData),
-		Refresh:    "true",
+		Refresh:    "false",
 	}
 
 	res, err := req.Do(ctx, es)
