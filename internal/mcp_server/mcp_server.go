@@ -92,6 +92,48 @@ func parseFileChanges(raw any) ([]cr_github.FileChange, error) {
 	return files, nil
 }
 
+// a duplicate function but pffff we messed up in the beginning with our little understanding of elastic and kibana and the @timestamp importance
+func elasticQueryTimestamped(index string, query any, size int, client *elasticsearch.Client) ([]map[string]any, error) {
+	body := SearchRequest{
+		Size: size,
+		Sort: []map[string]map[string]string{
+			{"@timestamp": {"order": "desc"}},
+		},
+		Query: query,
+	}
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(body); err != nil {
+		return nil, fmt.Errorf("encode request: %w", err)
+	}
+
+	res, err := client.Search(
+		client.Search.WithContext(context.Background()),
+		client.Search.WithIndex(index),
+		client.Search.WithBody(&buf),
+		client.Search.WithTrackTotalHits(true),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("search request: %w", err)
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		return nil, fmt.Errorf("elasticsearch error: %s", res.String())
+	}
+
+	var result ResultResponse
+	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+
+	docs := make([]map[string]any, 0, len(result.Hits.Hits))
+	for _, h := range result.Hits.Hits {
+		docs = append(docs, h.Source)
+	}
+	return docs, nil
+}
+
 func elasticQuery(index string, query any, size int, client *elasticsearch.Client) ([]map[string]any, error) {
 	body := SearchRequest{
 		Size: size,
@@ -749,7 +791,7 @@ func buildServer(client *elasticsearch.Client) *server.MCPServer {
 			query = fmt.Sprintf("namespace:%s", strings.TrimSpace(namespace))
 		}
 
-		docs, err := elasticQuery("kubernetes-pods", luceneQuery(query), limit, client)
+		docs, err := elasticQueryTimestamped("kubernetes-pods", luceneQuery(query), limit, client)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Elasticsearch retrieval error: %v", err)), nil
 		}
