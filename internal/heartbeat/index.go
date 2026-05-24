@@ -44,26 +44,21 @@ func indexHeartbeat(es *elasticsearch.Client, ctx context.Context, hb *gen.Heart
 		Refresh:    "false",
 	}
 
-	go func() {
-		res, err := req.Do(ctx, es)
-
-		if err != nil {
-			logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("heartbeat: failed to index heartbeat for %s: %v", sId, err)))
-			// return err
+	res, err := req.Do(ctx, es)
+	if err != nil {
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("heartbeat: failed to index heartbeat for %s: %v", sId, err)))
+		return err
+	}
+	defer func(Body io.ReadCloser) {
+		if err := Body.Close(); err != nil {
+			logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, fmt.Sprintf("heartbeat: failed to close response body after indexing %s: %v", sId, err)))
 		}
+	}(res.Body)
 
-		defer func(Body io.ReadCloser) {
-			if err := Body.Close(); err != nil {
-				logger.Log(logger.NewMessage(logger.WARN, logger.CONTROLROOM, fmt.Sprintf("heartbeat: failed to close response body after indexing %s: %v", sId, err)))
-			}
-		}(res.Body)
-
-		if res.IsError() {
-			logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("heartbeat: Elasticsearch error indexing heartbeat for %s: %s", sId, res.String())))
-			// return fmt.Errorf("elasticsearch error: %s", res.String())
-		}
-
-	}()
+	if res.IsError() {
+		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("heartbeat: Elasticsearch error indexing heartbeat for %s: %s", sId, res.String())))
+		return fmt.Errorf("elasticsearch error: %s", res.String())
+	}
 
 	return nil
 }
