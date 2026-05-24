@@ -44,7 +44,7 @@ func indexHeartbeat(es *elasticsearch.Client, ctx context.Context, hb *gen.Heart
 		Refresh:    "false",
 	}
 
-	res, err := req.Do(ctx, es)
+	go res, err := req.Do(ctx, es)
 	if err != nil {
 		logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("heartbeat: failed to index heartbeat for %s: %v", sId, err)))
 		return err

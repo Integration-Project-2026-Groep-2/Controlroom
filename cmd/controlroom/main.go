@@ -19,11 +19,11 @@ import (
 	config "integration-project-ehb/controlroom/internal/cr_config"
 	"integration-project-ehb/controlroom/internal/cr_logger"
 	"integration-project-ehb/controlroom/internal/cr_rabbitmq"
-	"integration-project-ehb/controlroom/internal/dashboard_sync"
+	sync "integration-project-ehb/controlroom/internal/dashboard_sync"
 	"integration-project-ehb/controlroom/internal/heartbeat"
 	"integration-project-ehb/controlroom/internal/jarvis_metrics"
 	"integration-project-ehb/controlroom/internal/k8retriever"
-	"integration-project-ehb/controlroom/internal/mcp_server"
+	mcp "integration-project-ehb/controlroom/internal/mcp_server"
 	"integration-project-ehb/controlroom/internal/rmq_heartbeat_publisher"
 	"integration-project-ehb/controlroom/internal/statuscheck"
 	"integration-project-ehb/controlroom/internal/summary"
@@ -184,16 +184,16 @@ func startSession(ctx context.Context, client *elasticsearch.Client) error {
 		}
 		// defer ch.Close()
 
+		if err := ch.Qos(def.Qos, 0, false); err != nil {
+			logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("failed to set QoS for %s: %v", def.Queue.Name, err)))
+			return fmt.Errorf("qos %s: %w", def.Queue.Name, err)
+		}
+
 		msgs, err := ch.Consume(def.Queue.Name, fmt.Sprintf("controlroom-%d", os.Getpid()), false, false, false, true, nil)
 		if err != nil {
 			logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("controlroom: failed to start consumer for %s: %v", def.Queue.Name, err)))
 			return fmt.Errorf("setup %s: %w", def.Queue.Name, err)
 		}
-
-		//		if err := ch.Qos(def.Qos, 0, false); err != nil {
-		//			logger.Log(logger.NewMessage(logger.ERROR, logger.CONTROLROOM, fmt.Sprintf("failed to set QoS for %s: %v", def.Queue.Name, err)))
-		//			return fmt.Errorf("qos %s: %w", def.Queue.Name, err)
-		//		}
 
 		cfg := &cr_rabbitmq.ConsumerConfig{
 			Client:  client,
