@@ -86,7 +86,7 @@ var ConsumerDefinitions = []ConsumerDef{
 		Type:     CHECK_IN,
 		Exchange: cr_rabbitmq.ExchangeInfo{Name: "user.checkin.topic", Kind: "topic", Durable: true},
 		Queue:    cr_rabbitmq.QueueInfo{Name: "controlroom.user.checkin", Durable: true},
-		Binding:  cr_rabbitmq.BindingInfo{Key: "routing.user.checkin"},
+		Binding:  cr_rabbitmq.BindingInfo{Key: "routing.controlroom.user.checkin"},
 		DLQName:  "controlroom.user.checkin.dlq",
 		Qos:      1,
 		Passive:  false,
