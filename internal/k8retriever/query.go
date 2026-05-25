@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"integration-project-ehb/controlroom/pkg/logger"
 	"github.com/elastic/go-elasticsearch/v9"
 	"github.com/elastic/go-elasticsearch/v9/esapi"
+	"integration-project-ehb/controlroom/pkg/logger"
 )
 
 func QuerySummaryKubernetes(ctx context.Context, es *elasticsearch.Client, buf *bytes.Buffer) (*esapi.Response, error) {
