@@ -7,7 +7,7 @@ var pruneCandidates = map[string]map[string]int{} // dashboardID -> serviceName 
 
 // PruneThreshold is the number of consecutive sync cycles a service must be missing
 // before its panel is actually pruned. Default is conservative (3 cycles).
-var PruneThreshold = 3
+var PruneThreshold = 7
 
 // incrPruneCandidate increments the miss counter for a dashboard/service and
 // returns the new count.
