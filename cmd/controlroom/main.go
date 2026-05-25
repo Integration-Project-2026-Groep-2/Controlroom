@@ -448,7 +448,19 @@ func main() {
 	// TODO(nasr & lars): should this communication happen over rabbitmq?
 	// jarvis metrics
 	{
-		go jarvis_metrics.ProcessJarvisMetrics(ctx, esClient, GlobalHttpClient)
+		go func() {
+
+			ticker := time.NewTicker(5 * time.Second)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ticker.C:
+					jarvis_metrics.ProcessJarvisMetrics(ctx, esClient, GlobalHttpClient)
+				case <-ctx.Done():
+					return
+				}
+			}
+		}()
 	}
 
 	backoff := initialBackoff
