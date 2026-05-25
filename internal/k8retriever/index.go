@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"integration-project-ehb/controlroom/pkg/logger"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/elastic/go-elasticsearch/v9"
@@ -18,38 +19,65 @@ const (
 	timeout      = 5 * time.Second
 )
 
+type indexedK8Doc struct {
+	Namespace             string                `json:"namespace"`
+	Name                  string                `json:"name"`
+	UID                   string                `json:"uid"`
+	Labels                map[string]string     `json:"labels"`
+	Annotations           map[string]string     `json:"annotations"`
+	Phase                 string                `json:"phase"`
+	Node                  string                `json:"node"`
+	IP                    string                `json:"ip"`
+	HostIP                string                `json:"host_ip"`
+	ServiceAccount        string                `json:"service_account"`
+	StartTime             string                `json:"start_time"`
+	QOSClass              string                `json:"qos_class"`
+	PodIPs                []string              `json:"pod_ips"`
+	NodeSelector          map[string]string     `json:"node_selector"`
+	Tolerations           []string              `json:"tolerations"`
+	Containers            []ContainerInfo       `json:"containers"`
+	InitContainers        []ContainerInfo       `json:"init_containers"`
+	Conditions            []PodConditionInfo    `json:"conditions"`
+	ContainerStatuses     []ContainerStatusInfo `json:"container_statuses"`
+	InitContainerStatuses []ContainerStatusInfo `json:"init_container_statuses"`
+	CPURequest            string                `json:"cpu_request"`
+	CPULimit              string                `json:"cpu_limit"`
+	MemRequest            string                `json:"mem_request"`
+	MemLimit              string                `json:"mem_limit"`
+	ContainerCount        int                   `json:"container_count"`
+	Timestamp             string                `json:"@timestamp"`
+}
+
 func indexK8Pod(ctx context.Context, es *elasticsearch.Client, pod PodInfo) error {
 	logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, fmt.Sprintf("k8retriever: indexing pod %s/%s", pod.Namespace, pod.Name)))
 
-	doc := map[string]any{
-		"namespace":               pod.Namespace,
-		"name":                    pod.Name,
-		"uid":                     pod.UID,
-		"labels":                  Sanitize(pod.Labels),
-		"annotations":             Sanitize(pod.Annotations),
-		"phase":                   pod.Phase,
-		"node":                    pod.Node,
-		"ip":                      pod.IP,
-		"host_ip":                 pod.HostIP,
-		"service_account":         pod.ServiceAccount,
-		"start_time":              pod.StartTime,
-		"qos_class":               pod.QOSClass,
-		"pod_ips":                 pod.PodIPs,
-		"node_selector":           Sanitize(pod.NodeSelector),
-		"tolerations":             pod.Tolerations,
-		"containers":              pod.Containers,
-		"init_containers":         pod.InitContainers,
-		"conditions":              pod.Conditions,
-		"container_statuses":      pod.ContainerStatuses,
-		"init_container_statuses": pod.InitContainerStatuses,
-		"cpu_request":             pod.CPURequest,
-		"cpu_limit":               pod.CPULimit,
-		"mem_request":             pod.MemRequest,
-		"mem_limit":               pod.MemLimit,
-		"container_count":         pod.ContainerCount,
-		// note(nsar): causing name errors
-		// "pod":                     pod.Pod,
-		"@timestamp": time.Now().UTC().Format(time.RFC3339Nano),
+	doc := indexedK8Doc{
+		Namespace:             pod.Namespace,
+		Name:                  pod.Name,
+		UID:                   pod.UID,
+		Labels:                Sanitize(pod.Labels),
+		Annotations:           filterAnnotations(Sanitize(pod.Annotations)),
+		Phase:                 pod.Phase,
+		Node:                  pod.Node,
+		IP:                    pod.IP,
+		HostIP:                pod.HostIP,
+		ServiceAccount:        pod.ServiceAccount,
+		StartTime:             pod.StartTime,
+		QOSClass:              pod.QOSClass,
+		PodIPs:                pod.PodIPs,
+		NodeSelector:          Sanitize(pod.NodeSelector),
+		Tolerations:           pod.Tolerations,
+		Containers:            pod.Containers,
+		InitContainers:        pod.InitContainers,
+		Conditions:            pod.Conditions,
+		ContainerStatuses:     pod.ContainerStatuses,
+		InitContainerStatuses: pod.InitContainerStatuses,
+		CPURequest:            pod.CPURequest,
+		CPULimit:              pod.CPULimit,
+		MemRequest:            pod.MemRequest,
+		MemLimit:              pod.MemLimit,
+		ContainerCount:        pod.ContainerCount,
+		Timestamp:             time.Now().UTC().Format(time.RFC3339Nano),
 	}
 
 	data, err := json.Marshal(doc)
@@ -98,4 +126,33 @@ func indexK8Pod(ctx context.Context, es *elasticsearch.Client, pod PodInfo) erro
 	logger.Log(logger.NewMessage(logger.DEBUG, logger.CONTROLROOM, fmt.Sprintf("k8retriever: successfully indexed pod %s/%s", pod.Namespace, pod.Name)))
 
 	return nil
+}
+
+// filterAnnotations removes known noisy annotation keys and truncates
+// excessively long annotation values to avoid indexing huge payloads
+// (e.g. kubectl.kubernetes.io/last-applied-configuration).
+func filterAnnotations(annotations map[string]string) map[string]string {
+	if len(annotations) == 0 {
+		return nil
+	}
+
+	out := make(map[string]string, len(annotations))
+	for k, v := range annotations {
+		lk := strings.ToLower(k)
+		if strings.Contains(lk, "last-applied") || strings.Contains(lk, "kubectl.kubernetes.io/last-applied-configuration") {
+			// skip huge last-applied manifests
+			continue
+		}
+		// truncate very long values
+		if len(v) > 2048 {
+			out[k] = v[:2048] + "...(truncated)"
+		} else {
+			out[k] = v
+		}
+	}
+
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }

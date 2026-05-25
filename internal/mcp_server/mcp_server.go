@@ -58,6 +58,7 @@ func formatDocs(docs []map[string]any) string {
 		raw, _ := json.MarshalIndent(doc, "  ", "  ")
 		fmt.Fprintf(&sb, "[%d]\n  %s\n\n", i+1, string(raw))
 	}
+
 	return sb.String()
 }
 
@@ -286,7 +287,7 @@ func buildServer(client *elasticsearch.Client) *server.MCPServer {
 		mcp.WithDescription("Summarise recent statuscheck events indexed from the RabbitMQ statuscheck consumer."),
 		mcp.WithReadOnlyHintAnnotation(true),
 		mcp.WithString("status",
-			mcp.Description("Filter by status value, e.g. 'ok', 'degraded', 'down' (optional)"),
+			mcp.Description("Filter by status value (optional, leave empty for all indexed statuses)"),
 		),
 		mcp.WithNumber("limit",
 			mcp.Description("Max number of results to return (default 15)"),
@@ -775,7 +776,7 @@ func buildServer(client *elasticsearch.Client) *server.MCPServer {
 	)
 	s.AddTool(k8sPodsTool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		args := parseArguments(req)
-		limit := 20
+		limit := 1
 
 		namespace, _ := args["namespace"].(string)
 		if raw, ok := args["limit"].(float64); ok && raw > 0 {
@@ -795,8 +796,12 @@ func buildServer(client *elasticsearch.Client) *server.MCPServer {
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Elasticsearch retrieval error: %v", err)), nil
 		}
+		payload, err := json.Marshal(docs)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to encode k8 docs: %v", err)), nil
+		}
 
-		return mcp.NewToolResultText(formatDocs(docs)), nil
+		return mcp.NewToolResultText(string(payload)), nil
 	})
 
 	attendanceTool := mcp.NewTool("checkin_attendance_summary",
