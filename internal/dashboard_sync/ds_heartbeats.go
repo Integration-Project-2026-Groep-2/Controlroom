@@ -159,7 +159,7 @@ func SyncHeartbeatDashboard(es *elasticsearch.Client) {
 
 		// Add or update TSVB panel
 		if tsvbID != "" {
-			tsvbPanel := buildHeartbeatPanel(serviceName, tsvbID, "visualization", "Status - "+serviceName, baseX, tsvbY, 8, 8, dynamicTSVBPanels)
+			tsvbPanel := buildHeartbeatPanel(serviceName, tsvbID, "vis", "Status - "+serviceName, baseX, tsvbY, 8, 8, dynamicTSVBPanels)
 			if tsvbPanel != nil {
 				finalPanels = append(finalPanels, tsvbPanel)
 				if _, existed := dynamicTSVBPanels[serviceName]; !existed {
@@ -171,7 +171,7 @@ func SyncHeartbeatDashboard(es *elasticsearch.Client) {
 
 		// Add or update Lens panel
 		if lensID != "" {
-			lensPanel := buildHeartbeatPanel(serviceName, lensID, "lens", "Last Received - "+serviceName, baseX, lensY, 8, 4, dynamicLensPanels)
+			lensPanel := buildHeartbeatPanel(serviceName, lensID, "vis", "Last Received - "+serviceName, baseX, lensY, 8, 4, dynamicLensPanels)
 			if lensPanel != nil {
 				finalPanels = append(finalPanels, lensPanel)
 				if _, existed := dynamicLensPanels[serviceName]; !existed {
